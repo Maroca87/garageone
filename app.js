@@ -154,7 +154,7 @@ function checkAuth() {
   currentUser = loadUser();
   if (isAuthenticated) {
     if (authScreen) authScreen.style.display = 'none';
-    if (appShell) appShell.style.display = 'block';
+    if (appShell) appShell.style.display = 'flex';
     renderApp();
   } else {
     if (authScreen) authScreen.style.display = 'flex';
@@ -299,23 +299,29 @@ function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (e) {
-    console.warn('Storage quota limit reached, performing silent data optimization...', e);
+    console.warn('Storage quota limit reached, performing data optimization...', e);
     try {
       const cleanData = JSON.parse(JSON.stringify(appState));
       if (cleanData.vehicles) {
         cleanData.vehicles.forEach(v => {
-          if (v.photo && v.photo.length > 150000) v.photo = '';
+          if (v.photo && v.photo.length > 100000) v.photo = '';
         });
       }
       if (cleanData.services) {
         cleanData.services.forEach(s => {
-          if (s.receipt && s.receipt.length > 150000) s.receipt = '';
+          if (s.receipt && s.receipt.length > 100000) s.receipt = '';
+        });
+      }
+      if (cleanData.documents) {
+        cleanData.documents.forEach(d => {
+          if (d.file && d.file.length > 100000) d.file = '';
         });
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
       appState = cleanData;
     } catch (err) {
       console.error('Critical quota error:', err);
+      alert('⚠️ Memoria local llena. Por favor borra datos innecesarios (fotos, documentos) para liberar espacio.');
     }
   }
 }
@@ -1076,14 +1082,17 @@ function renderGuantera() {
     let cHtml = '';
     (appState.emergencyContacts || []).forEach(c => {
       cHtml += `
-        <div class="settings-row" style="padding:6px 0;">
-          <div>
-            <strong style="color:#ffffff;">${escapeHtml(c.name)}</strong>
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-color);">
+          <div style="flex:1; min-width:0;">
+            <strong style="color:#ffffff; display:block;">${escapeHtml(c.name)}</strong>
             <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(c.category || 'Contacto')}</div>
           </div>
-          <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:#30d158; border-color:rgba(48,209,88,0.3);">
+          <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:#30d158; border-color:rgba(48,209,88,0.3); white-space:nowrap;">
             📞 ${escapeHtml(c.phone)}
           </a>
+          <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContact('${c.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar contacto">
+            ${SVG_ICONS.trash}
+          </button>
         </div>
       `;
     });
@@ -1155,6 +1164,13 @@ function saveEmergencyContact(e) {
     renderGuantera();
   }
   closeModal('modalContact');
+}
+
+function deleteEmergencyContact(id) {
+  if (!confirm('¿Eliminar este contacto?')) return;
+  appState.emergencyContacts = appState.emergencyContacts.filter(c => c.id !== id);
+  saveState();
+  renderGuantera();
 }
 
 function renderReports() {
