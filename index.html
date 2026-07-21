@@ -88,11 +88,11 @@
               link.href = fullBleedDataUrl;
             });
 
-            // Also update the auth header logo image if present
+            // Homologate in-app logos with the PWA full-bleed app icon
             const authLogo = document.querySelector('.auth-symbol img');
-            if (authLogo) {
-              authLogo.src = fullBleedDataUrl;
-            }
+            if (authLogo) authLogo.src = fullBleedDataUrl;
+            const headerLogo = document.querySelector('.header-logo-img');
+            if (headerLogo) headerLogo.src = fullBleedDataUrl;
           });
         } catch (err) {
           console.warn('User car icon processor:', err);

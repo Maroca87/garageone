@@ -36,27 +36,40 @@
 }
 
 html, body {
-  overflow-x: hidden !important;
   width: 100%;
-  position: relative;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   touch-action: manipulation;
-  font-family: var(--font-family);
+  overscroll-behavior: none;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  font-family: var(--font-family);
   font-size: 1rem;
-  padding-top: calc(10px + env(safe-area-inset-top, 20px));
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 20px) + 24px);
+  margin: 0;
+  padding: 0;
   -webkit-font-smoothing: antialiased;
 }
 
 /* Auth Screen */
 .auth-screen {
-  min-height: 100vh;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  z-index: 500;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 20px;
   background: radial-gradient(circle at top, #181824 0%, #09090b 100%);
+  overflow-y: auto;
 }
 
 .auth-card {
@@ -75,22 +88,19 @@ html, body {
   width: 72px;
   height: 72px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #0f62fe 0%, #052370 100%) !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 14px;
   overflow: hidden;
-  padding: 12px;
   box-shadow: 0 8px 24px rgba(15, 98, 254, 0.4);
 }
 
 .auth-symbol img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  background: transparent !important;
-  filter: invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  object-fit: cover;
+  border-radius: 20px;
 }
 
 .error-text {
@@ -99,13 +109,20 @@ html, body {
   margin-top: 6px;
 }
 
-/* Fluid App Body Container */
+/* Scrollable Main App Body Container (Frame Locked) */
 .app-body {
+  position: absolute;
+  top: calc(56px + env(safe-area-inset-top, 0px));
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   width: 100%;
   max-width: 520px;
-  margin: 0 auto;
-  padding: 0 16px;
+  padding: 12px 16px 28px 16px;
+  overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .tab-content {
@@ -435,23 +452,23 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
 .btn-group { display: flex; gap: 10px; margin-top: 10px; }
 
-/* Top App Header Bar */
+/* Top App Header Bar (Fixed & Locked) */
 .app-top-header {
-  position: sticky;
+  position: fixed;
   top: 0;
-  left: 0;
-  right: 0;
-  z-index: 90;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px 16px;
+  height: calc(56px + env(safe-area-inset-top, 0px));
   background: rgba(9, 9, 11, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
   max-width: 520px;
-  margin: 0 auto 12px auto;
   width: 100%;
 }
 
@@ -498,21 +515,12 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
   cursor: pointer;
 }
 
-.header-brand-center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
 .header-logo-img {
   width: 28px;
   height: 28px;
-  border-radius: 9px;
-  object-fit: contain;
-  background: linear-gradient(135deg, #0f62fe 0%, #052370 100%) !important;
-  padding: 4px;
-  filter: invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+  border-radius: 8px;
+  object-fit: cover;
+  filter: none !important;
 }
 
 .header-brand-title {

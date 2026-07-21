@@ -264,10 +264,60 @@ function resetAllSwipeItems() {
   });
 }
 
+function compressImageFile(file, maxDim, quality, callback) {
+  if (!file) return callback('');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => callback('');
+    img.src = e.target.result;
+  };
+  reader.onerror = () => callback('');
+  reader.readAsDataURL(file);
+}
+
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  } catch (e) { alert('Aviso: Memoria local llena.'); }
+  } catch (e) {
+    console.warn('Storage quota limit reached, performing silent data optimization...', e);
+    try {
+      const cleanData = JSON.parse(JSON.stringify(appState));
+      if (cleanData.vehicles) {
+        cleanData.vehicles.forEach(v => {
+          if (v.photo && v.photo.length > 150000) v.photo = '';
+        });
+      }
+      if (cleanData.services) {
+        cleanData.services.forEach(s => {
+          if (s.receipt && s.receipt.length > 150000) s.receipt = '';
+        });
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
+      appState = cleanData;
+    } catch (err) {
+      console.error('Critical quota error:', err);
+    }
+  }
 }
 
 function setTodayDates() {
@@ -544,9 +594,7 @@ function saveVehicle(e) {
   };
 
   if (photoInput && photoInput.files && photoInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (evt) => processSave(evt.target.result);
-    reader.readAsDataURL(photoInput.files[0]);
+    compressImageFile(photoInput.files[0], 600, 0.7, (compressed) => processSave(compressed));
   } else {
     const existingVeh = appState.vehicles.find(v => v.id === id);
     processSave(existingVeh ? existingVeh.photo : '');
@@ -704,9 +752,7 @@ function saveService(e) {
   };
 
   if (receiptInput && receiptInput.files && receiptInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (evt) => processSave(evt.target.result);
-    reader.readAsDataURL(receiptInput.files[0]);
+    compressImageFile(receiptInput.files[0], 800, 0.7, (compressed) => processSave(compressed));
   } else {
     const existing = appState.services.find(s => s.id === id);
     processSave(existing ? existing.receipt : '');
