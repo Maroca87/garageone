@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>GarageOne - Generador de Íconos para iOS y Android</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0b1329;
+      color: #f8fafc;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { color: #38bdf8; margin-bottom: 0.5rem; text-align: center; }
+    p { color: #94a3b8; max-width: 650px; text-align: center; margin-bottom: 2rem; line-height: 1.5; }
+    .icon-grid {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .icon-card {
+      background: #151f38;
+      border: 1px solid #223259;
+      border-radius: 1.25rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+    }
+    .canvas-preview {
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+    .ios-preview-dark {
+      background: #000000;
+      padding: 1.2rem;
+      border-radius: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border: 2px solid #334155;
+    }
+    .ios-squircle {
+      width: 120px;
+      height: 120px;
+      border-radius: 27px; /* Standard iOS continuous curve squircle mask */
+      overflow: hidden;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.7);
+    }
+    .ios-squircle canvas {
+      width: 100%;
+      height: 100%;
+    }
+    .label {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+    .badge {
+      background: #0284c7;
+      color: white;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .btn-download {
+      background: #0f62fe;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-download:hover {
+      background: #0b4ecc;
+    }
+  </style>
+</head>
+<body>
+  <h1>GarageOne - Ícono Oficial Procesado para iOS</h1>
+  <p>Hemos procesado el dibujo de auto original que subiste en la carpeta <code>icons</code> y lo adaptamos a un fondo 100% sólido ("Full-Bleed") de alto contraste. Esto evita que iOS lo oscurezca o lo vuelva invisible cuando usas tu iPhone en Modo Oscuro.</p>
+
+  <div class="icon-grid">
+    <!-- Option A: Royal Blue Solid Background with White Emblem -->
+    <div class="icon-card">
+      <span class="badge">Versión Fondo Azul Real Sólido (Recomendada)</span>
+      <canvas id="canvasBlue180" width="180" height="180" class="canvas-preview"></canvas>
+      <a id="dlBlue180" class="btn-download" download="apple-touch-icon.png">Descargar apple-touch-icon.png</a>
+      
+      <div class="ios-preview-dark">
+        <span style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; font-weight: 600;">Vista previa en iPhone (Modo Oscuro)</span>
+        <div class="ios-squircle">
+          <canvas id="previewiOSDark"></canvas>
+        </div>
+      </div>
+      <span class="label">Totalmente adaptable a iOS Light / Dark / Tinted</span>
+    </div>
+
+    <!-- Option B: Crisp White Solid Background with Dark Car Logo -->
+    <div class="icon-card">
+      <span class="badge">Versión Fondo Blanco Sólido</span>
+      <canvas id="canvasWhite180" width="180" height="180" class="canvas-preview"></canvas>
+      <a id="dlWhite180" class="btn-download" download="icon-white-180.png">Descargar Fondo Blanco</a>
+      
+      <div class="ios-preview-dark">
+        <span style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; font-weight: 600;">Vista previa en iPhone (Modo Oscuro)</span>
+        <div class="ios-squircle">
+          <canvas id="previewiOSWhiteDark"></canvas>
+        </div>
+      </div>
+      <span class="label">El logo original negro sobre fondo blanco sólido</span>
+    </div>
+  </div>
+
+  <script>
+    const userImg = new Image();
+    userImg.crossOrigin = 'Anonymous';
+    userImg.onload = function() {
+      // 1. Render Blue Full-Bleed Version
+      renderFullBleed(document.getElementById('canvasBlue180'), 'blue', userImg);
+      renderFullBleed(document.getElementById('previewiOSDark'), 'blue', userImg);
+      document.getElementById('dlBlue180').href = document.getElementById('canvasBlue180').toDataURL('image/png');
+
+      // 2. Render White Full-Bleed Version
+      renderFullBleed(document.getElementById('canvasWhite180'), 'white', userImg);
+      renderFullBleed(document.getElementById('previewiOSWhiteDark'), 'white', userImg);
+      document.getElementById('dlWhite180').href = document.getElementById('canvasWhite180').toDataURL('image/png');
+    };
+    userImg.src = 'icons/icon-192.png?v=' + Date.now();
+
+    function renderFullBleed(canvas, style, img) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      if (style === 'blue') {
+        // Full bleed blue gradient
+        const grad = ctx.createLinearGradient(0, 0, w * 0.8, h);
+        grad.addColorStop(0, '#0f62fe');
+        grad.addColorStop(0.5, '#0d50d1');
+        grad.addColorStop(1, '#052370');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        const glow = ctx.createRadialGradient(w * 0.5, h * 0.35, 0, w * 0.5, h * 0.35, w * 0.55);
+        glow.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+        glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, w, h);
+
+        // Invert user's black car artwork to crisp white emblem
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width || 512;
+        tempCanvas.height = img.height || 512;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0);
+
+        const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] > 30) {
+            data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;
+          }
+        }
+        tempCtx.putImageData(imgData, 0, 0);
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(2, 6, 23, 0.5)';
+        ctx.shadowBlur = w * 0.05;
+        ctx.shadowOffsetY = h * 0.025;
+
+        const p = w * 0.15;
+        ctx.drawImage(tempCanvas, p, p, w - p * 2, h - p * 2);
+        ctx.restore();
+      } else {
+        // Full bleed solid pure white
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.save();
+        const p = w * 0.15;
+        ctx.drawImage(img, p, p, w - p * 2, h - p * 2);
+        ctx.restore();
+      }
+    }
+  </script>
+</body>
+</html>

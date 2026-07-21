@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>GarageOne - Control Vehicular</title>
+  
+  <!-- iOS PWA & Dark Mode Adaptability Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GarageOne">
+  <meta name="theme-color" content="#0f62fe" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1329" media="(prefers-color-scheme: dark)">
+  
+  <!-- App Icons for iOS & PWA -->
+  <link rel="manifest" href="manifest.json?v=300">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=300">
+  <link rel="apple-touch-icon-precomposed" href="icons/apple-touch-icon.png?v=300">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=300">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=300">
+  <link rel="shortcut icon" href="icons/apple-touch-icon.png?v=300">
+
+  <!-- Engine to process User's exact PNG car logo into 100% full-bleed iOS icon -->
+  <script>
+    (function processUserExactCarIcon() {
+      const userImg = new Image();
+      userImg.crossOrigin = 'Anonymous';
+      userImg.onload = function() {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 180;
+          canvas.height = 180;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          // 1. FULL BLEED OPAQUE SOLID GRADIENT (100% Opaque - No transparent margins)
+          const grad = ctx.createLinearGradient(0, 0, 144, 180);
+          grad.addColorStop(0, '#0f62fe');  // Royal Blue
+          grad.addColorStop(0.5, '#0d50d1');
+          grad.addColorStop(1, '#052370');  // Deep Midnight Indigo
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 180, 180);
+
+          // Ambient Glow
+          const glow = ctx.createRadialGradient(90, 60, 0, 90, 60, 100);
+          glow.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+          glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 0, 180, 180);
+
+          // 2. Process User's exact car artwork (Invert black strokes to pure crisp white)
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = userImg.width || 512;
+          tempCanvas.height = userImg.height || 512;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(userImg, 0, 0);
+
+          const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            // If pixel is visible artwork (alpha > 30)
+            if (data[i + 3] > 30) {
+              data[i] = 255;     // Red -> 255 (White)
+              data[i + 1] = 255; // Green -> 255
+              data[i + 2] = 255; // Blue -> 255
+            }
+          }
+          tempCtx.putImageData(imgData, 0, 0);
+
+          // 3. Composite User's exact car logo centered with safe 15% padding & shadow
+          ctx.save();
+          ctx.shadowColor = 'rgba(2, 6, 23, 0.5)';
+          ctx.shadowBlur = 10;
+          ctx.shadowOffsetY = 4;
+
+          const padding = 180 * 0.15;
+          const drawW = 180 - padding * 2;
+          const drawH = 180 - padding * 2;
+          ctx.drawImage(tempCanvas, padding, padding, drawW, drawH);
+          ctx.restore();
+
+          const fullBleedDataUrl = canvas.toDataURL('image/png');
+
+          // Dynamically set all iOS & PWA icon link tags
+          window.addEventListener('DOMContentLoaded', function() {
+            const appleLinks = document.querySelectorAll('link[rel*="apple-touch-icon"], link[rel="shortcut icon"], link[rel="icon"]');
+            appleLinks.forEach(function(link) {
+              link.href = fullBleedDataUrl;
+            });
+
+            // Also update the auth header logo image if present
+            const authLogo = document.querySelector('.auth-symbol img');
+            if (authLogo) {
+              authLogo.src = fullBleedDataUrl;
+            }
+          });
+        } catch (err) {
+          console.warn('User car icon processor:', err);
+        }
+      };
+      userImg.src = 'icons/icon-192.png?v=' + Date.now();
+    })();
+  </script>
+
+  <!-- Font & CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=300">
+</head>
+<body>
+
+  <!-- AUTH SCREEN (LOGIN / REGISTER) -->
+  <div id="authScreen" class="auth-screen" style="display:none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-symbol">
+          <img src="icons/icon-192.png?v=300" alt="GarageOne Logo">
+        </div>
+        <h2 id="authTitle">GarageOne</h2>
+        <p class="subtitle" id="authSubtitle">Crea tu cuenta e ingresa tu PIN</p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="formLogin" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>PIN de Acceso</label>
+          <input type="password" id="loginPin" class="form-control text-center pin-input" maxlength="6" placeholder="••••" autocomplete="current-password">
+          <div id="loginError" class="error-text"></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Ingresar a la App</button>
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; text-align:center;">
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showRegisterForm()" style="font-size:0.8rem; color:#38bdf8;">¿No tienes cuenta? Crear Cuenta</button>
+          <button type="button" class="btn btn-tertiary btn-block" onclick="resetUserPin(event)" style="font-size:0.8rem; color:var(--text-secondary);">Restablecer / Crear nueva cuenta</button>
+        </div>
+      </form>
+
+      <!-- Register Form -->
+      <form id="formRegister" onsubmit="handleRegister(event)" style="display:none;">
+        <div class="form-group">
+          <label>Nombre Completo</label>
+          <input type="text" id="regName" class="form-control" placeholder="Ej. Mario Rodríguez" required>
+          <div id="nameError" class="error-text"></div>
+        </div>
+        <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="nombre@correo.com" required>
+          <div id="emailError" class="error-text"></div>
+        </div>
+        <div class="form-group">
+          <label>PIN de Seguridad (4 a 6 números)</label>
+          <input type="password" id="regPin" class="form-control text-center pin-input" maxlength="6" placeholder="••••" required>
+          <div id="pinError" class="error-text"></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Crear Cuenta y Empezar</button>
+        <div style="margin-top:12px; text-align:center;" id="alreadyHasUserContainer">
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes usuario? Ingresar con PIN</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- APP SHELL MAIN -->
+  <div id="appShell" style="display:block;">
+
+    <!-- TOP HEADER APP BAR -->
+    <header class="app-top-header">
+      <div class="header-action-left">
+        <button class="header-icon-btn" onclick="switchTab('tabReminders')" title="Recordatorios" id="btnHeaderReminders">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+      </div>
+      <div class="header-brand-center" onclick="switchTab('tabGarage')">
+        <img src="icons/icon-192.png?v=300" alt="GarageOne Logo" class="header-logo-img">
+        <span class="header-brand-title">GarageOne</span>
+      </div>
+      <div class="header-action-right">
+        <button class="header-icon-btn" onclick="switchTab('tabSettings')" title="Ajustes" id="btnHeaderSettings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main View Containers -->
+    <main class="app-body">
+      
+      <!-- TAB 1: Garaje -->
+      <section id="tabGarage" class="tab-content active">
+        
+        <!-- Vehicle Selector Pills Bar -->
+        <div class="filter-pills" id="vehicleSelectorPills" style="margin-bottom:12px;">
+          <!-- Dynamically rendered vehicle pills -->
+        </div>
+
+        <div class="hero-card" id="activeVehicleHero">
+          <!-- Dynamic Hero Content -->
+        </div>
+
+        <!-- User Configured Reminders Section -->
+        <div class="section-title-row" style="margin-top:20px;">
+          <h2>Mis Recordatorios</h2>
+          <button class="btn btn-secondary btn-sm" onclick="openModal('modalReminder')">+ Recordatorio</button>
+        </div>
+
+        <div id="userRemindersList" class="predictive-alerts-wrapper">
+          <!-- Dynamically populated user configured reminders -->
+        </div>
+
+        <div class="section-title-row" style="margin-top:24px;">
+          <h2>Mis Vehículos</h2>
+          <button class="btn btn-secondary btn-sm" onclick="openVehicleModal()">+ Nuevo Vehículo</button>
+        </div>
+        <div id="allVehiclesList" class="vehicles-mini-grid">
+          <!-- Dynamic Mini Vehicle List -->
+        </div>
+      </section>
+
+      <!-- TAB: Módulo de Recordatorios -->
+      <section id="tabReminders" class="tab-content">
+        <div class="section-header" style="flex-direction:column; align-items:flex-start; gap:10px;">
+          <div class="section-header-title">
+            <h1>Recordatorios</h1>
+            <p class="subtitle">Alertas personalizadas, tareas y repeticiones</p>
+          </div>
+          <div style="display:flex; gap:8px; width:100%; justify-content:flex-start; flex-wrap:wrap; margin-top:2px;">
+            <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Nuevo Recordatorio</button>
+            <button class="btn btn-secondary btn-sm" onclick="requestNotificationPermission()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notificaciones
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-pills" id="reminderFilterPills">
+          <button class="pill active" onclick="filterReminders('all', this)">Todos</button>
+          <button class="pill" onclick="filterReminders('pending', this)">Pendientes</button>
+          <button class="pill" onclick="filterReminders('completed', this)">Completados</button>
+        </div>
+
+        <div id="fullRemindersList" class="predictive-alerts-wrapper">
+          <!-- Dynamic list of user reminders -->
+        </div>
+      </section>
+
+      <!-- TAB 2: Historial de Mantenimientos & Facturas -->
+      <section id="tabMaintenance" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Mantenimientos</h1>
+            <p class="subtitle">Servicios mecánicos y facturas</p>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="openModal('modalNewCategory')">+ Tipo de Servicio</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modalService')">+ Registrar Servicio</button>
+          </div>
+        </div>
+
+        <div class="filter-pills" id="maintenanceFilterPills">
+          <!-- Dynamic Filter Pills -->
+        </div>
+
+        <div id="serviceLogList" class="log-list">
+          <!-- Dynamic Maintenance List -->
+        </div>
+      </section>
+
+      <!-- TAB 3: Bitácora de Combustible -->
+      <section id="tabFuel" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Combustible</h1>
+            <p class="subtitle">Rendimiento y costo por distancia</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalFuel')">+ Registrar Recarga</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-label">Rendimiento Prom.</span>
+            <span class="stat-value" id="fuelEfficiencyVal">0 km/L</span>
+            <span class="stat-sub">Eficiencia estimada</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Costo por KM</span>
+            <span class="stat-value" id="costPerKmVal">₡0/km</span>
+            <span class="stat-sub">Gasto por distancia</span>
+          </div>
+        </div>
+
+        <div class="section-title-row">
+          <h2>Registros de Tanqueada</h2>
+        </div>
+
+        <div id="fuelLogList" class="log-list">
+          <!-- Dynamic Fuel List -->
+        </div>
+      </section>
+
+      <!-- TAB: Guantera Digital -->
+      <section id="tabGuantera" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Guantera Digital</h1>
+            <p class="subtitle">Papeles, seguro, RTV y directorio de asistencia</p>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="openModal('modalContact')">+ Guardar Contacto</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modalDocument')">+ Guardar Documento</button>
+          </div>
+        </div>
+
+        <!-- Directory of Saved Important Phone Numbers -->
+        <div class="hero-card" style="margin-bottom:20px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255,255,255,0.1);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <h3 style="margin:0 0 2px 0; font-size:1rem; color:#ffffff;">Números Importantes</h3>
+              <p class="subtitle" style="margin:0; font-size:0.8rem;">Toca para llamar directamente a talleres, grúa o seguro</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="openContactModal()" style="font-size:0.75rem; padding:4px 10px;">+ Guardar Número</button>
+          </div>
+          <div id="emergencyContactsList" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Dynamic contacts -->
+          </div>
+        </div>
+
+        <div class="section-title-row">
+          <h2>Documentos del Vehículo</h2>
+        </div>
+
+        <div id="documentsList" class="log-list">
+          <!-- Dynamic Documents List -->
+        </div>
+      </section>
+
+      <!-- TAB 4: Asistente IA -->
+      <section id="tabAI" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Diagnóstico IA</h1>
+            <p class="subtitle">Análisis mecánico e inteligencia de vehículo</p>
+          </div>
+        </div>
+
+        <div class="ai-card" id="aiDiagnosticCard">
+          <!-- Dynamically populated AI Analysis -->
+        </div>
+
+        <div class="section-title-row">
+          <h2>Consulta a la IA</h2>
+        </div>
+        <div class="ai-card">
+          <p class="subtitle" style="margin-bottom:10px;">Preguntas rápidas o consulta personalizada:</p>
+          
+          <!-- Quick Suggestion Chips -->
+          <div class="ai-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+            <button type="button" class="btn btn-secondary btn-sm ai-chip" onclick="askQuickPrompt('¿Por qué encendió la luz Check Engine en el tablero?')">Check Engine</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-chip" onclick="askQuickPrompt('¿Por qué chillan los frenos al presionar el pedal?')">Frenos chillan</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-chip" onclick="askQuickPrompt('¿Por qué vibra el volante al conducir a alta velocidad?')">Vibración</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-chip" onclick="askQuickPrompt('¿Qué hacer si el auto sube la temperatura?')">Calentamiento</button>
+            <button type="button" class="btn btn-secondary btn-sm ai-chip" onclick="askQuickPrompt('¿Cada cuánto se recomienda cambiar el aceite sintético?')">Cambio de Aceite</button>
+          </div>
+
+          <form id="formAIChat" onsubmit="askAIAssistant(event)">
+            <div class="form-group">
+              <input type="text" id="aiUserQuestion" class="form-control" placeholder="Ej. ¿Por qué el pedal se siente suave al frenar?" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Consultar a la IA</button>
+          </form>
+          <div id="aiChatResponse" class="ai-response-box" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- TAB 5: Reportes y Finanzas -->
+      <section id="tabReports" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Reportes y Finanzas</h1>
+            <p class="subtitle">Inversión detallada en mantenimientos y combustible</p>
+          </div>
+        </div>
+
+        <div class="stats-summary-grid">
+          <div class="summary-card">
+            <span class="sum-title">Total Mantenimiento</span>
+            <span class="sum-num" id="totalServiceSpend">₡0</span>
+          </div>
+          <div class="summary-card">
+            <span class="sum-title">Total Combustible</span>
+            <span class="sum-num" id="totalFuelSpend">₡0</span>
+          </div>
+        </div>
+
+        <div class="report-actions-card">
+          <h3>Reportes de Historial</h3>
+          <p class="subtitle" style="margin-bottom:12px;">Genera reportes de gastos o historial completo de mantenimientos para venta del auto</p>
+          <div class="btn-group">
+            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()">Generar Historial Completo</button>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>Historial de Gastos por Categoría</h3>
+          <div id="reportsCategoryBreakdown" class="log-list" style="margin-top:12px;">
+            <!-- Category breakdown list -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: Ajustes de Usuario -->
+      <section id="tabSettings" class="tab-content">
+        <div class="section-header">
+          <div class="section-header-title">
+            <h1>Ajustes y Perfil</h1>
+            <p class="subtitle">Configuración de cuenta, moneda y respaldo de datos</p>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Información de Usuario</h3>
+          <div class="settings-row">
+            <span>Nombre</span>
+            <strong id="userProfileName">-</strong>
+          </div>
+          <div class="settings-row">
+            <span>Correo</span>
+            <strong id="userProfileEmail">-</strong>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Preferencias</h3>
+          <div class="form-group">
+            <label>Moneda del Sistema</label>
+            <select id="settingCurrency" class="form-control" onchange="changeCurrencySetting(this.value)">
+              <option value="CRC">Colones costarricenses (₡)</option>
+              <option value="USD">Dólares estadounidenses ($)</option>
+              <option value="EUR">Euros (€)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Respaldo y Seguridad</h3>
+          <div class="btn-group" style="flex-direction:column;">
+            <button class="btn btn-outline btn-block" onclick="exportDataJSON()">Exportar Datos (JSON)</button>
+            <label class="btn btn-outline btn-block" style="text-align:center;">
+              Importar Datos (JSON)
+              <input type="file" id="importJsonInput" accept=".json" onchange="importDataJSON(event)" style="display:none;">
+            </label>
+            <button class="btn btn-tertiary btn-block" onclick="handleLogout()" style="color:#ff453a; margin-top:8px;">Bloquear / Cerrar Sesión</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar - 100% Fixed & Static -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" onclick="switchTab('tabGarage', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17h2m8 0h2"/></svg>
+        </span>
+        <span class="nav-label">Garaje</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabMaintenance', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </span>
+        <span class="nav-label">Servicios</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabFuel', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 11h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3"/><path d="M3 22h12"/><path d="M7 9h4"/></svg>
+        </span>
+        <span class="nav-label">Gasolina</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabGuantera', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </span>
+        <span class="nav-label">Guantera</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabAI', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10h-10V2z"/><path d="M12 12 2.1 12.1"/><path d="M12 12v9.9"/><path d="m12 12 7.07 7.07"/></svg>
+        </span>
+        <span class="nav-label">IA</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabReports', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        <span class="nav-label">Reportes</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Modal: Agregar / Editar Vehículo -->
+  <div id="modalVehicle" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalVehicleTitle">Nuevo Vehículo</h3>
+        <button class="close-btn" onclick="closeModal('modalVehicle')">✕</button>
+      </div>
+      <form id="formVehicle" onsubmit="saveVehicle(event)">
+        <input type="hidden" id="vehId">
+        <div class="form-group">
+          <label>Tipo de Vehículo</label>
+          <select id="vehType" class="form-control" required>
+            <option value="Automóvil">Automóvil / Sedan</option>
+            <option value="SUV">SUV / Camioneta</option>
+            <option value="Pickup">Pickup / 4x4</option>
+            <option value="Motocicleta">Motocicleta</option>
+            <option value="Camión">Camión / Comercial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Marca y Modelo</label>
+          <input type="text" id="vehName" class="form-control" placeholder="Ej. Honda Civic Turbo" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Año</label>
+            <input type="number" id="vehYear" class="form-control" placeholder="2023" required>
+          </div>
+          <div class="form-group">
+            <label>Placa / Matrícula</label>
+            <input type="text" id="vehPlate" class="form-control" placeholder="Ej. HNK-542">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kilometraje Actual en Odómetro</label>
+          <input type="number" id="vehKm" class="form-control" placeholder="45000" required>
+        </div>
+        <div class="form-group">
+          <label>Foto del Vehículo (Opcional)</label>
+          <input type="file" id="vehPhoto" class="form-control" accept="image/*">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalVehicle')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Vehículo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Actualizar Odómetro -->
+  <div id="modalOdometer" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Actualizar Odómetro</h3>
+        <button class="close-btn" onclick="closeModal('modalOdometer')">✕</button>
+      </div>
+      <form id="formOdometer" onsubmit="updateOdometer(event)">
+        <div class="form-group">
+          <label>Nuevo Kilometraje Actual</label>
+          <input type="number" id="newOdometerKm" class="form-control" placeholder="48500" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalOdometer')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Actualizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar / Editar Servicio -->
+  <div id="modalService" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalServiceTitle">Registrar Servicio</h3>
+        <button class="close-btn" onclick="closeModal('modalService')">✕</button>
+      </div>
+      <form id="formService" onsubmit="saveService(event)">
+        <input type="hidden" id="servId">
+        <div class="form-group">
+          <label>Categoría / Tipo de Servicio</label>
+          <select id="servCategory" class="form-control" required></select>
+        </div>
+        <div class="form-group">
+          <label>Título o Descripción del Trabajo</label>
+          <input type="text" id="servTitle" class="form-control" placeholder="Ej. Cambio de Aceite Sintético 5W-30 + Filtro OEM" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Costo Total (<span class="currency-lbl">₡</span>)</label>
+            <input type="number" step="1" id="servCost" class="form-control" placeholder="45000" required>
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" id="servDate" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kilometraje al realizar el Servicio</label>
+          <input type="number" id="servKm" class="form-control" placeholder="45000" required>
+        </div>
+        <div class="form-group">
+          <label>Taller / Proveedor (Opcional)</label>
+          <input type="text" id="servShop" class="form-control" placeholder="Ej. Taller Central">
+        </div>
+        <div class="form-group">
+          <label>Notas Adicionales (Opcional)</label>
+          <input type="text" id="servNotes" class="form-control" placeholder="Ej. Garantía de 6 meses o marca de repuestos">
+        </div>
+        <div class="form-group">
+          <label>Foto de Factura / Comprobante</label>
+          <input type="file" id="servReceipt" class="form-control" accept="image/*,application/pdf">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalService')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Servicio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar / Editar Combustible -->
+  <div id="modalFuel" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalFuelTitle">Registrar Gasolina</h3>
+        <button class="close-btn" onclick="closeModal('modalFuel')">✕</button>
+      </div>
+      <form id="formFuel" onsubmit="saveFuel(event)">
+        <input type="hidden" id="fuelId">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Monto Total (<span class="currency-lbl">₡</span>)</label>
+            <input type="number" step="1" id="fuelCost" class="form-control" placeholder="25000" required>
+          </div>
+          <div class="form-group">
+            <label>Litros Cargados</label>
+            <input type="number" step="0.01" id="fuelVolume" class="form-control" placeholder="35.0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kilometraje en Odómetro</label>
+          <input type="number" id="fuelKm" class="form-control" placeholder="45200" required>
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="fuelDate" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Estación / Notas (Opcional)</label>
+          <input type="text" id="fuelNotes" class="form-control" placeholder="Ej. Gasolinera Delta, Súper">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalFuel')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Recarga</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Visor de Factura -->
+  <div id="modalReceiptViewer" class="modal-backdrop">
+    <div class="modal-card full-media">
+      <div class="modal-header">
+        <h3>Comprobante / Factura</h3>
+        <button class="close-btn" onclick="closeModal('modalReceiptViewer')">✕</button>
+      </div>
+      <div class="receipt-container" id="receiptContainer"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Expediente Certificado -->
+  <div id="modalCertifiedReport" class="modal-backdrop">
+    <div class="modal-card print-wrapper">
+      <div class="modal-header no-print">
+        <h3>Expediente de Venta</h3>
+        <div>
+          <button class="btn btn-primary btn-sm" onclick="window.print()">Imprimir / PDF</button>
+          <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
+        </div>
+      </div>
+      <div class="certified-document" id="certifiedDocumentContent"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear Nuevo Servicio / Categoría -->
+  <div id="modalNewCategory" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Crear Tipo de Servicio Personalizado</h3>
+        <button class="close-btn" onclick="closeModal('modalNewCategory')">✕</button>
+      </div>
+      <form id="formNewCategory" onsubmit="saveNewCategory(event)">
+        <div class="form-group">
+          <label>Nombre del Servicio / Categoría</label>
+          <input type="text" id="newCatName" class="form-control" placeholder="Ej. Cambio de Amortiguadores, Faja" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Intervalo en KM</label>
+            <input type="number" id="newCatKm" class="form-control" placeholder="20000" required>
+          </div>
+          <div class="form-group">
+            <label>Intervalo en Días</label>
+            <input type="number" id="newCatDays" class="form-control" placeholder="365" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalNewCategory')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Categoría</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar / Editar Documento -->
+  <div id="modalDocument" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalDocumentTitle">Agregar Documento</h3>
+        <button class="close-btn" onclick="closeModal('modalDocument')">✕</button>
+      </div>
+      <form id="formDocument" onsubmit="saveDocument(event)">
+        <input type="hidden" id="docId">
+        <div class="form-group">
+          <label>Tipo de Documento</label>
+          <select id="docType" class="form-control" required>
+            <option value="Seguro">Póliza de Seguro</option>
+            <option value="RTV">RTV / Inspección Técnica</option>
+            <option value="Marchamo">Marchamo / Impuesto</option>
+            <option value="Licencia">Licencia de Conducir</option>
+            <option value="Circulación">Tarjeta de Circulación</option>
+            <option value="Garantía">Garantía / Repuesto</option>
+            <option value="Otro">Otro Documento</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nombre o Número de Referencia</label>
+          <input type="text" id="docTitle" class="form-control" placeholder="Ej. Póliza Todo Riesgo #12345" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Fecha de Vencimiento</label>
+            <input type="date" id="docExpDate" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Tel. Asistencia / Grúa (Opcional)</label>
+            <input type="tel" id="docPhone" class="form-control" placeholder="Ej. 800-800-911">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notas Adicionales (Opcional)</label>
+          <input type="text" id="docNotes" class="form-control" placeholder="Ej. Cobertura completa INS">
+        </div>
+        <div class="form-group">
+          <label>Foto / PDF del Documento</label>
+          <input type="file" id="docFile" class="form-control" accept="image/*,application/pdf">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalDocument')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Documento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Recordatorio -->
+  <div id="modalReminder" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalReminderTitle">Nuevo Recordatorio</h3>
+        <button class="close-btn" onclick="closeModal('modalReminder')">✕</button>
+      </div>
+      <form id="formReminder" onsubmit="saveReminder(event)">
+        <input type="hidden" id="remId">
+        <div class="form-group">
+          <label>Título del Recordatorio</label>
+          <input type="text" id="remTitle" class="form-control" placeholder="Ej. Cambio de Aceite, Marchamo, Bujías" required>
+        </div>
+        <div class="form-group">
+          <label>Categoría / Tipo</label>
+          <select id="remCategory" class="form-control">
+            <option value="Mantenimiento">Mantenimiento General</option>
+            <option value="Aceite">Aceite y Filtros</option>
+            <option value="Frenos">Frenos y Neumáticos</option>
+            <option value="Documento">Marchamo / RTV / Seguro</option>
+            <option value="Otro">Otro Recordatorio</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Kilometraje Meta (Opcional)</label>
+            <input type="number" id="remTargetKm" class="form-control" placeholder="Ej. 50000">
+          </div>
+          <div class="form-group">
+            <label>Fecha Meta (Opcional)</label>
+            <input type="date" id="remTargetDate" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Repetir Recordatorio Automáticamente</label>
+          <select id="remRepeat" class="form-control">
+            <option value="none">Sin repetición (Una sola vez)</option>
+            <option value="1m">Cada 1 mes</option>
+            <option value="3m">Cada 3 meses</option>
+            <option value="6m">Cada 6 meses</option>
+            <option value="12m">Cada 1 año</option>
+            <option value="5000km">Cada 5.000 KM</option>
+            <option value="10000km">Cada 10.000 KM</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nota adicional / Detalle (Opcional)</label>
+          <input type="text" id="remNotes" class="form-control" placeholder="Ej. Taller de confianza">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalReminder')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Recordatorio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Contacto Importante -->
+  <div id="modalContact" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalContactTitle">Nuevo Contacto Importante</h3>
+        <button class="close-btn" onclick="closeModal('modalContact')">✕</button>
+      </div>
+      <form id="formContact" onsubmit="saveEmergencyContact(event)">
+        <input type="hidden" id="contactId">
+        <div class="form-group">
+          <label>Nombre del Servicio / Taller / Grúa</label>
+          <input type="text" id="contactName" class="form-control" placeholder="Ej. Grúa 24/7 INS, Mecánico Juan" required>
+        </div>
+        <div class="form-group">
+          <label>Número Telefónico</label>
+          <input type="tel" id="contactPhone" class="form-control" placeholder="Ej. 800-800-911" required>
+        </div>
+        <div class="form-group">
+          <label>Categoría</label>
+          <select id="contactCategory" class="form-control">
+            <option value="Auxilio">Auxilio / Grúa 24/7</option>
+            <option value="Taller">Taller Mecánico</option>
+            <option value="Emergencia">Emergencia / Seguro</option>
+            <option value="Otro">Otro Contacto</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalContact')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Contacto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js?v=200"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js?v=200').catch(err => console.log('ServiceWorker error: ', err));
+    }
+  </script>
+</body>
+</html>
