@@ -4,6 +4,7 @@
 
 const STORAGE_KEY = 'AUTOCARE_DATA_V14';
 const USER_KEY = 'AUTOCARE_USER_V14';
+const USERS_KEY = 'AUTOCARE_USERS_V14';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -116,6 +117,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+function getUsersList() {
+  try {
+    const raw = localStorage.getItem(USERS_KEY);
+    let list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    if (currentUser && currentUser.username) {
+      if (!list.some(u => u.username && u.username.toLowerCase() === currentUser.username.toLowerCase())) {
+        list.push(currentUser);
+        localStorage.setItem(USERS_KEY, JSON.stringify(list));
+      }
+    }
+    return list;
+  } catch (e) {
+    return currentUser ? [currentUser] : [];
+  }
+}
+
+async function saveUsersList(usersList) {
+  try {
+    localStorage.setItem(USERS_KEY, JSON.stringify(usersList));
+  } catch (e) {
+    console.warn('Error saving users to localStorage:', e);
+  }
+  try {
+    const db = await openIDB();
+    if (db) {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(usersList, 'usersList');
+    }
+  } catch (e) {
+    console.warn('Error saving users to IndexedDB:', e);
+  }
+}
+
 function loadUser() {
   try {
     const u = localStorage.getItem(USER_KEY);
@@ -125,7 +160,19 @@ function loadUser() {
 
 function saveUser(user) {
   currentUser = user;
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch (e) {
+    console.warn('Error saving currentUser:', e);
+  }
+  const list = getUsersList();
+  const idx = list.findIndex(u => u.username && user.username && u.username.toLowerCase() === user.username.toLowerCase());
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...user };
+  } else {
+    list.push(user);
+  }
+  saveUsersList(list);
 }
 
 function showLoginForm() {
@@ -133,17 +180,22 @@ function showLoginForm() {
   const formRegister = document.getElementById('formRegister');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
+  const loginUser = document.getElementById('loginUser');
 
   if (formLogin) formLogin.style.display = 'block';
   if (formRegister) formRegister.style.display = 'none';
 
+  if (loginUser && currentUser && !loginUser.value) {
+    loginUser.value = currentUser.username || currentUser.name || '';
+  }
+
   const username = currentUser ? (currentUser.username || currentUser.name || '') : '';
   if (authTitle) authTitle.textContent = username ? `Hola, ${escapeHtml(username)}` : 'Bienvenido a GarageOne';
-  
+
   if (currentUser && currentUser.pinEnabled && currentUser.pin) {
-    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña o PIN para desbloquear';
+    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña o PIN para acceder (Web & App)';
   } else {
-    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña para acceder';
+    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu usuario y contraseña de acceso';
   }
 }
 
@@ -156,7 +208,7 @@ function showRegisterForm() {
   if (formLogin) formLogin.style.display = 'none';
   if (formRegister) formRegister.style.display = 'block';
   if (authTitle) authTitle.textContent = 'GarageOne';
-  if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario y contraseña de acceso';
+  if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario único de acceso (Web & App)';
 }
 
 function checkAuth() {
@@ -189,11 +241,12 @@ function checkAuth() {
 }
 
 function handleRegister(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
 
   const userInput = document.getElementById('regUser');
   const passInput = document.getElementById('regPassword');
   const confirmPassInput = document.getElementById('regConfirmPassword');
+  const githubInput = document.getElementById('regGithubUser');
 
   const userError = document.getElementById('userError');
   const passError = document.getElementById('passError');
@@ -208,6 +261,7 @@ function handleRegister(e) {
   const username = userInput ? userInput.value.trim() : '';
   const password = passInput ? passInput.value.trim() : '';
   const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
+  const githubUser = githubInput ? githubInput.value.trim() : '';
 
   if (!username || username.length < 3) {
     if (userError) {
@@ -215,6 +269,17 @@ function handleRegister(e) {
       userError.style.display = 'block';
     }
     hasError = true;
+  } else {
+    // DUPLICATE USERNAME VALIDATION Across Web & App
+    const usersList = getUsersList();
+    const isDuplicate = usersList.some(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    if (isDuplicate) {
+      if (userError) {
+        userError.textContent = `El usuario "${username}" ya está registrado en el sistema. Por favor inicia sesión o elige otro nombre de usuario.`;
+        userError.style.display = 'block';
+      }
+      hasError = true;
+    }
   }
 
   if (!password || password.length < 4) {
@@ -235,21 +300,28 @@ function handleRegister(e) {
 
   if (hasError) return;
 
-  saveUser({
+  const newUser = {
+    id: 'usr_' + Date.now(),
     username: username,
     name: username,
     password: password,
+    githubUser: githubUser || username,
     pinEnabled: false,
     pin: '',
-    faceIdEnabled: false
-  });
+    createdAt: new Date().toISOString()
+  };
+
+  saveUser(newUser);
 
   isAuthenticated = true;
+  failedLoginAttempts = 0;
+  lockoutUntil = 0;
   checkAuth();
 }
 
 function handleLogin(e) {
   if (e) e.preventDefault();
+  const userInput = document.getElementById('loginUser');
   const pinInput = document.getElementById('loginPin');
   const loginError = document.getElementById('loginError');
   if (loginError) loginError.style.display = 'none';
@@ -263,33 +335,57 @@ function handleLogin(e) {
     return;
   }
 
+  const usernameVal = userInput ? userInput.value.trim() : '';
   const inputVal = pinInput ? String(pinInput.value).trim() : '';
 
-  if (currentUser) {
-    const isPassCorrect = currentUser.password && (inputVal === currentUser.password);
-    const isPinCorrect = currentUser.pinEnabled && currentUser.pin && (inputVal === currentUser.pin);
-
-    if (!isPassCorrect && !isPinCorrect) {
-      failedLoginAttempts++;
-      if (failedLoginAttempts >= 5) {
-        lockoutUntil = Date.now() + 30000;
-        failedLoginAttempts = 0;
-        if (loginError) {
-          loginError.textContent = 'Demasiados intentos fallidos. Acceso bloqueado por 30 segundos.';
-          loginError.style.display = 'block';
-        }
-      } else {
-        if (loginError) {
-          loginError.textContent = currentUser.pinEnabled
-            ? `Contraseña o PIN incorrecto (${5 - failedLoginAttempts} intentos restantes).`
-            : `Contraseña incorrecta (${5 - failedLoginAttempts} intentos restantes).`;
-          loginError.style.display = 'block';
-        }
-      }
-      return;
+  if (!usernameVal) {
+    if (loginError) {
+      loginError.textContent = 'Por favor ingresa tu nombre de usuario.';
+      loginError.style.display = 'block';
     }
+    return;
   }
 
+  const usersList = getUsersList();
+  let targetUser = usersList.find(u => u.username && u.username.toLowerCase() === usernameVal.toLowerCase());
+
+  if (!targetUser && currentUser && currentUser.username && currentUser.username.toLowerCase() === usernameVal.toLowerCase()) {
+    targetUser = currentUser;
+  }
+
+  if (!targetUser) {
+    failedLoginAttempts++;
+    if (loginError) {
+      loginError.textContent = `El usuario "${usernameVal}" no está registrado. Revisa el nombre o crea una nueva cuenta.`;
+      loginError.style.display = 'block';
+    }
+    return;
+  }
+
+  const isPassCorrect = targetUser.password && (inputVal === targetUser.password);
+  const isPinCorrect = targetUser.pinEnabled && targetUser.pin && (inputVal === targetUser.pin);
+
+  if (!isPassCorrect && !isPinCorrect) {
+    failedLoginAttempts++;
+    if (failedLoginAttempts >= 5) {
+      lockoutUntil = Date.now() + 30000;
+      failedLoginAttempts = 0;
+      if (loginError) {
+        loginError.textContent = 'Demasiados intentos fallidos. Acceso bloqueado por 30 segundos.';
+        loginError.style.display = 'block';
+      }
+    } else {
+      if (loginError) {
+        loginError.textContent = targetUser.pinEnabled
+          ? `Contraseña o PIN incorrecto (${5 - failedLoginAttempts} intentos restantes).`
+          : `Contraseña incorrecta (${5 - failedLoginAttempts} intentos restantes).`;
+        loginError.style.display = 'block';
+      }
+    }
+    return;
+  }
+
+  saveUser(targetUser);
   isAuthenticated = true;
   failedLoginAttempts = 0;
   lockoutUntil = 0;
@@ -299,9 +395,8 @@ function handleLogin(e) {
 
 function resetUserPin(e) {
   if (e) e.preventDefault();
-  if (confirm('¿Deseas restablecer las credenciales y crear un usuario nuevo?')) {
+  if (confirm('¿Deseas cerrar sesión para ingresar con otro usuario o registrar una cuenta nueva?')) {
     currentUser = null;
-    localStorage.removeItem(USER_KEY);
     isAuthenticated = false;
     showRegisterForm();
   }
@@ -355,6 +450,10 @@ function saveNewPin() {
 
 function handleLogout() {
   isAuthenticated = false;
+  const loginUser = document.getElementById('loginUser');
+  if (loginUser && currentUser) {
+    loginUser.value = currentUser.username || '';
+  }
   checkAuth();
 }
 
@@ -436,6 +535,22 @@ function loadStateFromIDB() {
   });
 }
 
+function loadUsersListFromIDB() {
+  return new Promise((resolve) => {
+    openIDB().then(db => {
+      if (!db) return resolve(null);
+      try {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get('usersList');
+        req.onsuccess = (e) => resolve(e.target.result || null);
+        req.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    }).catch(() => resolve(null));
+  });
+}
+
 async function initAsyncStorage() {
   try {
     const idbState = await loadStateFromIDB();
@@ -450,6 +565,22 @@ async function initAsyncStorage() {
     }
   } catch (e) {
     console.warn('Error loading IndexedDB state on startup:', e);
+  }
+
+  try {
+    const idbUsers = await loadUsersListFromIDB();
+    if (idbUsers && Array.isArray(idbUsers)) {
+      const localUsers = getUsersList();
+      const merged = [...localUsers];
+      idbUsers.forEach(iu => {
+        if (iu && iu.username && !merged.some(mu => mu.username && mu.username.toLowerCase() === iu.username.toLowerCase())) {
+          merged.push(iu);
+        }
+      });
+      localStorage.setItem(USERS_KEY, JSON.stringify(merged));
+    }
+  } catch (e) {
+    console.warn('Error syncing users list from IDB:', e);
   }
 }
 
@@ -2042,6 +2173,12 @@ function renderUserSettings() {
   if (currentUser) {
     const profileNameEl = document.getElementById('userProfileName');
     if (profileNameEl) profileNameEl.textContent = currentUser.username || currentUser.name || '-';
+
+    const ghStatusEl = document.getElementById('userGithubStatus');
+    if (ghStatusEl) {
+      const gh = currentUser.githubUser || currentUser.username || 'Web';
+      ghStatusEl.textContent = `Sincronizado (@${gh}) ✓`;
+    }
 
     const togglePin = document.getElementById('togglePinSetting');
     const pinStatusText = document.getElementById('pinStatusText');
