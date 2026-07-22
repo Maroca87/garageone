@@ -2305,8 +2305,8 @@ function importDataJSON(e) {
   reader.readAsText(file);
 }
 
-// Report Sharing (WhatsApp & Email)
-function shareReportWhatsApp() {
+// Report Sharing (Text & Email)
+function shareReportText() {
   const veh = getActiveVehicle();
   if (!veh) return;
   const services = appState.services.filter(s => s.vehicleId === veh.id);
@@ -2314,17 +2314,30 @@ function shareReportWhatsApp() {
   const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
   const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
 
-  const text = `🚗 *Expediente de Vehículo - GarageOne*\n\n` +
-    `• *Vehículo:* ${veh.name} (${veh.year})\n` +
-    `• *Placa:* ${veh.plate || 'N/A'}\n` +
-    `• *Odómetro:* ${veh.km.toLocaleString()} KM\n\n` +
-    `📊 *Resumen de Inversión:*\n` +
+  const text = `🚗 Expediente de Vehículo - GarageOne\n\n` +
+    `• Vehículo: ${veh.name} (${veh.year})\n` +
+    `• Placa: ${veh.plate || 'N/A'}\n` +
+    `• Odómetro: ${veh.km.toLocaleString()} KM\n\n` +
+    `📊 Resumen de Inversión:\n` +
     `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
     `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
     `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
     `Generado con GarageOne.`;
 
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  if (navigator.share) {
+    navigator.share({
+      title: `Expediente ${veh.name}`,
+      text: text
+    }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Resumen copiado al portapapeles.');
+    }).catch(() => {
+      alert(text);
+    });
+  } else {
+    alert(text);
+  }
 }
 
 function shareReportEmail() {
@@ -2386,7 +2399,7 @@ const I18N_DICT = {
     reportTitle: 'Historial de Mantenimientos y Reparaciones',
     reportSubtitle: 'Genera un documento formal con todas las reparaciones mecánicas, servicios, talleres y fechas registradas para este vehículo, listo para compartir o imprimir en PDF.',
     btnViewReport: 'Ver / Imprimir Expediente (PDF)',
-    btnShareWA: 'WhatsApp',
+    btnShareText: 'Compartir Texto',
     btnShareEmail: 'Correo',
     titleSettings: 'Ajustes Generales',
     subSettings: 'Configuración de cuenta e intervalos',
@@ -2454,7 +2467,7 @@ const I18N_DICT = {
     reportTitle: 'Maintenance & Service History',
     reportSubtitle: 'Generate an official certified vehicle report with all mechanical repairs, services, and costs ready to share or print to PDF.',
     btnViewReport: 'View / Print Report (PDF)',
-    btnShareWA: 'WhatsApp',
+    btnShareText: 'Share Text',
     btnShareEmail: 'Email',
     titleSettings: 'General Settings',
     subSettings: 'Account configuration and preferences',
