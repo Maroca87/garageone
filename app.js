@@ -754,7 +754,7 @@ function renderRemindersListHelper(remindersList, veh) {
         <div class="swipe-action-bg">
           <button class="swipe-action-btn" onclick="deleteReminderDirect('${r.id}')">
             ${SVG_ICONS.trash}
-            <span>Eliminar</span>
+            <span>${t('deleteBtn', 'Eliminar')}</span>
           </button>
         </div>
         <div class="swipe-content user-reminder-card ${cardClass}" onclick="openReminderModal('${r.id}')">
@@ -764,13 +764,12 @@ function renderRemindersListHelper(remindersList, veh) {
               ${statusBadge}
             </div>
             <div class="reminder-meta">${escapeHtml(detailsText.join(' • ')) || 'Configurado por usuario'}${repeatText}</div>
-            ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
+            ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">${escapeHtml(r.notes)}</div>` : ''}
           </div>
           <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
             <button class="btn btn-secondary btn-sm" onclick="toggleReminderComplete('${r.id}')" style="padding:4px 8px;" title="Marcar como completado">
               ${r.completed ? 'Desmarcar' : '✓ Listo'}
             </button>
-            <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:#ff453a; padding:4px 6px;" title="Eliminar recordatorio">✕</button>
           </div>
         </div>
       </div>
@@ -935,19 +934,19 @@ function renderEmergencyContacts() {
       <div class="swipe-action-bg">
         <button class="swipe-action-btn" onclick="deleteEmergencyContactDirect('${c.id}')">
           ${SVG_ICONS.trash}
-          <span>Eliminar</span>
+          <span>${t('deleteBtn', 'Eliminar')}</span>
         </button>
       </div>
       <div class="swipe-content contact-card-item" onclick="openContactModal('${c.id}')">
         <div class="contact-info">
           <span class="contact-name">${escapeHtml(c.name)}</span>
           <span class="contact-sub">${escapeHtml(c.category)} • ${escapeHtml(c.phone)}</span>
-          ${c.notes ? `<span class="contact-sub" style="font-style:italic;">Nota: ${escapeHtml(c.notes)}</span>` : ''}
+          ${c.notes ? `<span class="contact-sub" style="font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}
         </div>
         <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
           <button class="btn-call-direct" onclick="callContact('${escapeHtml(c.phone)}')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            <span>Llamar</span>
+            <span>${t('callBtn', 'Llamar')}</span>
           </button>
         </div>
       </div>
@@ -2096,6 +2095,19 @@ function shareReportEmail() {
 // Internationalization (i18n) Engine
 const I18N_DICT = {
   es: {
+    navGarage: 'Garaje',
+    navServices: 'Servicios',
+    navFuel: 'Gasolina',
+    navGlovebox: 'Guantera',
+    navAI: 'IA',
+    navReports: 'Reportes',
+    subtitleGarage: 'Tu taller y control vehicular inteligente',
+    titleMaintenance: 'Servicios y Mantenimientos',
+    subMaintenance: 'Historial mecánico y preventivo',
+    btnAddService: '+ Registrar Servicio',
+    titleFuel: 'Control de Gasolina',
+    subFuel: 'Registro de recargas y consumo de combustible',
+    btnAddFuel: '+ Registrar Gasolina',
     guanteraTitle: 'Guantera Digital',
     guanteraSubtitle: 'Papeles, seguro, RTV y directorio de asistencia',
     contactsTitle: 'Números Importantes',
@@ -2103,37 +2115,129 @@ const I18N_DICT = {
     btnAddContact: '+ Guardar Número',
     docsTitle: 'Documentos del Vehículo',
     btnAddDoc: '+ Agregar Documento',
+    titleAI: 'Asistente IA Mecánico',
+    subAI: 'Análisis inteligente y consultas mecánicas',
+    aiQueryTitle: 'Consulta a la IA',
+    aiQuerySub: 'Preguntas rápidas o consulta personalizada:',
+    btnAskAI: 'Consultar a la IA',
+    titleReports: 'Reportes y Finanzas',
+    subReports: 'Inversión detallada en mantenimientos y combustible',
+    cardTotalServ: 'Total Mantenimiento',
+    cardTotalFuel: 'Total Combustible',
+    cardCatBreakdown: 'Desglose de Gastos por Categoría',
+    cardMonthBreakdown: 'Desglose de Gastos por Mes',
     reportTitle: 'Historial de Mantenimientos y Reparaciones',
     reportSubtitle: 'Genera un documento formal con todas las reparaciones mecánicas, servicios, talleres y fechas registradas para este vehículo, listo para compartir o imprimir en PDF.',
     btnViewReport: 'Ver / Imprimir Expediente (PDF)',
-    btnShareWA: '📱 WhatsApp',
-    btnShareEmail: '✉️ Correo',
+    btnShareWA: 'WhatsApp',
+    btnShareEmail: 'Correo',
+    titleSettings: 'Ajustes Generales',
+    subSettings: 'Configuración de cuenta e intervalos',
+    profileTitle: 'Perfil de Usuario',
+    lblUsername: 'Usuario',
+    secAuthTitle: 'Seguridad y Autenticación',
+    pinTitle: 'Acceso con PIN',
+    pinSubtitle: 'Permite desbloquear la app con un PIN numérico',
+    btnSavePin: 'Guardar PIN',
     prefTitle: 'Preferencias',
     lblLanguage: 'Idioma de la App / App Language',
     lblCurrency: 'Moneda del Sistema',
+    backupTitle: 'Respaldo y Seguridad',
+    btnExport: 'Exportar Datos (JSON)',
+    btnImport: 'Importar Datos (JSON)',
+    btnLogout: 'Bloquear / Cerrar Sesión',
     certifiedModalTitle: 'Expediente de Venta',
-    btnPrint: 'Imprimir / PDF'
+    btnPrint: 'Imprimir / PDF',
+    noVehicles: 'No hay vehículos registrados.',
+    noServices: 'Sin mantenimientos registrados para este vehículo.',
+    noFuels: 'Sin recargas de gasolina registradas.',
+    noReminders: 'No hay recordatorios pendientes.',
+    noDocs: 'Sin documentos registrados en la guantera.',
+    noContacts: 'No hay números guardados.',
+    callBtn: 'Llamar',
+    deleteBtn: 'Eliminar',
+    urgentBadge: 'Atención requerida',
+    okBadge: 'Al día',
+    validDoc: 'Vigente',
+    expiredDoc: 'Vencido',
+    dueSoonDoc: 'Por vencer'
   },
   en: {
+    navGarage: 'Garage',
+    navServices: 'Services',
+    navFuel: 'Fuel',
+    navGlovebox: 'Glovebox',
+    navAI: 'AI',
+    navReports: 'Reports',
+    subtitleGarage: 'Smart vehicle management and workshop assistant',
+    titleMaintenance: 'Services & Maintenance',
+    subMaintenance: 'Mechanical and preventive service history',
+    btnAddService: '+ Add Service',
+    titleFuel: 'Fuel Log',
+    subFuel: 'Refuel entries and fuel consumption tracking',
+    btnAddFuel: '+ Log Fuel',
     guanteraTitle: 'Digital Glovebox',
-    guanteraSubtitle: 'Documents, insurance, inspection & emergency contacts',
+    guanteraSubtitle: 'Documents, insurance, inspection & assistance directory',
     contactsTitle: 'Important Numbers',
     contactsSubtitle: 'Swipe left to delete. Tap to call mechanic, tow or insurance',
     btnAddContact: '+ Save Number',
     docsTitle: 'Vehicle Documents',
     btnAddDoc: '+ Add Document',
+    titleAI: 'AI Mechanic Assistant',
+    subAI: 'Smart diagnostic analysis and mechanic Q&A',
+    aiQueryTitle: 'Ask AI Mechanic',
+    aiQuerySub: 'Quick topics or custom question:',
+    btnAskAI: 'Ask AI Assistant',
+    titleReports: 'Reports & Expenses',
+    subReports: 'Detailed breakdown of maintenance and fuel spend',
+    cardTotalServ: 'Total Maintenance',
+    cardTotalFuel: 'Total Fuel',
+    cardCatBreakdown: 'Expense Breakdown by Category',
+    cardMonthBreakdown: 'Expense Breakdown by Month',
     reportTitle: 'Maintenance & Service History',
     reportSubtitle: 'Generate an official certified vehicle report with all mechanical repairs, services, and costs ready to share or print to PDF.',
     btnViewReport: 'View / Print Report (PDF)',
-    btnShareWA: '📱 WhatsApp',
-    btnShareEmail: '✉️ Email',
+    btnShareWA: 'WhatsApp',
+    btnShareEmail: 'Email',
+    titleSettings: 'General Settings',
+    subSettings: 'Account configuration and preferences',
+    profileTitle: 'User Profile',
+    lblUsername: 'Username',
+    secAuthTitle: 'Security & Authentication',
+    pinTitle: 'PIN Access',
+    pinSubtitle: 'Unlock the application with a 4-6 digit numeric PIN',
+    btnSavePin: 'Save PIN',
     prefTitle: 'Preferences',
     lblLanguage: 'App Language / Idioma de la App',
     lblCurrency: 'System Currency',
+    backupTitle: 'Backup & Security',
+    btnExport: 'Export Data (JSON)',
+    btnImport: 'Import Data (JSON)',
+    btnLogout: 'Lock / Log Out',
     certifiedModalTitle: 'Vehicle Service Record',
-    btnPrint: 'Print / PDF'
+    btnPrint: 'Print / PDF',
+    noVehicles: 'No vehicles added yet.',
+    noServices: 'No maintenance records found for this vehicle.',
+    noFuels: 'No fuel entries logged yet.',
+    noReminders: 'No pending reminders.',
+    noDocs: 'No documents stored in glovebox.',
+    noContacts: 'No phone numbers saved.',
+    callBtn: 'Call',
+    deleteBtn: 'Delete',
+    urgentBadge: 'Attention needed',
+    okBadge: 'Up to date',
+    validDoc: 'Valid',
+    expiredDoc: 'Expired',
+    dueSoonDoc: 'Expiring soon'
   }
 };
+
+function t(key, fallback = '') {
+  const lang = appState.language || 'es';
+  if (I18N_DICT[lang] && I18N_DICT[lang][key]) return I18N_DICT[lang][key];
+  if (I18N_DICT.es && I18N_DICT.es[key]) return I18N_DICT.es[key];
+  return fallback || key;
+}
 
 function changeLanguageSetting(lang) {
   appState.language = lang || 'es';
@@ -2141,6 +2245,10 @@ function changeLanguageSetting(lang) {
   applyLanguageTranslations();
   renderUserSettings();
   renderApp();
+  renderEmergencyContacts();
+  renderDocuments();
+  renderUserReminders();
+  renderRemindersTab();
 }
 
 function applyLanguageTranslations() {
@@ -2154,4 +2262,5 @@ function applyLanguageTranslations() {
     }
   });
 }
+
 

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d62d9" />
+      <stop offset="100%" stop-color="#063380" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
+  <g fill="#ffffff">
+    <!-- Car Front Silhouette -->
+    <path d="M140 180 C150 140 200 120 256 120 C312 120 362 140 372 180 L395 240 C410 240 420 252 420 268 L420 310 C420 325 408 335 395 335 L395 350 C395 365 380 375 365 375 L350 375 C335 375 325 365 325 350 L325 335 L187 335 L187 350 C187 365 177 375 162 375 L147 375 C132 375 117 365 117 350 L117 335 C104 335 92 325 92 310 L92 268 C92 252 102 240 117 240 Z M160 230 L352 230 L335 175 C330 155 295 145 256 145 C217 145 182 155 177 175 Z" />
+    <!-- Headlights -->
+    <circle cx="150" cy="275" r="20" fill="#0d62d9" />
+    <circle cx="362" cy="275" r="20" fill="#0d62d9" />
+    <!-- Grille -->
+    <rect x="206" y="280" width="100" height="20" rx="6" fill="#0d62d9" />
+  </g>
+</svg>
