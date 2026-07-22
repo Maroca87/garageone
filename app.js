@@ -391,22 +391,56 @@ function resetAllSwipeItems() {
   });
 }
 
+// High-Capacity Storage Engine (IndexedDB + LocalStorage 50MB Expansion)
+const IDB_NAME = 'GarageOneDB';
+const IDB_STORE = 'appStateStore';
+
+function openIDB() {
+  return new Promise((resolve) => {
+    if (!window.indexedDB) return resolve(null);
+    try {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function saveStateToIDB(data) {
+  try {
+    const db = await openIDB();
+    if (!db) return;
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(data, 'appState');
+  } catch (e) {
+    console.log('IndexedDB save fallback:', e);
+  }
+}
+
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
   } catch (e) {
-    console.error('Error al guardar estado en LocalStorage:', e);
-    alert('Aviso de Almacenamiento: El espacio local está cerca de su límite. Ve a Ajustes -> Almacenamiento y Producción para optimizar las fotos almacenadas.');
+    console.warn('LocalStorage limit reached, saving to IndexedDB high-capacity store...', e);
   }
+  saveStateToIDB(appState);
 }
 
 function getStorageUsage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || '';
+    const raw = localStorage.getItem(STORAGE_KEY) || JSON.stringify(appState);
     const bytes = raw.length * 2;
     const kb = (bytes / 1024).toFixed(1);
     const mb = (bytes / (1024 * 1024)).toFixed(2);
-    const percent = Math.min(100, Math.round((bytes / (5 * 1024 * 1024)) * 100));
+    const percent = Math.min(100, Math.round((bytes / (50 * 1024 * 1024)) * 100));
     return { bytes, kb, mb, percent };
   } catch (e) {
     return { bytes: 0, kb: '0', mb: '0', percent: 0 };
@@ -429,7 +463,7 @@ function renderStorageStats() {
   container.innerHTML = `
     <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px;">
       <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
-      <span style="font-weight:700; color:${barColor};">${usage.percent}% de 5MB</span>
+      <span style="font-weight:700; color:${barColor};">${usage.percent}% de 50MB Ampliado</span>
     </div>
     <div style="width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin-bottom:6px;">
       <div style="width:${usage.percent}%; height:100%; background:${barColor}; border-radius:4px; transition:width 0.3s ease;"></div>
@@ -1364,6 +1398,29 @@ function renderAIDiagnostic() {
 
   let lastService = services.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
 
+  const statusBanner = document.getElementById('aiConnectionStatusBanner');
+  if (statusBanner) {
+    if (appState.geminiApiKey) {
+      statusBanner.innerHTML = `
+        <div style="background:rgba(48,209,88,0.12); border:1px solid rgba(48,209,88,0.3); border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#30d158; box-shadow:0 0 8px #30d158;"></span>
+            <strong style="color:#30d158; font-size:0.88rem;">Conectado a Google Gemini IA en Vivo ✓</strong>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="switchTab('tabSettings')" style="font-size:0.75rem; padding:4px 10px;">Ajustes</button>
+        </div>`;
+    } else {
+      statusBanner.innerHTML = `
+        <div style="background:rgba(255,214,10,0.12); border:1px solid rgba(255,214,10,0.3); border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <strong style="color:#ffd60a; display:block; font-size:0.88rem;">Modo Experto Integrado (Offline)</strong>
+            <span style="font-size:0.78rem; color:#cbd5e1;">Ingresa tu API Key gratuita de Google Gemini en Ajustes para activar la IA en vivo de Google.</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="switchTab('tabSettings')" style="font-size:0.78rem; padding:6px 12px;">Conectar Gemini</button>
+        </div>`;
+    }
+  }
+
   container.innerHTML = `
     <div class="ai-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
       <div>
@@ -1458,6 +1515,8 @@ async function askAIAssistantDirect(question) {
     return;
   }
 
+  let lastGeminiApiError = '';
+
   // 1. LIVE GOOGLE GEMINI API ENGINE
   if (appState.geminiApiKey) {
     try {
@@ -1494,16 +1553,18 @@ Instrucciones de Respuesta:
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
           });
-          if (res.ok) {
-            resData = await res.json();
-            if (resData && resData.candidates && resData.candidates[0].content.parts[0].text) {
-              appState.geminiWorkingUrl = url;
-              saveState();
-              break;
-            }
+          const data = await res.json();
+          if (res.ok && data.candidates && data.candidates[0].content.parts[0].text) {
+            resData = data;
+            appState.geminiWorkingUrl = url;
+            saveState();
+            break;
+          } else if (data.error) {
+            lastGeminiApiError = data.error.message;
           }
         } catch (e) {
           console.log('Error testing endpoint:', url, e);
+          lastGeminiApiError = e.message;
         }
       }
 
@@ -1515,12 +1576,18 @@ Instrucciones de Respuesta:
       }
     } catch (err) {
       console.error('Error calling Gemini API:', err);
+      lastGeminiApiError = err.message;
     }
   }
 
   // 2. ENHANCED OFFLINE EXPERT MECHANICAL ENGINE
   setTimeout(() => {
     const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">🛠️ Asistente Mecánico Integrado (Modo Offline)</div><br>`;
+    
+    let errorNotice = '';
+    if (appState.geminiApiKey && lastGeminiApiError) {
+      errorNotice = `<div style="background:rgba(255,69,58,0.15); color:#ff453a; border:1px solid rgba(255,69,58,0.3); padding:8px 12px; border-radius:10px; font-size:0.82rem; margin-bottom:12px;">⚠️ <strong>Error en Google Gemini API:</strong> ${escapeHtml(lastGeminiApiError)}<br><span style="color:#cbd5e1; font-size:0.76rem;">Se muestra respuesta del motor mecánico local como respaldo.</span></div>`;
+    }
 
     let response = '';
 
@@ -1542,7 +1609,7 @@ Instrucciones de Respuesta:
       response = `🟢 **Nivel de Severidad: PREVENTIVA / INFORMATIVA**\n\n🛠️ **Asesoría Técnica Experta para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n🔍 **Recomendaciones de Mantenimiento:**\n• Para un vehículo con **${veh ? veh.km.toLocaleString() : 0} KM**, asegúrate de realizar cambio de aceite y filtro cada 5.000 KM (mineral) o 10.000 KM (sintético).\n• Inspecciona fajas de distribución y accesorios cada 40.000 KM.\n• Mantén al día tu bitácora registrando cada servicio en la pestaña **Servicios** de GarageOne.`;
     }
 
-    responseBox.innerHTML = offlineBadge + formatText(response);
+    responseBox.innerHTML = errorNotice + offlineBadge + formatText(response);
     if (input) input.value = '';
   }, 300);
 }
