@@ -14,8 +14,8 @@ function Generate-CarWrenchIcon($size, $path) {
     $blueGrad = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
         (New-Object System.Drawing.PointF(0, 0)),
         (New-Object System.Drawing.PointF($size, $size)),
-        [System.Drawing.Color]::FromArgb(255, 13, 98, 217),
-        [System.Drawing.Color]::FromArgb(255, 6, 51, 128)
+        [System.Drawing.Color]::FromArgb(255, 15, 23, 42),
+        [System.Drawing.Color]::FromArgb(255, 2, 6, 23)
     )
     $g.FillRectangle($blueGrad, 0, 0, $size, $size)
 
@@ -86,7 +86,7 @@ function Generate-CarWrenchIcon($size, $path) {
     $bmp.Dispose()
 }
 
-$iconDir = "c:\Users\mrodriguez\.gemini\antigravity-ide\scratch\autocare-pwa\icons"
+$iconDir = "c:\Users\mrodriguez\.gemini\antigravity-ide\scratch\garage_one\icons"
 if (-not (Test-Path $iconDir)) { New-Item -ItemType Directory -Path $iconDir }
 
 Generate-CarWrenchIcon 180 "$iconDir\apple-touch-icon.png"

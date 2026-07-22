@@ -19,31 +19,11 @@ function generateCarWrenchIconPNG(size) {
     for (let x = 0; x < size; x++) {
       const offset = rowOffset + 1 + x * bytesPerPixel;
 
-      // Squircle Check (Full icon squircle fill)
-      let inSquircle = false;
-      let cDx = 0, cDy = 0;
-
-      if (x < squircleRadius && y < squircleRadius) {
-        cDx = x - squircleRadius; cDy = y - squircleRadius;
-        if (cDx * cDx + cDy * cDy <= squircleRadius * squircleRadius) inSquircle = true;
-      } else if (x > size - squircleRadius && y < squircleRadius) {
-        cDx = x - (size - squircleRadius); cDy = y - squircleRadius;
-        if (cDx * cDx + cDy * cDy <= squircleRadius * squircleRadius) inSquircle = true;
-      } else if (x < squircleRadius && y > size - squircleRadius) {
-        cDx = x - squircleRadius; cDy = y - (size - squircleRadius);
-        if (cDx * cDx + cDy * cDy <= squircleRadius * squircleRadius) inSquircle = true;
-      } else if (x > size - squircleRadius && y > size - squircleRadius) {
-        cDx = x - (size - squircleRadius); cDy = y - (size - squircleRadius);
-        if (cDx * cDx + cDy * cDy <= squircleRadius * squircleRadius) inSquircle = true;
-      } else {
-        inSquircle = true;
-      }
-
-      // Full Bleed Vibrant Royal Blue Gradient Fill (#0d62d9 top left to #063380 bottom right)
+      // Full Bleed Dark Premium Gradient Fill (#0f172a to #020617) - 100% Solid Opaque
       const gradT = (x * 0.3 + y * 0.7) / size;
-      let r = Math.round(13 * (1 - gradT) + 6 * gradT);
-      let g = Math.round(98 * (1 - gradT) + 51 * gradT);
-      let b = Math.round(217 * (1 - gradT) + 128 * gradT);
+      let r = Math.round(15 * (1 - gradT) + 2 * gradT);
+      let g = Math.round(23 * (1 - gradT) + 6 * gradT);
+      let b = Math.round(42 * (1 - gradT) + 23 * gradT);
 
       // --- CAR SILHOUETTE (Top Center) ---
       const carCenterX = center;

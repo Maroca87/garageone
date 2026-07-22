@@ -273,7 +273,7 @@
 
           <form id="formAIChat" onsubmit="askAIAssistant(event)">
             <div class="form-group">
-              <input type="text" id="aiUserQuestion" class="form-control" placeholder="Ej. ¿Por qué el pedal se siente suave al frenar?" required>
+              <input type="text" id="aiUserQuestion" class="form-control" placeholder="" required>
             </div>
             <button type="submit" class="btn btn-primary btn-block">Consultar a la IA</button>
           </form>
@@ -362,7 +362,7 @@
               Probar y Guardar Key
             </button>
             <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-tertiary btn-sm" style="color:#38bdf8; text-decoration:none; font-size:0.8rem;">
-              🔗 Obtener API Key Gratis
+              Obtener API Key Gratis
             </a>
           </div>
           <div id="geminiKeyStatusMsg" style="margin-top:8px; font-size:0.82rem; font-weight:600; display:none;"></div>
@@ -517,21 +517,21 @@
         </div>
         <div class="form-group">
           <label>Marca y Modelo</label>
-          <input type="text" id="vehName" class="form-control" placeholder="Ej. Toyota Corolla" required>
+          <input type="text" id="vehName" class="form-control" placeholder="" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Año</label>
-            <input type="number" id="vehYear" class="form-control" placeholder="2022" required>
+            <input type="number" id="vehYear" class="form-control" placeholder="" required>
           </div>
           <div class="form-group">
             <label>Placa / Matrícula</label>
-            <input type="text" id="vehPlate" class="form-control" placeholder="ABC-123">
+            <input type="text" id="vehPlate" class="form-control" placeholder="">
           </div>
         </div>
         <div class="form-group">
           <label>Kilometraje Actual (KM)</label>
-          <input type="number" id="vehKm" class="form-control" placeholder="45000" required>
+          <input type="number" id="vehKm" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Foto del Vehículo (Opcional)</label>
@@ -556,7 +556,7 @@
         <p class="form-help">Ingresa la lectura actual de kilómetros de tu odómetro.</p>
         <div class="form-group">
           <label>Nuevo Kilometraje (KM)</label>
-          <input type="number" id="quickOdometerInput" class="form-control" placeholder="Ej. 48500" required>
+          <input type="number" id="quickOdometerInput" class="form-control" placeholder="" required>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalOdometer')">Cancelar</button>
@@ -583,12 +583,12 @@
         </div>
         <div class="form-group">
           <label>Descripción del Trabajo</label>
-          <input type="text" id="servTitle" class="form-control" placeholder="Ej. Aceite Sintético 5W-30 + Filtro OEM" required>
+          <input type="text" id="servTitle" class="form-control" placeholder="" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Costo Total (<span class="currency-lbl">₡</span>)</label>
-            <input type="number" step="1" id="servCost" class="form-control" placeholder="45000" required>
+            <input type="number" step="1" id="servCost" class="form-control" placeholder="" required>
           </div>
           <div class="form-group">
             <label>Fecha</label>
@@ -597,15 +597,15 @@
         </div>
         <div class="form-group">
           <label>Kilometraje al realizar el Servicio</label>
-          <input type="number" id="servKm" class="form-control" placeholder="45000" required>
+          <input type="number" id="servKm" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Taller / Proveedor (Opcional)</label>
-          <input type="text" id="servShop" class="form-control" placeholder="Ej. Taller Central">
+          <input type="text" id="servShop" class="form-control" placeholder="">
         </div>
         <div class="form-group">
           <label>Notas Adicionales / Detalles (Opcional)</label>
-          <input type="text" id="servNotes" class="form-control" placeholder="Ej. Garantía de 6 meses o marca de repuestos usados">
+          <input type="text" id="servNotes" class="form-control" placeholder="">
         </div>
         <div class="form-group">
           <label>Foto de Factura / Comprobante</label>
@@ -631,16 +631,16 @@
         <div class="form-row">
           <div class="form-group">
             <label>Monto Total (<span class="currency-lbl">₡</span>)</label>
-            <input type="number" step="1" id="fuelCost" class="form-control" placeholder="25000" required>
+            <input type="number" step="1" id="fuelCost" class="form-control" placeholder="" required>
           </div>
           <div class="form-group">
             <label>Litros Cargados</label>
-            <input type="number" step="0.01" id="fuelVolume" class="form-control" placeholder="35.0" required>
+            <input type="number" step="0.01" id="fuelVolume" class="form-control" placeholder="" required>
           </div>
         </div>
         <div class="form-group">
           <label>Kilometraje en Odómetro</label>
-          <input type="number" id="fuelKm" class="form-control" placeholder="45200" required>
+          <input type="number" id="fuelKm" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Fecha</label>
@@ -648,7 +648,7 @@
         </div>
         <div class="form-group">
           <label>Estación / Notas (Opcional)</label>
-          <input type="text" id="fuelNotes" class="form-control" placeholder="Ej. Gasolinera Delta, Gasolina Súper">
+          <input type="text" id="fuelNotes" class="form-control" placeholder="">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalFuel')">Cancelar</button>
@@ -701,16 +701,16 @@
       <form id="formNewCategory" onsubmit="saveNewCategory(event)">
         <div class="form-group">
           <label>Nombre del Servicio / Categoría</label>
-          <input type="text" id="newCatName" class="form-control" placeholder="Ej. Amortiguadores, Alineación" required>
+          <input type="text" id="newCatName" class="form-control" placeholder="" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Intervalo en KM</label>
-            <input type="number" id="newCatKm" class="form-control" placeholder="20000" required>
+            <input type="number" id="newCatKm" class="form-control" placeholder="" required>
           </div>
           <div class="form-group">
             <label>Intervalo en Días</label>
-            <input type="number" id="newCatDays" class="form-control" placeholder="365" required>
+            <input type="number" id="newCatDays" class="form-control" placeholder="" required>
           </div>
         </div>
         <div class="modal-footer">
@@ -744,7 +744,7 @@
         </div>
         <div class="form-group">
           <label>Nombre o Número de Referencia</label>
-          <input type="text" id="docTitle" class="form-control" placeholder="Ej. Póliza Todo Riesgo INS #12345" required>
+          <input type="text" id="docTitle" class="form-control" placeholder="" required>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -753,12 +753,12 @@
           </div>
           <div class="form-group">
             <label>Tel. Asistencia / Grúa (Opcional)</label>
-            <input type="tel" id="docPhone" class="form-control" placeholder="Ej. 800-800-911">
+            <input type="tel" id="docPhone" class="form-control" placeholder="">
           </div>
         </div>
         <div class="form-group">
           <label>Notas Adicionales (Opcional)</label>
-          <input type="text" id="docNotes" class="form-control" placeholder="Ej. Cobertura A+B+C, agente de seguros Juan">
+          <input type="text" id="docNotes" class="form-control" placeholder="">
         </div>
         <div class="form-group">
           <label>Foto / PDF del Documento</label>
@@ -783,7 +783,7 @@
         <input type="hidden" id="remId">
         <div class="form-group">
           <label>Título del Recordatorio</label>
-          <input type="text" id="remTitle" class="form-control" placeholder="Ej. Cambio de Llantas, Marchamo, Bujías" required>
+          <input type="text" id="remTitle" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Categoría / Tipo</label>
@@ -798,7 +798,7 @@
         <div class="form-row">
           <div class="form-group">
             <label>Kilometraje Meta (Opcional)</label>
-            <input type="number" id="remTargetKm" class="form-control" placeholder="Ej. 50000">
+            <input type="number" id="remTargetKm" class="form-control" placeholder="">
           </div>
           <div class="form-group">
             <label>Fecha Meta (Opcional)</label>
@@ -819,7 +819,7 @@
         </div>
         <div class="form-group">
           <label>Nota adicional / Detalle (Opcional)</label>
-          <input type="text" id="remNotes" class="form-control" placeholder="Ej. Comprar marca Michelin o lubricentro del norte">
+          <input type="text" id="remNotes" class="form-control" placeholder="">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalReminder')">Cancelar</button>
@@ -840,11 +840,11 @@
         <input type="hidden" id="contactId">
         <div class="form-group">
           <label>Nombre del Servicio / Taller / Grúa</label>
-          <input type="text" id="contactName" class="form-control" placeholder="Ej. Grúa INS 24/7, Taller Central, Mecánico Juan" required>
+          <input type="text" id="contactName" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Número Telefónico</label>
-          <input type="tel" id="contactPhone" class="form-control" placeholder="Ej. 800-800-911 o 8888-8888" required>
+          <input type="tel" id="contactPhone" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
           <label>Categoría</label>
@@ -858,7 +858,7 @@
         </div>
         <div class="form-group">
           <label>Notas / Horarios (Opcional)</label>
-          <input type="text" id="contactNotes" class="form-control" placeholder="Ej. Atiende 24h, preguntar por Mario">
+          <input type="text" id="contactNotes" class="form-control" placeholder="">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalContact')">Cancelar</button>
