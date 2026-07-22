@@ -275,12 +275,21 @@ function sendRecoveryVerificationCode() {
   const emailSentTargetEl = document.getElementById('forgotEmailSentTarget');
   if (emailSentTargetEl) emailSentTargetEl.textContent = targetEmail;
 
+  // Real Email Dispatch via Mailto / Email Client Protocol (No code shown on screen!)
+  const subject = encodeURIComponent("Codigo de Verificacion de Seguridad - GarageOne");
+  const body = encodeURIComponent(`Hola,\n\nTu codigo de verificacion de 6 digitos para restablecer tu contraseña en GarageOne es:\n\n${code}\n\nIngresa este codigo en la aplicacion para cambiar tu contraseña.`);
+  const mailtoUrl = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
+
+  const link = document.createElement('a');
+  link.href = mailtoUrl;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
   const step1 = document.getElementById('forgotStep1');
   const step2 = document.getElementById('forgotStep2');
   if (step1) step1.style.display = 'none';
   if (step2) step2.style.display = 'block';
-
-  alert(`VERIFICACIÓN DE SEGURIDAD GARAGEONE\n\nSe ha enviado un código de recuperación a tu correo:\n${targetEmail}\n\nTu Código de Verificación de 6 dígitos es:\n ${code} \n\nIngresa este código para cambiar tu contraseña de forma segura.`);
 }
 
 function handleForgotPassword(e) {
