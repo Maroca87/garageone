@@ -3,8 +3,8 @@
    ========================================================================== */
 
 const STORAGE_KEY = 'AUTOCARE_DATA_V14';
-const USER_KEY = 'AUTOCARE_USER_V14';
-const USERS_KEY = 'AUTOCARE_USERS_V14';
+const USER_KEY = 'AUTOCARE_USER_V16';
+const USERS_KEY = 'AUTOCARE_USERS_V16';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -796,10 +796,25 @@ async function initAsyncStorage() {
   }
 
   try {
-    await syncUsersDatabase();
+    // Complete Wipe of all old test users from LocalStorage and IndexedDB to start 100% clean
+    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15'].forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(USERS_KEY);
+
+    const db = await openIDB();
+    if (db) {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete('usersList');
+    }
   } catch (e) {
-    console.warn('Error syncing users database on startup:', e);
+    console.warn('Error purging old users database:', e);
   }
+
+  currentUser = null;
+  isAuthenticated = false;
+  showRegisterForm();
 }
 
 async function saveStateToIDB(data) {
