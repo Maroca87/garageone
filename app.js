@@ -1461,21 +1461,22 @@ async function askAIAssistantDirect(question) {
   // 1. LIVE GOOGLE GEMINI API ENGINE
   if (appState.geminiApiKey) {
     try {
-      const promptText = `Eres un Ingeniero Mecánico Automotriz Experto y Asistente Técnico de GarageOne. 
-Analiza con máxima precisión la siguiente consulta para este vehículo:
-- Vehículo: ${vehContext}
-- Historial de Mantenimientos Recientes:\n${recentServicesText}
-- Recordatorios Pendientes:\n${pendingRemindersText}
+      const promptText = `Eres el Asistente Técnico y Mecánico Automotriz de GarageOne con Inteligencia Artificial.
+Vehículo actual del usuario: ${vehContext}
+Mantenimientos recientes registrados:
+${recentServicesText}
+Recordatorios pendientes:
+${pendingRemindersText}
 
 Consulta del Usuario: "${question}"
 
 Instrucciones de Respuesta:
-Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente formato Markdown:
-1. 🔴 / 🟡 / 🟢 **Severidad y Nivel de Riesgo** (Explica brevemente el riesgo de circular así).
-2. 🛠️ **Diagnóstico Técnico y Causas Probables** (Lista las 2-3 causas más comunes).
-3. 🔍 **Componentes Específicos a Inspeccionar** (Menciona piezas exactas o pruebas).
-4. 📋 **Relación con Historial / Kilometraje** (Analiza si según sus ${veh ? veh.km.toLocaleString() : 0} KM o historial previo se requiere cambio).
-5. ⏱️ **Acción Inmediata Recomendada** (Qué debe hacer el conductor ahora mismo).`;
+- Responde de forma clara, natural, precisa y útil en español.
+- Si el usuario hace una pregunta general (como un saludo, quién eres, un concepto o consejo básico de autos), responde de manera conversacional, directa y amigable.
+- Si el usuario consulta sobre un problema técnico, falla, ruido o testigo de alerta, incluye:
+  • Severidad / Nivel de Riesgo (🔴 Alto, 🟡 Moderado, 🟢 Informativo)
+  • Diagnóstico Técnico y Causas Probables
+  • Recomendaciones o Pasos Inmediatos a Seguir.`;
 
       const candidateUrls = [
         appState.geminiWorkingUrl,
@@ -1507,7 +1508,8 @@ Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente
       }
 
       if (resData && resData.candidates && resData.candidates[0].content.parts[0].text) {
-        responseBox.innerHTML = formatText(resData.candidates[0].content.parts[0].text);
+        const liveBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(48,209,88,0.15); color:#30d158; border:1px solid rgba(48,209,88,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">⚡ Respuesta en Vivo por Google Gemini IA</div><br>`;
+        responseBox.innerHTML = liveBadge + formatText(resData.candidates[0].content.parts[0].text);
         if (input) input.value = '';
         return;
       }
@@ -1518,6 +1520,8 @@ Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente
 
   // 2. ENHANCED OFFLINE EXPERT MECHANICAL ENGINE
   setTimeout(() => {
+    const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">🛠️ Asistente Mecánico Integrado (Modo Offline)</div><br>`;
+
     let response = '';
 
     if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo') || qLower.includes('obd')) {
@@ -1538,7 +1542,7 @@ Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente
       response = `🟢 **Nivel de Severidad: PREVENTIVA / INFORMATIVA**\n\n🛠️ **Asesoría Técnica Experta para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n🔍 **Recomendaciones de Mantenimiento:**\n• Para un vehículo con **${veh ? veh.km.toLocaleString() : 0} KM**, asegúrate de realizar cambio de aceite y filtro cada 5.000 KM (mineral) o 10.000 KM (sintético).\n• Inspecciona fajas de distribución y accesorios cada 40.000 KM.\n• Mantén al día tu bitácora registrando cada servicio en la pestaña **Servicios** de GarageOne.`;
     }
 
-    responseBox.innerHTML = formatText(response);
+    responseBox.innerHTML = offlineBadge + formatText(response);
     if (input) input.value = '';
   }, 300);
 }
