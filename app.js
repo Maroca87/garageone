@@ -419,6 +419,7 @@ function renderApp() {
   renderMiniVehiclesList();
   renderMaintenanceFilterPills();
   populateServCategorySelect();
+  renderPredefinedServices();
   renderGuantera();
   const veh = getActiveVehicle();
   if (!veh) {
@@ -449,7 +450,7 @@ function renderApp() {
   renderServiceList(veh.id);
   renderFuelList(veh.id);
 
-  setTimeout(initSwipeListeners, 50);
+  setTimeout(initSwipeListeners, 30);
 }
 
 function initSwipeListeners() {
@@ -463,12 +464,15 @@ function initSwipeListeners() {
     let initialOffset = 0;
     let isSwiping = false;
 
+    const getX = (e) => (e.touches && e.touches.length > 0) ? e.touches[0].clientX : (e.clientX || 0);
+    const getY = (e) => (e.touches && e.touches.length > 0) ? e.touches[0].clientY : (e.clientY || 0);
+
     const handleStart = (e) => {
       isSwiping = true;
-      startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-      startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+      startX = getX(e);
+      startY = getY(e);
       const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal !== 'none') {
+      if (transformVal && transformVal !== 'none') {
         const matrix = new WebKitCSSMatrix(transformVal);
         initialOffset = matrix.m41;
       } else {
@@ -479,14 +483,14 @@ function initSwipeListeners() {
 
     const handleMove = (e) => {
       if (!isSwiping) return;
-      const currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-      const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+      const currentX = getX(e);
+      const currentY = getY(e);
       const diffX = currentX - startX;
       const diffY = currentY - startY;
 
-      if (Math.abs(diffX) > Math.abs(diffY)) {
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 4) {
         let newX = initialOffset + diffX;
-        if (newX < -90) newX = -90;
+        if (newX < -95) newX = -95;
         if (newX > 0) newX = 0;
         el.style.transform = `translateX(${newX}px)`;
       }
@@ -497,9 +501,9 @@ function initSwipeListeners() {
       isSwiping = false;
       el.classList.remove('swiping');
       const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal !== 'none') {
+      if (transformVal && transformVal !== 'none') {
         const matrix = new WebKitCSSMatrix(transformVal);
-        if (matrix.m41 < -40) {
+        if (matrix.m41 < -35) {
           el.style.transform = `translateX(-85px)`;
         } else {
           el.style.transform = `translateX(0px)`;
@@ -522,10 +526,12 @@ function initSwipeListeners() {
         return;
       }
       const transformVal = window.getComputedStyle(el).transform;
-      const matrix = new WebKitCSSMatrix(transformVal);
-      if (matrix.m41 < -10) {
-        evt.stopPropagation();
-        el.style.transform = `translateX(0px)`;
+      if (transformVal && transformVal !== 'none') {
+        const matrix = new WebKitCSSMatrix(transformVal);
+        if (matrix.m41 < -10) {
+          evt.stopPropagation();
+          el.style.transform = `translateX(0px)`;
+        }
       }
     });
   });
@@ -641,6 +647,7 @@ function renderMiniVehiclesList() {
     `;
   });
   container.innerHTML = html;
+  setTimeout(initSwipeListeners, 30);
 }
 
 function updateOdometer(e) {
@@ -660,6 +667,63 @@ function populateServCategorySelect() {
   const select = document.getElementById('servCategory');
   if (!select) return;
   select.innerHTML = SERVICE_CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+function openServiceModal(categoryName = '', titleText = '') {
+  const form = document.getElementById('formService');
+  if (form) form.reset();
+  const veh = getActiveVehicle();
+  
+  populateServCategorySelect();
+  
+  if (document.getElementById('servId')) document.getElementById('servId').value = '';
+  if (document.getElementById('servDate')) {
+    document.getElementById('servDate').value = new Date().toISOString().split('T')[0];
+  }
+  if (veh && document.getElementById('servKm')) {
+    document.getElementById('servKm').value = veh.km || 0;
+  }
+  if (categoryName && document.getElementById('servCategory')) {
+    document.getElementById('servCategory').value = categoryName;
+  }
+  if (titleText && document.getElementById('servTitle')) {
+    document.getElementById('servTitle').value = titleText;
+  }
+  
+  openModal('modalService');
+}
+
+function selectPredefinedService(categoryName, titleText) {
+  populateServCategorySelect();
+  if (document.getElementById('servCategory')) {
+    document.getElementById('servCategory').value = categoryName;
+  }
+  if (document.getElementById('servTitle')) {
+    document.getElementById('servTitle').value = titleText;
+  }
+}
+
+function renderPredefinedServices() {
+  const container = document.getElementById('predefinedServicesGrid');
+  if (!container) return;
+  
+  const presets = [
+    { icon: '🛢️', cat: 'Cambio de Aceite de Motor y Filtro', title: 'Cambio de Aceite 5W-30 + Filtro' },
+    { icon: '🛑', cat: 'Inspección y Cambio de Pastillas/Discos de Freno', title: 'Pastillas y Discos de Freno' },
+    { icon: '🛞', cat: 'Rotación, Alineación y Balanceo de Llantas', title: 'Alineación y Balanceo' },
+    { icon: '💨', cat: 'Cambio de Filtros (Aire, Cabina, Combustible)', title: 'Filtro de Aire y Cabina' },
+    { icon: '⚡', cat: 'Cambio de Bujías y Limpieza de Inyectores', title: 'Cambio de Bujías' },
+    { icon: '🔋', cat: 'Revisión y Cambio de Batería', title: 'Cambio de Batería' },
+    { icon: '⚙️', cat: 'Mantenimiento y Cambio de Aceite de Transmisión', title: 'Aceite de Transmisión' },
+    { icon: '📄', cat: 'Trámite de Vehículo (Marchamo / RTV / Seguro)', title: 'RTV / Marchamo' }
+  ];
+
+  container.innerHTML = presets.map(p => `
+    <button class="preset-service-card" type="button" onclick="openServiceModal('${escapeHtml(p.cat)}', '${escapeHtml(p.title)}')">
+      <span class="preset-icon">${p.icon}</span>
+      <span class="preset-title">${escapeHtml(p.title)}</span>
+    </button>
+  `).join('');
 }
 
 function openNewCategoryModal() {
@@ -712,6 +776,7 @@ function renderServiceList(vehicleId) {
     `;
   });
   container.innerHTML = html;
+  setTimeout(initSwipeListeners, 30);
 }
 
 function deleteServiceDirect(id) {
@@ -806,6 +871,7 @@ function renderFuelList(vehicleId) {
     `;
   });
   container.innerHTML = html;
+  setTimeout(initSwipeListeners, 30);
 }
 
 function deleteFuelDirect(id) {
@@ -814,16 +880,42 @@ function deleteFuelDirect(id) {
   renderApp();
 }
 
+function openFuelModal(fuelId = null) {
+  const form = document.getElementById('formFuel');
+  if (form) form.reset();
+  const veh = getActiveVehicle();
+  
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (document.getElementById('fuelDate')) {
+    document.getElementById('fuelDate').value = todayStr;
+  }
+  if (veh && document.getElementById('fuelKm')) {
+    document.getElementById('fuelKm').value = veh.km || 0;
+  }
+  if (document.getElementById('fuelId')) {
+    document.getElementById('fuelId').value = fuelId || '';
+  }
+  openModal('modalFuel');
+}
+
 function saveFuel(e) {
   e.preventDefault();
   const veh = getActiveVehicle();
-  if (!veh) return;
+  if (!veh) {
+    alert('Agrega o selecciona un vehículo primero.');
+    return;
+  }
 
   const cost = parseFloat(document.getElementById('fuelCost').value) || 0;
   const volume = parseFloat(document.getElementById('fuelVolume').value) || 0;
-  const km = parseInt(document.getElementById('fuelKm').value) || veh.km;
-  const date = document.getElementById('fuelDate').value;
-  const notes = document.getElementById('fuelNotes').value.trim();
+  const km = parseInt(document.getElementById('fuelKm').value) || veh.km || 0;
+  const date = document.getElementById('fuelDate').value || new Date().toISOString().split('T')[0];
+  const notes = document.getElementById('fuelNotes').value ? document.getElementById('fuelNotes').value.trim() : '';
+
+  if (cost <= 0 || volume <= 0) {
+    alert('Por favor ingresa un monto y cantidad de litros válidos.');
+    return;
+  }
 
   appState.fuels.push({
     id: 'f_' + Date.now(),
@@ -998,9 +1090,12 @@ function renderUserReminders(targetContainerId = 'userRemindersList') {
             </div>
             <div class="veh-info-sub">${escapeHtml(r.category || 'Mantenimiento')} ${targetStr ? '• ' + targetStr : ''} ${r.repeat && r.repeat !== 'none' ? '↻ Recurrente' : ''}</div>
           </div>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:6px; align-items:center;">
             <button class="btn ${r.completed ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="toggleReminderCompleted('${r.id}')">
               ${r.completed ? '✓ Listo' : 'Marcar Completado'}
+            </button>
+            <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar recordatorio">
+              ${SVG_ICONS.trash}
             </button>
           </div>
         </div>
@@ -1008,6 +1103,7 @@ function renderUserReminders(targetContainerId = 'userRemindersList') {
     `;
   });
   container.innerHTML = html;
+  setTimeout(initSwipeListeners, 30);
 }
 
 function openDocumentModal(docId = null) {
@@ -1082,17 +1178,26 @@ function renderGuantera() {
     let cHtml = '';
     (appState.emergencyContacts || []).forEach(c => {
       cHtml += `
-        <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-color);">
-          <div style="flex:1; min-width:0;">
-            <strong style="color:#ffffff; display:block;">${escapeHtml(c.name)}</strong>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(c.category || 'Contacto')}</div>
+        <div class="swipe-container">
+          <div class="swipe-action-bg">
+            <button class="swipe-action-btn" onclick="deleteEmergencyContact('${c.id}')">
+              ${SVG_ICONS.trash} <span>Borrar</span>
+            </button>
           </div>
-          <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:#30d158; border-color:rgba(48,209,88,0.3); white-space:nowrap;">
-            📞 ${escapeHtml(c.phone)}
-          </a>
-          <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContact('${c.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar contacto">
-            ${SVG_ICONS.trash}
-          </button>
+          <div class="swipe-content">
+            <div style="flex:1; min-width:0;">
+              <strong style="color:#ffffff; display:block;">${escapeHtml(c.name)}</strong>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(c.category || 'Contacto')}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:#30d158; border-color:rgba(48,209,88,0.3); white-space:nowrap;">
+                📞 ${escapeHtml(c.phone)}
+              </a>
+              <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContact('${c.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar contacto">
+                ${SVG_ICONS.trash}
+              </button>
+            </div>
+          </div>
         </div>
       `;
     });
@@ -1136,6 +1241,7 @@ function renderGuantera() {
     `;
   });
   docContainer.innerHTML = html;
+  setTimeout(initSwipeListeners, 30);
 }
 
 function deleteDocumentDirect(id) {

@@ -13,18 +13,18 @@
   <meta name="theme-color" content="#0b1329" media="(prefers-color-scheme: dark)">
   
   <!-- App Icons for iOS & PWA -->
-  <link rel="manifest" href="manifest.json?v=400">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png?v=400">
-  <link rel="apple-touch-icon-precomposed" href="icons/icon-192.png?v=400">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=400">
-  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=400">
-  <link rel="shortcut icon" href="icons/icon-192.png?v=400">
+  <link rel="manifest" href="manifest.json?v=500">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png?v=500">
+  <link rel="apple-touch-icon-precomposed" href="icons/icon-192.png?v=500">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=500">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=500">
+  <link rel="shortcut icon" href="icons/icon-192.png?v=500">
 
   <!-- Font & CSS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=400">
+  <link rel="stylesheet" href="style.css?v=500">
 </head>
 <body>
 
@@ -168,7 +168,17 @@
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="openModal('modalNewCategory')">+ Tipo de Servicio</button>
-            <button class="btn btn-primary btn-sm" onclick="openModal('modalService')">+ Registrar Servicio</button>
+            <button class="btn btn-primary btn-sm" onclick="openServiceModal()">+ Registrar Servicio</button>
+          </div>
+        </div>
+
+        <!-- Section: Servicios Predefinidos Rápida Selección -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:0.82rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px;">
+            ⚡ Servicios Predefinidos (Selección Rápida):
+          </div>
+          <div class="predefined-services-grid" id="predefinedServicesGrid">
+            <!-- Dynamically populated predefined services -->
           </div>
         </div>
 
@@ -188,7 +198,7 @@
             <h1>Combustible</h1>
             <p class="subtitle">Rendimiento y costo por distancia</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openModal('modalFuel')">+ Registrar Recarga</button>
+          <button class="btn btn-primary btn-sm" onclick="openFuelModal()">+ Registrar Recarga</button>
         </div>
 
         <div class="stats-row">
@@ -499,6 +509,18 @@
       <form id="formService" onsubmit="saveService(event)">
         <input type="hidden" id="servId">
         <div class="form-group">
+          <label>Mantenimiento Predefinido Rápido</label>
+          <div class="predefined-chips-row">
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Cambio de Aceite de Motor y Filtro', 'Cambio de Aceite 5W-30 + Filtro')">🛢️ Aceite</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Inspección y Cambio de Pastillas/Discos de Freno', 'Pastillas y Discos de Freno')">🛑 Frenos</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Rotación, Alineación y Balanceo de Llantas', 'Alineación y Balanceo')">🛞 Llantas</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Cambio de Filtros (Aire, Cabina, Combustible)', 'Filtro de Aire y Cabina')">💨 Filtros</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Cambio de Bujías y Limpieza de Inyectores', 'Cambio de Bujías')">⚡ Bujías</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Revisión y Cambio de Batería', 'Cambio de Batería')">🔋 Batería</button>
+            <button type="button" class="chip-btn" onclick="selectPredefinedService('Trámite de Vehículo (Marchamo / RTV / Seguro)', 'RTV / Inspección Técnica')">📄 RTV / Marchamo</button>
+          </div>
+        </div>
+        <div class="form-group">
           <label>Categoría / Tipo de Servicio</label>
           <select id="servCategory" class="form-control" required></select>
         </div>
@@ -776,10 +798,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=400"></script>
+  <script src="app.js?v=500"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=400').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=500').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>
