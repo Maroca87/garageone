@@ -117,6 +117,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+// BroadcastChannel for Live Cross-Tab & Web/App User Sync
+const userSyncChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('garageone_user_database_sync') : null;
+
+if (userSyncChannel) {
+  userSyncChannel.onmessage = function(event) {
+    if (event && event.data && event.data.type === 'USER_DATABASE_UPDATED') {
+      syncUsersDatabase();
+    }
+  };
+}
+
 function getUsersList() {
   try {
     const raw = localStorage.getItem(USERS_KEY);
@@ -149,6 +160,53 @@ async function saveUsersList(usersList) {
   } catch (e) {
     console.warn('Error saving users to IndexedDB:', e);
   }
+  if (userSyncChannel) {
+    try {
+      userSyncChannel.postMessage({ type: 'USER_DATABASE_UPDATED' });
+    } catch (e) {}
+  }
+}
+
+async function syncUsersDatabase() {
+  try {
+    const idbUsers = (await loadUsersListFromIDB()) || [];
+    let lsUsers = [];
+    try {
+      const raw = localStorage.getItem(USERS_KEY);
+      lsUsers = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(lsUsers)) lsUsers = [];
+    } catch (e) {}
+
+    const activeUser = currentUser || loadUser();
+
+    const map = new Map();
+    [...idbUsers, ...lsUsers, activeUser].forEach(u => {
+      if (!u || (!u.username && !u.email)) return;
+      const key = (u.username || u.email).trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, u);
+      } else {
+        const prev = map.get(key);
+        map.set(key, {
+          ...prev,
+          ...u,
+          password: u.password || prev.password,
+          pin: u.pin || prev.pin,
+          email: u.email || prev.email
+        });
+      }
+    });
+
+    const merged = Array.from(map.values());
+    try {
+      localStorage.setItem(USERS_KEY, JSON.stringify(merged));
+    } catch (e) {}
+    await saveUsersList(merged);
+    return merged;
+  } catch (e) {
+    console.warn('Error in syncUsersDatabase:', e);
+    return getUsersList();
+  }
 }
 
 function loadUser() {
@@ -158,21 +216,24 @@ function loadUser() {
   } catch (e) { return null; }
 }
 
-function saveUser(user) {
+async function saveUser(user) {
   currentUser = user;
   try {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch (e) {
     console.warn('Error saving currentUser:', e);
   }
-  const list = getUsersList();
-  const idx = list.findIndex(u => u.username && user.username && u.username.toLowerCase() === user.username.toLowerCase());
+  const list = await syncUsersDatabase();
+  const idx = list.findIndex(u => 
+    (u.username && user.username && u.username.toLowerCase() === user.username.toLowerCase()) ||
+    (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase())
+  );
   if (idx >= 0) {
     list[idx] = { ...list[idx], ...user };
   } else {
     list.push(user);
   }
-  saveUsersList(list);
+  await saveUsersList(list);
 }
 
 let currentRecoveryOTP = null;
@@ -386,14 +447,13 @@ function checkAuth() {
   }
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
   if (e) e.preventDefault();
 
   const userInput = document.getElementById('regUser');
   const emailInput = document.getElementById('regEmail');
   const passInput = document.getElementById('regPassword');
   const confirmPassInput = document.getElementById('regConfirmPassword');
-  const jsonFileInput = document.getElementById('regJsonFile');
 
   const userError = document.getElementById('userError');
   const emailError = document.getElementById('emailError');
@@ -412,6 +472,8 @@ function handleRegister(e) {
   const password = passInput ? passInput.value.trim() : '';
   const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
 
+  await syncUsersDatabase();
+
   if (!username || username.length < 3) {
     if (userError) {
       userError.textContent = 'El usuario debe tener al menos 3 caracteres.';
@@ -420,10 +482,13 @@ function handleRegister(e) {
     hasError = true;
   } else {
     const usersList = getUsersList();
-    const isDuplicate = usersList.some(u => u.username && u.username.toLowerCase() === username.toLowerCase());
+    const isDuplicate = usersList.some(u => 
+      (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+      (u.email && email && u.email.toLowerCase() === email.toLowerCase())
+    );
     if (isDuplicate) {
       if (userError) {
-        userError.textContent = `El usuario "${username}" ya está registrado en el sistema. Por favor inicia sesión o elige otro nombre de usuario.`;
+        userError.textContent = `El usuario "${username}" o correo ya está registrado en el sistema. Inicia sesión con tus credenciales.`;
         userError.style.display = 'block';
       }
       hasError = true;
@@ -432,7 +497,7 @@ function handleRegister(e) {
 
   if (!email || !email.includes('@') || !email.includes('.')) {
     if (emailError) {
-      emailError.textContent = 'Ingresa un correo electrónico válido para recuperar tu cuenta.';
+      emailError.textContent = 'Ingresa un correo electrónico válido para tu cuenta.';
       emailError.style.display = 'block';
     }
     hasError = true;
@@ -467,7 +532,7 @@ function handleRegister(e) {
     createdAt: new Date().toISOString()
   };
 
-  saveUser(newUser);
+  await saveUser(newUser);
 
   isAuthenticated = true;
   failedLoginAttempts = 0;
@@ -475,7 +540,7 @@ function handleRegister(e) {
   checkAuth();
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
   if (e) e.preventDefault();
   const userInput = document.getElementById('loginUser');
   const pinInput = document.getElementById('loginPin');
@@ -496,23 +561,30 @@ function handleLogin(e) {
 
   if (!usernameVal) {
     if (loginError) {
-      loginError.textContent = 'Por favor ingresa tu nombre de usuario.';
+      loginError.textContent = 'Por favor ingresa tu nombre de usuario o correo.';
       loginError.style.display = 'block';
     }
     return;
   }
 
-  const usersList = getUsersList();
-  let targetUser = usersList.find(u => u.username && u.username.toLowerCase() === usernameVal.toLowerCase());
+  const usersList = await syncUsersDatabase();
 
-  if (!targetUser && currentUser && currentUser.username && currentUser.username.toLowerCase() === usernameVal.toLowerCase()) {
+  let targetUser = usersList.find(u => 
+    (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
+    (u.email && u.email.toLowerCase() === usernameVal.toLowerCase())
+  );
+
+  if (!targetUser && currentUser && (
+    (currentUser.username && currentUser.username.toLowerCase() === usernameVal.toLowerCase()) ||
+    (currentUser.email && currentUser.email.toLowerCase() === usernameVal.toLowerCase())
+  )) {
     targetUser = currentUser;
   }
 
   if (!targetUser) {
     failedLoginAttempts++;
     if (loginError) {
-      loginError.textContent = `El usuario "${usernameVal}" no está registrado. Revisa el nombre o crea una nueva cuenta.`;
+      loginError.textContent = `El usuario o correo "${usernameVal}" no está registrado. Revisa el nombre o crea una nueva cuenta.`;
       loginError.style.display = 'block';
     }
     return;
@@ -541,7 +613,7 @@ function handleLogin(e) {
     return;
   }
 
-  saveUser(targetUser);
+  await saveUser(targetUser);
   isAuthenticated = true;
   failedLoginAttempts = 0;
   lockoutUntil = 0;
@@ -724,19 +796,9 @@ async function initAsyncStorage() {
   }
 
   try {
-    const idbUsers = await loadUsersListFromIDB();
-    if (idbUsers && Array.isArray(idbUsers)) {
-      const localUsers = getUsersList();
-      const merged = [...localUsers];
-      idbUsers.forEach(iu => {
-        if (iu && iu.username && !merged.some(mu => mu.username && mu.username.toLowerCase() === iu.username.toLowerCase())) {
-          merged.push(iu);
-        }
-      });
-      localStorage.setItem(USERS_KEY, JSON.stringify(merged));
-    }
+    await syncUsersDatabase();
   } catch (e) {
-    console.warn('Error syncing users list from IDB:', e);
+    console.warn('Error syncing users database on startup:', e);
   }
 }
 
