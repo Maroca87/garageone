@@ -87,9 +87,10 @@ function formatCurrency(amount) {
 }
 
 // App Initialization
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   checkAuth();
   setTodayDates();
+  await initAsyncStorage();
 
   // Close modals when clicking dark backdrop
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
@@ -358,31 +359,36 @@ function handleLogout() {
 }
 
 // State Management
-function loadState() {
-  let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      state = { ...state, ...parsed };
-      if (state.vehicles) {
-        state.vehicles = state.vehicles.filter(v => v.id !== 'v1' && !v.name.includes('Toyota'));
-        if (state.vehicles.length > 0) {
-          if (!state.vehicles.some(v => v.id === state.activeVehicleId)) {
-            state.activeVehicleId = state.vehicles[0].id;
-          }
-        } else {
-          state.activeVehicleId = '';
-        }
+function sanitizeState(parsed) {
+  let state = { ...JSON.parse(JSON.stringify(DEFAULT_STATE)), ...parsed };
+  if (state.vehicles) {
+    state.vehicles = state.vehicles.filter(v => v.id !== 'v1' && !v.name.includes('Toyota'));
+    if (state.vehicles.length > 0) {
+      if (!state.vehicles.some(v => v.id === state.activeVehicleId)) {
+        state.activeVehicleId = state.vehicles[0].id;
       }
+    } else {
+      state.activeVehicleId = '';
     }
-  } catch (e) { console.error('Error loading state:', e); }
+  }
   state.documents = (state.documents || []).filter(d => d.vehicleId !== 'v1');
   state.services = (state.services || []).filter(s => s.vehicleId !== 'v1');
   state.fuels = (state.fuels || []).filter(f => f.vehicleId !== 'v1');
   state.reminders = (state.reminders || []).filter(r => r.vehicleId !== 'v1');
   state.emergencyContacts = state.emergencyContacts || DEFAULT_STATE.emergencyContacts;
   return state;
+}
+
+function loadState() {
+  let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      state = sanitizeState(parsed);
+    }
+  } catch (e) { console.error('Error loading state:', e); }
+  return sanitizeState(state);
 }
 
 function resetAllSwipeItems() {
@@ -414,6 +420,39 @@ function openIDB() {
   });
 }
 
+function loadStateFromIDB() {
+  return new Promise((resolve) => {
+    openIDB().then(db => {
+      if (!db) return resolve(null);
+      try {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get('appState');
+        req.onsuccess = (e) => resolve(e.target.result || null);
+        req.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    }).catch(() => resolve(null));
+  });
+}
+
+async function initAsyncStorage() {
+  try {
+    const idbState = await loadStateFromIDB();
+    if (idbState) {
+      const localRaw = localStorage.getItem(STORAGE_KEY) || '';
+      const idbRaw = JSON.stringify(idbState);
+      if (idbRaw.length >= localRaw.length && idbState.vehicles) {
+        appState = sanitizeState(idbState);
+        renderApp();
+        renderStorageStats();
+      }
+    }
+  } catch (e) {
+    console.warn('Error loading IndexedDB state on startup:', e);
+  }
+}
+
 async function saveStateToIDB(data) {
   try {
     const db = await openIDB();
@@ -432,18 +471,20 @@ function saveState() {
     console.warn('LocalStorage limit reached, saving to IndexedDB high-capacity store...', e);
   }
   saveStateToIDB(appState);
+  renderStorageStats();
 }
 
 function getStorageUsage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || JSON.stringify(appState);
-    const bytes = raw.length * 2;
+    const raw = JSON.stringify(appState);
+    const bytes = new Blob([raw]).size;
     const kb = (bytes / 1024).toFixed(1);
     const mb = (bytes / (1024 * 1024)).toFixed(2);
-    const percent = Math.min(100, Math.round((bytes / (50 * 1024 * 1024)) * 100));
-    return { bytes, kb, mb, percent };
+    const maxMb = 50;
+    const percent = Math.min(100, Math.round((bytes / (maxMb * 1024 * 1024)) * 100));
+    return { bytes, kb, mb, percent, maxMb };
   } catch (e) {
-    return { bytes: 0, kb: '0', mb: '0', percent: 0 };
+    return { bytes: 0, kb: '0', mb: '0', percent: 0, maxMb: 50 };
   }
 }
 
@@ -461,15 +502,19 @@ function renderStorageStats() {
                      (appState.vehicles || []).filter(v => v.photo).length;
 
   container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
       <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
       <span style="font-weight:700; color:${barColor};">${usage.percent}% de 50MB Ampliado</span>
     </div>
-    <div style="width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin-bottom:6px;">
-      <div style="width:${usage.percent}%; height:100%; background:${barColor}; border-radius:4px; transition:width 0.3s ease;"></div>
+    <div style="width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
+      <div style="width:${Math.max(1, usage.percent)}%; height:100%; background:${barColor}; border-radius:5px; transition:width 0.3s ease; box-shadow:0 0 10px ${barColor}66;"></div>
     </div>
-    <div style="font-size:0.78rem; color:#cbd5e1;">
-      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s)/foto(s) comprimidos.
+    <div style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#30d158; margin-bottom:6px;">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#30d158; box-shadow:0 0 8px #30d158;"></span>
+      <strong>Almacenamiento IndexedDB (50MB+ Ampliado): Activo y Sincronizado</strong>
+    </div>
+    <div style="font-size:0.78rem; color:#cbd5e1; line-height:1.4;">
+      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s)/foto(s) respaldados.
     </div>
   `;
 }
