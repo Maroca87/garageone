@@ -1,4 +1,4 @@
-const CACHE_NAME = 'garageone-v600';
+const CACHE_NAME = 'garageone-v105';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
@@ -12,7 +12,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Network-First Strategy for Fresh Instant Updates
+// Network-First Strategy with Cache Invalidation for Instant Updates
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
@@ -27,3 +27,4 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match(e.request))
   );
 });
+

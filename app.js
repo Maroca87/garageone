@@ -1,10 +1,11 @@
 /* ==========================================================================
-   GarageOne - Core Logic (v200)
+   AutoCare - Core Logic (v14: Bi-Directional Seamless iOS Swipe Physics)
    ========================================================================== */
 
-const STORAGE_KEY = 'GARAGEONE_DATA_V200';
-const USER_KEY = 'GARAGEONE_USER_V200';
+const STORAGE_KEY = 'AUTOCARE_DATA_V14';
+const USER_KEY = 'AUTOCARE_USER_V14';
 
+// Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -15,6 +16,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// SVG Vector Icons Collection
 const SVG_ICONS = {
   car: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17h2m8 0h2"/></svg>`,
   oil: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="m14 10-2 2-2-2"/><path d="M5 18a7 7 0 1 0 14 0 7 7 0 0 0-14 0z"/></svg>`,
@@ -23,30 +25,21 @@ const SVG_ICONS = {
   filters: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>`,
   spark: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
   battery: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="12" rx="2"/><line x1="22" y1="11" x2="22" y2="15"/><line x1="6" y1="13" x2="10" y2="13"/><line x1="14" y1="13" x2="14" y2="13"/></svg>`,
-  transmission: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  transmission: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
   belt: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`,
   document: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
   fuel: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 11h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3"/><path d="M3 22h12"/><path d="M7 9h4"/></svg>`,
   wrench: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
   edit: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  zap: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`
+  zap: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  alertTriangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 1 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  alertCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
 };
 
-// Descriptive Mechanics Service Categories
-const SERVICE_CATEGORIES = [
-  'Cambio de Aceite de Motor y Filtro',
-  'Inspección y Cambio de Pastillas/Discos de Freno',
-  'Rotación, Alineación y Balanceo de Llantas',
-  'Cambio de Filtros (Aire, Cabina, Combustible)',
-  'Cambio de Bujías y Limpieza de Inyectores',
-  'Revisión y Cambio de Batería',
-  'Mantenimiento y Cambio de Aceite de Transmisión',
-  'Cambio de Correa de Distribución / Faja',
-  'Trámite de Vehículo (Marchamo / RTV / Seguro)',
-  'Mantenimiento Correctivo / Reparación General'
-];
+const SERVICE_CATEGORIES = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
 
+// Default Seed Data
 const DEFAULT_STATE = {
   currency: 'CRC',
   geminiApiKey: '',
@@ -84,6 +77,7 @@ let isAuthenticated = false;
 let failedLoginAttempts = 0;
 let lockoutUntil = 0;
 
+// Currency Formatter
 function formatCurrency(amount) {
   const curr = appState.currency || 'CRC';
   if (curr === 'CRC') return '₡' + Math.round(amount).toLocaleString('es-CR');
@@ -92,20 +86,28 @@ function formatCurrency(amount) {
   return '₡' + Math.round(amount).toLocaleString('es-CR');
 }
 
+// App Initialization
 document.addEventListener('DOMContentLoaded', () => {
   checkAuth();
   setTodayDates();
 
+  // Close modals when clicking dark backdrop
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
     backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) closeModal(backdrop.id);
+      if (e.target === backdrop) {
+        closeModal(backdrop.id);
+      }
     });
   });
 
+  // Reset slid-open swipe items on document click outside
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.swipe-container')) resetAllSwipeItems();
+    if (!e.target.closest('.swipe-container')) {
+      resetAllSwipeItems();
+    }
   });
 
+  // Close active modal on Escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-backdrop.open').forEach(m => closeModal(m.id));
@@ -144,83 +146,143 @@ function showRegisterForm() {
   const authSubtitle = document.getElementById('authSubtitle');
   if (formLogin) formLogin.style.display = 'none';
   if (formRegister) formRegister.style.display = 'block';
-  if (authTitle) authTitle.textContent = 'Crear Cuenta en GarageOne';
-  if (authSubtitle) authSubtitle.textContent = 'Registra tus datos y define un PIN';
+  if (authTitle) authTitle.textContent = 'GarageOne';
+  if (authSubtitle) authSubtitle.textContent = 'Crea tu cuenta e ingresa tu PIN de seguridad';
 }
 
 function checkAuth() {
   const authScreen = document.getElementById('authScreen');
   const appShell = document.getElementById('appShell');
-  currentUser = loadUser();
+
+  if (!currentUser) {
+    isAuthenticated = false;
+    showRegisterForm();
+  }
+
   if (isAuthenticated) {
     if (authScreen) authScreen.style.display = 'none';
-    if (appShell) appShell.style.display = 'flex';
-    renderApp();
+    if (appShell) appShell.style.display = 'block';
+    try {
+      renderApp();
+      renderUserSettings();
+    } catch (err) {
+      console.error('Error al renderizar la app:', err);
+    }
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
-    showLoginForm();
-  }
-}
-
-function handleLogin(e) {
-  e.preventDefault();
-  const pinInput = document.getElementById('loginPin');
-  const errorDiv = document.getElementById('loginError');
-  const pin = pinInput ? pinInput.value.trim() : '';
-
-  if (lockoutUntil && Date.now() < lockoutUntil) {
-    const waitSecs = Math.ceil((lockoutUntil - Date.now()) / 1000);
-    if (errorDiv) errorDiv.textContent = `Demasiados intentos fallidos. Espera ${waitSecs}s.`;
-    return;
-  }
-
-  if (!currentUser || !currentUser.pin) {
-    showRegisterForm();
-    return;
-  }
-
-  if (pin === currentUser.pin) {
-    isAuthenticated = true;
-    failedLoginAttempts = 0;
-    if (pinInput) pinInput.value = '';
-    if (errorDiv) errorDiv.textContent = '';
-    checkAuth();
-    requestNotificationPermission();
-  } else {
-    failedLoginAttempts++;
-    if (failedLoginAttempts >= 4) {
-      lockoutUntil = Date.now() + 30000;
-      if (errorDiv) errorDiv.textContent = 'PIN incorrecto. Bloqueado por 30 segundos.';
+    if (currentUser && currentUser.pin) {
+      showLoginForm();
     } else {
-      if (errorDiv) errorDiv.textContent = `PIN incorrecto (${failedLoginAttempts}/4 intentos).`;
+      showRegisterForm();
     }
   }
 }
 
+// Strict Validation & PIN Rate Limiting Security
+function isValidEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(String(email).toLowerCase());
+}
+
 function handleRegister(e) {
   e.preventDefault();
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const pin = document.getElementById('regPin').value.trim();
+  
+  const nameInput = document.getElementById('regName');
+  const emailInput = document.getElementById('regEmail');
+  const pinInput = document.getElementById('regPin');
 
-  if (!name || !email || !pin) return;
-  if (pin.length < 4) {
-    document.getElementById('pinError').textContent = 'El PIN debe tener al menos 4 dígitos.';
+  const nameError = document.getElementById('nameError');
+  const emailError = document.getElementById('emailError');
+  const pinError = document.getElementById('pinError');
+
+  nameError.style.display = 'none';
+  emailError.style.display = 'none';
+  pinError.style.display = 'none';
+
+  let hasError = false;
+
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  const pin = pinInput.value.trim();
+
+  if (name.length < 2) {
+    nameError.textContent = 'Por favor ingresa tu nombre completo.';
+    nameError.style.display = 'block';
+    hasError = true;
+  }
+
+  if (!isValidEmail(email)) {
+    emailError.textContent = 'Correo inválido. Ejemplo correcto: usuario@correo.com';
+    emailError.style.display = 'block';
+    hasError = true;
+  }
+
+  if (!pin || pin.length < 4 || isNaN(pin)) {
+    pinError.textContent = 'El PIN debe ser numérico de al menos 4 dígitos.';
+    pinError.style.display = 'block';
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  saveUser({ name, email, pin: String(pin) });
+  isAuthenticated = true;
+  checkAuth();
+}
+
+function handleLogin(e) {
+  if (e) e.preventDefault();
+  const pinInput = document.getElementById('loginPin');
+  const loginError = document.getElementById('loginError');
+  if (loginError) loginError.style.display = 'none';
+
+  if (Date.now() < lockoutUntil) {
+    const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+    if (loginError) {
+      loginError.textContent = `Demasiados intentos fallidos. Intenta de nuevo en ${remaining}s.`;
+      loginError.style.display = 'block';
+    }
     return;
   }
 
-  saveUser({ name, email, pin });
+  const inputPin = pinInput ? String(pinInput.value).trim() : '';
+
+  if (currentUser && currentUser.pin) {
+    if (inputPin !== currentUser.pin) {
+      failedLoginAttempts++;
+      if (failedLoginAttempts >= 5) {
+        lockoutUntil = Date.now() + 30000;
+        failedLoginAttempts = 0;
+        if (loginError) {
+          loginError.textContent = 'Demasiados intentos fallidos. Acceso bloqueado por 30 segundos.';
+          loginError.style.display = 'block';
+        }
+      } else {
+        if (loginError) {
+          loginError.textContent = `PIN incorrecto (${5 - failedLoginAttempts} intentos restantes).`;
+          loginError.style.display = 'block';
+        }
+      }
+      return;
+    }
+  } else if (currentUser && !currentUser.pin && inputPin) {
+    currentUser.pin = inputPin;
+    saveUser(currentUser);
+  }
+
   isAuthenticated = true;
+  failedLoginAttempts = 0;
+  lockoutUntil = 0;
+  if (pinInput) pinInput.value = '';
   checkAuth();
-  requestNotificationPermission();
 }
 
 function resetUserPin(e) {
   if (e) e.preventDefault();
-  if (confirm('¿Deseas restablecer la cuenta de usuario para crear un nuevo PIN? Tus vehículos y datos se mantendrán seguros.')) {
-    localStorage.removeItem(USER_KEY);
+  if (confirm('¿Deseas restablecer las credenciales y crear un usuario nuevo?')) {
     currentUser = null;
+    localStorage.removeItem(USER_KEY);
     isAuthenticated = false;
     showRegisterForm();
   }
@@ -231,6 +293,7 @@ function handleLogout() {
   checkAuth();
 }
 
+// State Management
 function loadState() {
   let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   try {
@@ -264,66 +327,10 @@ function resetAllSwipeItems() {
   });
 }
 
-function compressImageFile(file, maxDim, quality, callback) {
-  if (!file) return callback('');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.width;
-      let h = img.height;
-      if (w > maxDim || h > maxDim) {
-        if (w > h) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
-        } else {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => callback('');
-    img.src = e.target.result;
-  };
-  reader.onerror = () => callback('');
-  reader.readAsDataURL(file);
-}
-
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  } catch (e) {
-    console.warn('Storage quota limit reached, performing data optimization...', e);
-    try {
-      const cleanData = JSON.parse(JSON.stringify(appState));
-      if (cleanData.vehicles) {
-        cleanData.vehicles.forEach(v => {
-          if (v.photo && v.photo.length > 100000) v.photo = '';
-        });
-      }
-      if (cleanData.services) {
-        cleanData.services.forEach(s => {
-          if (s.receipt && s.receipt.length > 100000) s.receipt = '';
-        });
-      }
-      if (cleanData.documents) {
-        cleanData.documents.forEach(d => {
-          if (d.file && d.file.length > 100000) d.file = '';
-        });
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
-      appState = cleanData;
-    } catch (err) {
-      console.error('Critical quota error:', err);
-      alert('⚠️ Memoria local llena. Por favor borra datos innecesarios (fotos, documentos) para liberar espacio.');
-    }
-  }
+  } catch (e) { alert('Aviso: Memoria local llena.'); }
 }
 
 function setTodayDates() {
@@ -349,9 +356,15 @@ function switchTab(tabId, el) {
   const btnRem = document.getElementById('btnHeaderReminders');
   const btnSet = document.getElementById('btnHeaderSettings');
   if (btnRem) {
-    btnRem.style.display = 'flex';
-    if (tabId === 'tabReminders') btnRem.classList.add('active');
-    else btnRem.classList.remove('active');
+    if (tabId === 'tabGarage') {
+      btnRem.style.display = 'flex';
+      btnRem.classList.remove('active');
+    } else if (tabId === 'tabReminders') {
+      btnRem.style.display = 'flex';
+      btnRem.classList.add('active');
+    } else {
+      btnRem.style.display = 'none';
+    }
   }
   if (btnSet) {
     btnSet.style.display = 'flex';
@@ -400,15 +413,11 @@ function renderVehicleSelectorPills() {
     return;
   }
 
-  let html = '';
-  appState.vehicles.forEach(v => {
+  let html = appState.vehicles.map(v => {
     const isActive = v.id === appState.activeVehicleId;
-    html += `
-      <button class="pill ${isActive ? 'active' : ''}" onclick="selectActiveVehicle('${v.id}')">
-        ${escapeHtml(v.name)} (${escapeHtml(v.plate) || 'Sin Placa'})
-      </button>
-    `;
-  });
+    return `<button class="pill ${isActive ? 'active' : ''}" onclick="selectActiveVehicle('${v.id}')">${escapeHtml(v.name)} ${v.plate ? `(${escapeHtml(v.plate)})` : ''}</button>`;
+  }).join('');
+
   html += `<button class="pill" onclick="openVehicleModal()" style="border-style:dashed;">+ Nuevo Carro</button>`;
   container.innerHTML = html;
 }
@@ -419,7 +428,6 @@ function renderApp() {
   renderMiniVehiclesList();
   renderMaintenanceFilterPills();
   populateServCategorySelect();
-  renderPredefinedServices();
   renderGuantera();
   const veh = getActiveVehicle();
   if (!veh) {
@@ -444,24 +452,16 @@ function renderApp() {
         <span class="hero-odometer-val">${veh.km.toLocaleString()} km</span>
       </div>
     </div>
-    ${veh.photo ? `
-      <div class="hero-photo-wrapper">
-        <img src="${veh.photo}" class="hero-image-preview" alt="Foto ${escapeHtml(veh.name)}">
-      </div>
-    ` : `
-      <div class="hero-photo-placeholder" onclick="openVehicleModal('${veh.id}')" title="Toca para agregar foto a tu auto">
-        <div class="hero-placeholder-icon">${SVG_ICONS.car}</div>
-        <span class="hero-placeholder-text">+ Agregar foto a tu ${escapeHtml(veh.name)}</span>
-      </div>
-    `}
+    ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo">` : ''}
   `;
 
   renderServiceList(veh.id);
   renderFuelList(veh.id);
 
-  setTimeout(initSwipeListeners, 30);
+  setTimeout(initSwipeListeners, 50);
 }
 
+// Bi-Directional Seamless iOS Swipe Physics Engine
 function initSwipeListeners() {
   const items = document.querySelectorAll('.swipe-content');
   items.forEach(el => {
@@ -472,48 +472,62 @@ function initSwipeListeners() {
     let startY = 0;
     let initialOffset = 0;
     let isSwiping = false;
+    let isPressed = false;
+    let currentX = 0;
 
-    const getX = (e) => (e.touches && e.touches.length > 0) ? e.touches[0].clientX : (e.clientX || 0);
-    const getY = (e) => (e.touches && e.touches.length > 0) ? e.touches[0].clientY : (e.clientY || 0);
+    const getCoords = (e) => {
+      if (e.touches && e.touches[0]) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    };
 
     const handleStart = (e) => {
-      isSwiping = true;
-      startX = getX(e);
-      startY = getY(e);
+      const coords = getCoords(e);
+      startX = coords.x;
+      startY = coords.y;
+      isPressed = true;
+      isSwiping = false;
       const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal && transformVal !== 'none') {
+      if (transformVal !== 'none') {
         const matrix = new WebKitCSSMatrix(transformVal);
-        initialOffset = matrix.m41;
+        initialOffset = matrix.m41 || 0;
       } else {
         initialOffset = 0;
       }
-      el.classList.add('swiping');
     };
 
     const handleMove = (e) => {
-      if (!isSwiping) return;
-      const currentX = getX(e);
-      const currentY = getY(e);
-      const diffX = currentX - startX;
-      const diffY = currentY - startY;
+      if (!isPressed) return;
+      const coords = getCoords(e);
+      const deltaX = coords.x - startX;
+      const deltaY = coords.y - startY;
 
-      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 4) {
-        let newX = initialOffset + diffX;
-        if (newX < -95) newX = -95;
-        if (newX > 0) newX = 0;
-        el.style.transform = `translateX(${newX}px)`;
+      if (!isSwiping) {
+        if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+          isSwiping = true;
+          el.classList.add('swiping');
+        } else {
+          return;
+        }
       }
+
+      let newX = initialOffset + deltaX;
+      if (newX > 0) newX = 0;
+      if (newX < -90) newX = -90;
+
+      currentX = newX;
+      el.style.transform = `translateX(${newX}px)`;
     };
 
     const handleEnd = () => {
-      if (!isSwiping) return;
-      isSwiping = false;
-      el.classList.remove('swiping');
-      const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal && transformVal !== 'none') {
-        const matrix = new WebKitCSSMatrix(transformVal);
-        if (matrix.m41 < -35) {
-          el.style.transform = `translateX(-85px)`;
+      if (!isPressed) return;
+      isPressed = false;
+
+      if (isSwiping) {
+        el.classList.remove('swiping');
+        if (currentX < -40) {
+          el.style.transform = `translateX(-80px)`;
         } else {
           el.style.transform = `translateX(0px)`;
         }
@@ -522,30 +536,30 @@ function initSwipeListeners() {
 
     el.addEventListener('touchstart', handleStart, { passive: true });
     el.addEventListener('touchmove', handleMove, { passive: true });
-    el.addEventListener('touchend', handleEnd);
+    el.addEventListener('touchend', handleEnd, { passive: true });
 
     el.addEventListener('mousedown', handleStart);
     el.addEventListener('mousemove', handleMove);
     el.addEventListener('mouseup', handleEnd);
     el.addEventListener('mouseleave', handleEnd);
 
+    // Auto-close when clicking on the open item body
     el.addEventListener('click', (evt) => {
       if (isSwiping) {
         evt.stopPropagation();
         return;
       }
       const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal && transformVal !== 'none') {
-        const matrix = new WebKitCSSMatrix(transformVal);
-        if (matrix.m41 < -10) {
-          evt.stopPropagation();
-          el.style.transform = `translateX(0px)`;
-        }
+      const matrix = new WebKitCSSMatrix(transformVal);
+      if (matrix.m41 < -10) {
+        evt.stopPropagation();
+        el.style.transform = `translateX(0px)`;
       }
     });
   });
 }
 
+// Direct Deletion Functions
 function deleteVehicleDirect(vehId) {
   appState.vehicles = appState.vehicles.filter(item => item.id !== vehId);
   appState.services = appState.services.filter(s => s.vehicleId !== vehId);
@@ -559,862 +573,1299 @@ function deleteVehicleDirect(vehId) {
   renderApp();
 }
 
-function openVehicleModal(vehId = null) {
-  const modal = document.getElementById('modalVehicle');
-  const title = document.getElementById('modalVehicleTitle');
-  const form = document.getElementById('formVehicle');
-  form.reset();
-
-  if (vehId) {
-    const veh = appState.vehicles.find(v => v.id === vehId);
-    if (veh) {
-      title.textContent = 'Editar Vehículo';
-      document.getElementById('vehId').value = veh.id;
-      document.getElementById('vehType').value = veh.type;
-      document.getElementById('vehName').value = veh.name;
-      document.getElementById('vehYear').value = veh.year;
-      document.getElementById('vehPlate').value = veh.plate || '';
-      document.getElementById('vehKm').value = veh.km;
-    }
-  } else {
-    title.textContent = 'Nuevo Vehículo';
-    document.getElementById('vehId').value = '';
-  }
-  openModal('modalVehicle');
-}
-
-function saveVehicle(e) {
-  e.preventDefault();
-  const id = document.getElementById('vehId').value;
-  const type = document.getElementById('vehType').value;
-  const name = document.getElementById('vehName').value.trim();
-  const year = parseInt(document.getElementById('vehYear').value) || 2023;
-  const plate = document.getElementById('vehPlate').value.trim().toUpperCase();
-  const km = parseInt(document.getElementById('vehKm').value) || 0;
-  const photoInput = document.getElementById('vehPhoto');
-
-  const processSave = (photoData = '') => {
-    if (id) {
-      const veh = appState.vehicles.find(v => v.id === id);
-      if (veh) {
-        veh.type = type; veh.name = name; veh.year = year; veh.plate = plate; veh.km = km;
-        if (photoData) veh.photo = photoData;
-      }
-    } else {
-      const newVeh = {
-        id: 'v_' + Date.now(),
-        type, name, year, plate, km,
-        photo: photoData
-      };
-      appState.vehicles.push(newVeh);
-      appState.activeVehicleId = newVeh.id;
-    }
-    saveState();
-    closeModal('modalVehicle');
-    renderApp();
-  };
-
-  if (photoInput && photoInput.files && photoInput.files[0]) {
-    compressImageFile(photoInput.files[0], 500, 0.65, (compressed) => processSave(compressed));
-  } else {
-    const existingVeh = appState.vehicles.find(v => v.id === id);
-    processSave(existingVeh ? existingVeh.photo : '');
-  }
-}
-
-function renderMiniVehiclesList() {
-  const container = document.getElementById('allVehiclesList');
-  if (!container) return;
-  if (!appState.vehicles || appState.vehicles.length === 0) {
-    container.innerHTML = `<p class="subtitle">No hay vehículos adicionales en tu garaje.</p>`;
-    return;
-  }
-
-  let html = '';
-  appState.vehicles.forEach(v => {
-    const isActive = v.id === appState.activeVehicleId;
-    html += `
-      <div class="swipe-container">
-        <div class="swipe-action-bg">
-          <button class="swipe-action-btn" onclick="deleteVehicleDirect('${v.id}')">
-            ${SVG_ICONS.trash} <span>Borrar</span>
-          </button>
-        </div>
-        <div class="swipe-content ${isActive ? 'vehicle-mini-item active-veh' : 'vehicle-mini-item'}">
-          ${v.photo ? `<img src="${v.photo}" class="veh-mini-thumb" alt="${escapeHtml(v.name)}">` : `<div class="veh-mini-icon-badge">${SVG_ICONS.car}</div>`}
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:700; font-size:0.95rem; display:flex; align-items:center;">
-              ${escapeHtml(v.name)} ${isActive ? '<span class="badge-subtle badge-green" style="margin-left:6px; font-size:0.68rem;">Activo</span>' : ''}
-            </div>
-            <div class="veh-info-sub">${escapeHtml(v.plate) || 'Sin Placa'} • ${v.year} • ${v.km.toLocaleString()} km</div>
-          </div>
-          <div class="veh-actions">
-            <button class="btn btn-secondary btn-sm" onclick="selectActiveVehicle('${v.id}')">Seleccionar</button>
-            <button class="btn btn-tertiary btn-sm" onclick="openVehicleModal('${v.id}')">${SVG_ICONS.edit}</button>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  container.innerHTML = html;
-  setTimeout(initSwipeListeners, 30);
-}
-
-function updateOdometer(e) {
-  e.preventDefault();
-  const kmVal = parseInt(document.getElementById('newOdometerKm').value);
-  const veh = getActiveVehicle();
-  if (veh && !isNaN(kmVal)) {
-    veh.km = kmVal;
-    saveState();
-    closeModal('modalOdometer');
-    renderApp();
-    checkAndSendDueNotifications();
-  }
-}
-
-function populateServCategorySelect() {
-  const select = document.getElementById('servCategory');
-  if (!select) return;
-  select.innerHTML = SERVICE_CATEGORIES.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-}
-
-function openServiceModal(categoryName = '', titleText = '') {
-  const form = document.getElementById('formService');
-  if (form) form.reset();
-  const veh = getActiveVehicle();
-  
-  populateServCategorySelect();
-  
-  if (document.getElementById('servId')) document.getElementById('servId').value = '';
-  if (document.getElementById('servDate')) {
-    document.getElementById('servDate').value = new Date().toISOString().split('T')[0];
-  }
-  if (veh && document.getElementById('servKm')) {
-    document.getElementById('servKm').value = veh.km || 0;
-  }
-  if (categoryName && document.getElementById('servCategory')) {
-    document.getElementById('servCategory').value = categoryName;
-  }
-  if (titleText && document.getElementById('servTitle')) {
-    document.getElementById('servTitle').value = titleText;
-  }
-  
-  openModal('modalService');
-}
-
-function selectPredefinedService(categoryName, titleText) {
-  populateServCategorySelect();
-  if (document.getElementById('servCategory')) {
-    document.getElementById('servCategory').value = categoryName;
-  }
-  if (document.getElementById('servTitle')) {
-    document.getElementById('servTitle').value = titleText;
-  }
-}
-
-function renderPredefinedServices() {
-  const container = document.getElementById('predefinedServicesGrid');
-  if (!container) return;
-  
-  const presets = [
-    { icon: '🛢️', cat: 'Cambio de Aceite de Motor y Filtro', title: 'Cambio de Aceite 5W-30 + Filtro' },
-    { icon: '🛑', cat: 'Inspección y Cambio de Pastillas/Discos de Freno', title: 'Pastillas y Discos de Freno' },
-    { icon: '🛞', cat: 'Rotación, Alineación y Balanceo de Llantas', title: 'Alineación y Balanceo' },
-    { icon: '💨', cat: 'Cambio de Filtros (Aire, Cabina, Combustible)', title: 'Filtro de Aire y Cabina' },
-    { icon: '⚡', cat: 'Cambio de Bujías y Limpieza de Inyectores', title: 'Cambio de Bujías' },
-    { icon: '🔋', cat: 'Revisión y Cambio de Batería', title: 'Cambio de Batería' },
-    { icon: '⚙️', cat: 'Mantenimiento y Cambio de Aceite de Transmisión', title: 'Aceite de Transmisión' },
-    { icon: '📄', cat: 'Trámite de Vehículo (Marchamo / RTV / Seguro)', title: 'RTV / Marchamo' }
-  ];
-
-  container.innerHTML = presets.map(p => `
-    <button class="preset-service-card" type="button" onclick="openServiceModal('${escapeHtml(p.cat)}', '${escapeHtml(p.title)}')">
-      <span class="preset-icon">${p.icon}</span>
-      <span class="preset-title">${escapeHtml(p.title)}</span>
-    </button>
-  `).join('');
-}
-
-function openNewCategoryModal() {
-  document.getElementById('formNewCategory').reset();
-  openModal('modalNewCategory');
-}
-
-function saveNewCategory(e) {
-  e.preventDefault();
-  const name = document.getElementById('newCatName').value.trim();
-  if (name && !SERVICE_CATEGORIES.includes(name)) {
-    SERVICE_CATEGORIES.push(name);
-    populateServCategorySelect();
-    alert(`Tipo de servicio "${name}" creado exitosamente.`);
-  }
-  closeModal('modalNewCategory');
-}
-
-function renderServiceList(vehicleId) {
-  const container = document.getElementById('serviceLogList');
-  if (!container) return;
-  const list = (appState.services || []).filter(s => s.vehicleId === vehicleId);
-
-  if (list.length === 0) {
-    container.innerHTML = `<div class="text-center" style="padding:20px; color:var(--text-secondary);">No hay mantenimientos registrados para este vehículo.</div>`;
-    return;
-  }
-
-  let html = '';
-  list.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
-    html += `
-      <div class="swipe-container">
-        <div class="swipe-action-bg">
-          <button class="swipe-action-btn" onclick="deleteServiceDirect('${item.id}')">
-            ${SVG_ICONS.trash} <span>Borrar</span>
-          </button>
-        </div>
-        <div class="swipe-content">
-          <div class="log-item-main" style="flex:1;">
-            <div class="log-icon-badge">${SVG_ICONS.wrench}</div>
-            <div>
-              <div class="log-title">${escapeHtml(item.title)}</div>
-              <div class="log-meta">${escapeHtml(item.category)} • ${item.date} • ${item.km.toLocaleString()} km ${item.shop ? '• ' + escapeHtml(item.shop) : ''}</div>
-              ${item.receipt ? `<button class="receipt-chip" onclick="viewReceipt('${item.id}')">${SVG_ICONS.document} Ver Comprobante</button>` : ''}
-            </div>
-          </div>
-          <div class="log-cost">${formatCurrency(item.cost)}</div>
-        </div>
-      </div>
-    `;
-  });
-  container.innerHTML = html;
-  setTimeout(initSwipeListeners, 30);
-}
-
-function deleteServiceDirect(id) {
-  appState.services = appState.services.filter(s => s.id !== id);
+function deleteServiceDirect(servId) {
+  appState.services = appState.services.filter(s => s.id !== servId);
   saveState();
   renderApp();
 }
 
-function saveService(e) {
-  e.preventDefault();
+function deleteFuelDirect(fuelId) {
+  appState.fuels = appState.fuels.filter(f => f.id !== fuelId);
+  saveState();
+  renderApp();
+}
+
+// User Configured Reminders Engine (100% User-Managed)
+let currentReminderFilter = 'all';
+
+function filterReminders(filterType, el) {
+  currentReminderFilter = filterType;
+  document.querySelectorAll('#reminderFilterPills .pill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderRemindersTab();
+}
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('Tu navegador o dispositivo no soporta notificaciones de sistema.');
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      alert('¡Notificaciones activadas con éxito! GarageOne te avisará de tus recordatorios pendientes.');
+      checkAndSendDueNotifications();
+    } else {
+      alert('Permiso de notificaciones no concedido.');
+    }
+  });
+}
+
+function checkAndSendDueNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
   const veh = getActiveVehicle();
   if (!veh) return;
 
-  const id = document.getElementById('servId').value;
-  const category = document.getElementById('servCategory').value;
-  const title = document.getElementById('servTitle').value.trim();
-  const cost = parseFloat(document.getElementById('servCost').value) || 0;
-  const date = document.getElementById('servDate').value;
-  const km = parseInt(document.getElementById('servKm').value) || veh.km;
-  const shop = document.getElementById('servShop').value.trim();
-  const notes = document.getElementById('servNotes').value.trim();
-  const receiptInput = document.getElementById('servReceipt');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
 
-  const processSave = (receiptData = '') => {
-    if (id) {
-      const item = appState.services.find(s => s.id === id);
-      if (item) {
-        item.category = category; item.title = title; item.cost = cost;
-        item.date = date; item.km = km; item.shop = shop; item.notes = notes;
-        if (receiptData) item.receipt = receiptData;
-      }
-    } else {
-      appState.services.push({
-        id: 's_' + Date.now(),
-        vehicleId: veh.id,
-        category, title, cost, date, km, shop, notes,
-        receipt: receiptData
+  reminders.forEach(r => {
+    let isDue = false;
+    if (r.targetKm && veh.km >= r.targetKm) isDue = true;
+    if (r.targetDate && r.targetDate <= todayStr) isDue = true;
+
+    if (isDue) {
+      new Notification(`GarageOne - ${veh.name}`, {
+        body: `Recordatorio Pendiente: ${r.title}`,
+        icon: 'icons/icon-192.png'
       });
     }
-    if (km > veh.km) veh.km = km;
-    saveState();
-    closeModal('modalService');
-    renderApp();
-  };
-
-  if (receiptInput && receiptInput.files && receiptInput.files[0]) {
-    compressImageFile(receiptInput.files[0], 800, 0.7, (compressed) => processSave(compressed));
-  } else {
-    const existing = appState.services.find(s => s.id === id);
-    processSave(existing ? existing.receipt : '');
-  }
+  });
 }
 
-function viewReceipt(serviceId) {
-  const item = appState.services.find(s => s.id === serviceId);
-  if (!item || !item.receipt) return;
-  const container = document.getElementById('receiptContainer');
-  container.innerHTML = `<img src="${item.receipt}" alt="Factura / Comprobante">`;
-  openModal('modalReceiptViewer');
-}
-
-function renderFuelList(vehicleId) {
-  const container = document.getElementById('fuelLogList');
-  if (!container) return;
-  const list = (appState.fuels || []).filter(f => f.vehicleId === vehicleId);
-
-  if (list.length === 0) {
-    container.innerHTML = `<div class="text-center" style="padding:20px; color:var(--text-secondary);">No hay recargas de combustible registradas.</div>`;
-    return;
+function renderRemindersListHelper(remindersList, veh) {
+  if (!remindersList || remindersList.length === 0) {
+    return `
+      <div class="user-reminder-card" style="justify-content:center; text-align:center;">
+        <span class="subtitle">No hay recordatorios registrados.<br>Toca "+ Recordatorio" para agregar uno.</span>
+      </div>
+    `;
   }
 
-  let html = '';
-  list.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(item => {
-    html += `
-      <div class="swipe-container">
-        <div class="swipe-action-bg">
-          <button class="swipe-action-btn" onclick="deleteFuelDirect('${item.id}')">
-            ${SVG_ICONS.trash} <span>Borrar</span>
-          </button>
-        </div>
-        <div class="swipe-content">
-          <div class="log-item-main" style="flex:1;">
-            <div class="log-icon-badge">${SVG_ICONS.fuel}</div>
-            <div>
-              <div class="log-title">${item.volume} Litros</div>
-              <div class="log-meta">${item.date} • ${item.km.toLocaleString()} km ${item.notes ? '• ' + escapeHtml(item.notes) : ''}</div>
-            </div>
+  const todayStr = new Date().toISOString().split('T')[0];
+  const repeatLabelsMap = { '1m': 'Cada 1 mes', '3m': 'Cada 3 meses', '6m': 'Cada 6 meses', '12m': 'Cada 1 año', '5000km': 'Cada 5.000 KM', '10000km': 'Cada 10.000 KM' };
+
+  return remindersList.map(r => {
+    let statusBadge = '';
+    let isUrgent = false;
+    let isUpcoming = false;
+    let detailsText = [];
+
+    if (r.targetKm) {
+      const remainingKm = r.targetKm - veh.km;
+      if (remainingKm <= 0) {
+        isUrgent = true;
+        detailsText.push(`Excedido por ${Math.abs(remainingKm).toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
+      } else if (remainingKm <= 2000) {
+        isUpcoming = true;
+        detailsText.push(`Próximo: faltan ${remainingKm.toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
+      } else {
+        detailsText.push(`Meta KM: ${r.targetKm.toLocaleString()} km (${remainingKm.toLocaleString()} km restantes)`);
+      }
+    }
+
+    if (r.targetDate) {
+      const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) {
+        isUrgent = true;
+        detailsText.push(`Vencido el ${r.targetDate} (${Math.abs(diffDays)}d atrás)`);
+      } else if (diffDays <= 30) {
+        isUpcoming = true;
+        detailsText.push(`Vence el ${r.targetDate} (en ${diffDays}d)`);
+      } else {
+        detailsText.push(`Meta Fecha: ${r.targetDate}`);
+      }
+    }
+
+    const repeatText = (r.repeat && r.repeat !== 'none') ? ` • 🔄 ${repeatLabelsMap[r.repeat] || r.repeat}` : '';
+
+    if (r.completed) {
+      statusBadge = '<span class="badge-subtle badge-green">Completado ✓</span>';
+    } else if (isUrgent) {
+      statusBadge = '<span class="badge-subtle badge-red">Atención Pendiente</span>';
+    } else if (isUpcoming) {
+      statusBadge = '<span class="badge-subtle badge-yellow">Próximo</span>';
+    } else {
+      statusBadge = '<span class="badge-subtle badge-blue">Al día</span>';
+    }
+
+    const cardClass = r.completed ? '' : isUrgent ? 'urgent' : isUpcoming ? 'upcoming' : '';
+
+    return `
+      <div class="user-reminder-card ${cardClass}" onclick="openReminderModal('${r.id}')">
+        <div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(r.title)}</span>
+            ${statusBadge}
           </div>
-          <div class="log-cost">${formatCurrency(item.cost)}</div>
+          <div class="reminder-meta">${escapeHtml(detailsText.join(' • ')) || 'Configurado por usuario'}${repeatText}</div>
+          ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick="toggleReminderComplete('${r.id}')" style="padding:4px 8px;" title="Marcar como completado">
+            ${r.completed ? 'Desmarcar' : '✓ Listo'}
+          </button>
+          <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:#ff453a; padding:4px 6px;" title="Eliminar recordatorio">✕</button>
         </div>
       </div>
     `;
-  });
-  container.innerHTML = html;
-  setTimeout(initSwipeListeners, 30);
+  }).join('');
 }
 
-function deleteFuelDirect(id) {
-  appState.fuels = appState.fuels.filter(f => f.id !== id);
-  saveState();
-  renderApp();
-}
-
-function openFuelModal(fuelId = null) {
-  const form = document.getElementById('formFuel');
-  if (form) form.reset();
+function renderUserReminders() {
+  const container = document.getElementById('userRemindersList');
+  if (!container) return;
   const veh = getActiveVehicle();
-  
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (document.getElementById('fuelDate')) {
-    document.getElementById('fuelDate').value = todayStr;
-  }
-  if (veh && document.getElementById('fuelKm')) {
-    document.getElementById('fuelKm').value = veh.km || 0;
-  }
-  if (document.getElementById('fuelId')) {
-    document.getElementById('fuelId').value = fuelId || '';
-  }
-  openModal('modalFuel');
-}
+  if (!veh) { container.innerHTML = ''; return; }
 
-function saveFuel(e) {
-  e.preventDefault();
-  const veh = getActiveVehicle();
-  if (!veh) {
-    alert('Agrega o selecciona un vehículo primero.');
-    return;
-  }
-
-  const cost = parseFloat(document.getElementById('fuelCost').value) || 0;
-  const volume = parseFloat(document.getElementById('fuelVolume').value) || 0;
-  const km = parseInt(document.getElementById('fuelKm').value) || veh.km || 0;
-  const date = document.getElementById('fuelDate').value || new Date().toISOString().split('T')[0];
-  const notes = document.getElementById('fuelNotes').value ? document.getElementById('fuelNotes').value.trim() : '';
-
-  if (cost <= 0 || volume <= 0) {
-    alert('Por favor ingresa un monto y cantidad de litros válidos.');
-    return;
-  }
-
-  appState.fuels.push({
-    id: 'f_' + Date.now(),
-    vehicleId: veh.id,
-    cost, volume, km, date, notes
-  });
-
-  if (km > veh.km) veh.km = km;
-  saveState();
-  closeModal('modalFuel');
-  renderApp();
+  const reminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
+  container.innerHTML = renderRemindersListHelper(reminders, veh);
 }
 
 function renderRemindersTab() {
-  renderUserReminders('fullRemindersList');
+  const container = document.getElementById('fullRemindersList');
+  if (!container) return;
+  const veh = getActiveVehicle();
+  if (!veh) { container.innerHTML = '<p class="subtitle" style="text-align:center; padding:20px;">No hay vehículo activo.</p>'; return; }
+
+  let list = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
+
+  if (currentReminderFilter === 'pending') {
+    list = list.filter(r => !r.completed);
+  } else if (currentReminderFilter === 'completed') {
+    list = list.filter(r => r.completed);
+  }
+
+  container.innerHTML = renderRemindersListHelper(list, veh);
 }
 
 function openReminderModal(remId = null) {
-  const form = document.getElementById('formReminder');
-  form.reset();
+  document.getElementById('formReminder').reset();
+  document.getElementById('remId').value = '';
+  document.getElementById('modalReminderTitle').textContent = 'Nuevo Recordatorio';
+
   if (remId) {
-    const rem = appState.reminders.find(r => r.id === remId);
-    if (rem) {
-      document.getElementById('remId').value = rem.id;
-      document.getElementById('remTitle').value = rem.title;
-      document.getElementById('remCategory').value = rem.category || 'Mantenimiento';
-      document.getElementById('remTargetKm').value = rem.targetKm || '';
-      document.getElementById('remTargetDate').value = rem.targetDate || '';
-      document.getElementById('remRepeat').value = rem.repeat || 'none';
-      document.getElementById('remNotes').value = rem.notes || '';
+    const r = (appState.reminders || []).find(item => item.id === remId);
+    if (r) {
+      document.getElementById('modalReminderTitle').textContent = 'Editar Recordatorio';
+      document.getElementById('remId').value = r.id;
+      document.getElementById('remTitle').value = r.title;
+      document.getElementById('remCategory').value = r.category || 'Mantenimiento';
+      document.getElementById('remTargetKm').value = r.targetKm || '';
+      document.getElementById('remTargetDate').value = r.targetDate || '';
+      if (document.getElementById('remRepeat')) document.getElementById('remRepeat').value = r.repeat || 'none';
+      document.getElementById('remNotes').value = r.notes || '';
     }
-  } else {
-    document.getElementById('remId').value = '';
   }
+
   openModal('modalReminder');
 }
 
 function saveReminder(e) {
   e.preventDefault();
   const veh = getActiveVehicle();
-  if (!veh) return;
+  if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
 
-  const id = document.getElementById('remId').value;
+  const remId = document.getElementById('remId').value;
   const title = document.getElementById('remTitle').value.trim();
   const category = document.getElementById('remCategory').value;
-  const targetKm = parseInt(document.getElementById('remTargetKm').value) || null;
-  const targetDate = document.getElementById('remTargetDate').value || null;
-  const repeat = document.getElementById('remRepeat').value;
+  const targetKmVal = document.getElementById('remTargetKm').value;
+  const targetDate = document.getElementById('remTargetDate').value;
+  const repeat = document.getElementById('remRepeat') ? document.getElementById('remRepeat').value : 'none';
   const notes = document.getElementById('remNotes').value.trim();
 
-  if (id) {
-    const rem = appState.reminders.find(r => r.id === id);
-    if (rem) {
-      rem.title = title; rem.category = category;
-      rem.targetKm = targetKm; rem.targetDate = targetDate;
-      rem.repeat = repeat; rem.notes = notes;
+  const targetKm = targetKmVal ? parseInt(targetKmVal) : null;
+
+  if (!title) return;
+
+  if (remId) {
+    const existing = (appState.reminders || []).find(r => r.id === remId);
+    if (existing) {
+      existing.title = title;
+      existing.category = category;
+      existing.targetKm = targetKm;
+      existing.targetDate = targetDate;
+      existing.repeat = repeat;
+      existing.notes = notes;
     }
   } else {
-    appState.reminders.push({
-      id: 'r_' + Date.now(),
+    const newRem = {
+      id: 'rem_' + Date.now(),
       vehicleId: veh.id,
-      title, category, targetKm, targetDate, repeat, notes,
-      completed: false
-    });
+      title, category, targetKm, targetDate, repeat, notes, completed: false
+    };
+    appState.reminders = appState.reminders || [];
+    appState.reminders.push(newRem);
   }
 
   saveState();
   closeModal('modalReminder');
-  renderApp();
+  document.getElementById('formReminder').reset();
+  renderUserReminders();
   renderRemindersTab();
 }
 
-function toggleReminderCompleted(remId) {
-  const rem = appState.reminders.find(r => r.id === remId);
-  const veh = getActiveVehicle();
-  if (!rem) return;
+function toggleReminderComplete(remId) {
+  const rem = (appState.reminders || []).find(r => r.id === remId);
+  if (rem) {
+    rem.completed = !rem.completed;
 
-  rem.completed = !rem.completed;
+    // Recurrence logic: if marked completed and repeat is set, spawn next reminder
+    if (rem.completed && rem.repeat && rem.repeat !== 'none') {
+      const nextRem = {
+        id: 'rem_' + Date.now(),
+        vehicleId: rem.vehicleId,
+        title: rem.title,
+        category: rem.category,
+        targetKm: rem.targetKm,
+        targetDate: rem.targetDate,
+        repeat: rem.repeat,
+        notes: rem.notes,
+        completed: false
+      };
 
-  if (rem.completed && rem.repeat && rem.repeat !== 'none' && veh) {
-    let nextTargetDate = rem.targetDate;
-    let nextTargetKm = rem.targetKm;
+      if (rem.repeat === '5000km' && rem.targetKm) {
+        nextRem.targetKm = rem.targetKm + 5000;
+      } else if (rem.repeat === '10000km' && rem.targetKm) {
+        nextRem.targetKm = rem.targetKm + 10000;
+      } else if (rem.targetDate) {
+        const d = new Date(rem.targetDate);
+        if (rem.repeat === '1m') d.setMonth(d.getMonth() + 1);
+        else if (rem.repeat === '3m') d.setMonth(d.getMonth() + 3);
+        else if (rem.repeat === '6m') d.setMonth(d.getMonth() + 6);
+        else if (rem.repeat === '12m') d.setFullYear(d.getFullYear() + 1);
+        nextRem.targetDate = d.toISOString().split('T')[0];
+      }
 
-    if (rem.repeat === '1m') {
-      const d = rem.targetDate ? new Date(rem.targetDate) : new Date();
-      d.setMonth(d.getMonth() + 1);
-      nextTargetDate = d.toISOString().split('T')[0];
-    } else if (rem.repeat === '3m') {
-      const d = rem.targetDate ? new Date(rem.targetDate) : new Date();
-      d.setMonth(d.getMonth() + 3);
-      nextTargetDate = d.toISOString().split('T')[0];
-    } else if (rem.repeat === '6m') {
-      const d = rem.targetDate ? new Date(rem.targetDate) : new Date();
-      d.setMonth(d.getMonth() + 6);
-      nextTargetDate = d.toISOString().split('T')[0];
-    } else if (rem.repeat === '12m') {
-      const d = rem.targetDate ? new Date(rem.targetDate) : new Date();
-      d.setFullYear(d.getFullYear() + 1);
-      nextTargetDate = d.toISOString().split('T')[0];
-    } else if (rem.repeat === '5000km') {
-      nextTargetKm = (veh.km || 0) + 5000;
-    } else if (rem.repeat === '10000km') {
-      nextTargetKm = (veh.km || 0) + 10000;
+      appState.reminders.push(nextRem);
     }
 
-    appState.reminders.push({
-      id: 'r_' + Date.now(),
-      vehicleId: veh.id,
-      title: rem.title,
-      category: rem.category,
-      targetKm: nextTargetKm,
-      targetDate: nextTargetDate,
-      repeat: rem.repeat,
-      notes: rem.notes,
-      completed: false
-    });
+    saveState();
+    renderUserReminders();
+    renderRemindersTab();
   }
-
-  saveState();
-  renderApp();
-  renderRemindersTab();
 }
 
 function deleteReminderDirect(remId) {
-  appState.reminders = appState.reminders.filter(r => r.id !== remId);
+  appState.reminders = (appState.reminders || []).filter(r => r.id !== remId);
   saveState();
-  renderApp();
+  renderUserReminders();
   renderRemindersTab();
 }
 
-function renderUserReminders(targetContainerId = 'userRemindersList') {
-  const container = document.getElementById(targetContainerId);
+// Emergency Contacts & Important Phone Numbers Engine
+function renderEmergencyContacts() {
+  const container = document.getElementById('emergencyContactsList');
+  if (!container) return;
+
+  const contacts = appState.emergencyContacts || [];
+  if (contacts.length === 0) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; color:rgba(255,255,255,0.7); width:100%; grid-column: 1 / -1;">No hay números guardados.<br>Toca "+ Guardar Número" para registrar tus talleres, grúa o seguro.</p>`;
+    return;
+  }
+
+  container.innerHTML = contacts.map(c => `
+    <div class="contact-card-item" onclick="openContactModal('${c.id}')">
+      <div class="contact-info">
+        <span class="contact-name">${escapeHtml(c.name)}</span>
+        <span class="contact-sub">${escapeHtml(c.category)} • ${escapeHtml(c.phone)}</span>
+        ${c.notes ? `<span class="contact-sub" style="font-style:italic;">Nota: ${escapeHtml(c.notes)}</span>` : ''}
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
+        <button class="btn-call-direct" onclick="callContact('${escapeHtml(c.phone)}')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span>Llamar</span>
+        </button>
+        <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContactDirect('${c.id}')" style="color:#ff453a; padding:2px 6px;">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openContactModal(contactId = null) {
+  document.getElementById('formContact').reset();
+  document.getElementById('contactId').value = '';
+  document.getElementById('modalContactTitle').textContent = 'Nuevo Contacto Importante';
+
+  if (contactId) {
+    const c = (appState.emergencyContacts || []).find(item => item.id === contactId);
+    if (c) {
+      document.getElementById('modalContactTitle').textContent = 'Editar Contacto';
+      document.getElementById('contactId').value = c.id;
+      document.getElementById('contactName').value = c.name;
+      document.getElementById('contactPhone').value = c.phone;
+      document.getElementById('contactCategory').value = c.category || 'Auxilio';
+      if (document.getElementById('contactNotes')) document.getElementById('contactNotes').value = c.notes || '';
+    }
+  }
+
+  openModal('modalContact');
+}
+
+function saveEmergencyContact(e) {
+  e.preventDefault();
+  const contactId = document.getElementById('contactId').value;
+  const name = document.getElementById('contactName').value.trim();
+  const phone = document.getElementById('contactPhone').value.trim();
+  const category = document.getElementById('contactCategory').value;
+  const notes = document.getElementById('contactNotes') ? document.getElementById('contactNotes').value.trim() : '';
+
+  if (!name || !phone) return;
+
+  appState.emergencyContacts = appState.emergencyContacts || [];
+
+  if (contactId) {
+    const existing = appState.emergencyContacts.find(c => c.id === contactId);
+    if (existing) {
+      existing.name = name;
+      existing.phone = phone;
+      existing.category = category;
+      existing.notes = notes;
+    }
+  } else {
+    const newContact = {
+      id: 'c_' + Date.now(),
+      name, phone, category, notes
+    };
+    appState.emergencyContacts.push(newContact);
+  }
+
+  saveState();
+  closeModal('modalContact');
+  document.getElementById('formContact').reset();
+  renderEmergencyContacts();
+}
+
+function deleteEmergencyContactDirect(contactId) {
+  if (confirm('¿Eliminar este número de teléfono?')) {
+    appState.emergencyContacts = (appState.emergencyContacts || []).filter(c => c.id !== contactId);
+    saveState();
+    renderEmergencyContacts();
+  }
+}
+
+function callContact(phone) {
+  if (!phone) return;
+  const cleanPhone = phone.replace(/[^0-9+]/g, '');
+  window.location.href = `tel:${cleanPhone}`;
+}
+
+// Render Dynamic Filter Pills for Maintenance Tab
+function renderMaintenanceFilterPills() {
+  const container = document.getElementById('maintenanceFilterPills');
+  if (!container) return;
+
+  let html = `<button class="pill ${currentFilter === 'all' ? 'active' : ''}" onclick="filterLogs('all', this)">Todos</button>`;
+  
+  SERVICE_CATEGORIES.forEach(cat => {
+    html += `<button class="pill ${currentFilter === cat ? 'active' : ''}" onclick="filterLogs('${cat}', this)">${escapeHtml(cat)}</button>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+// Populate Category Dropdown in Modal Service
+function populateServCategorySelect() {
+  const select = document.getElementById('servCategory');
+  if (!select) return;
+
+  const currentVal = select.value;
+  let html = '';
+  SERVICE_CATEGORIES.forEach(cat => {
+    html += `<option value="${cat}">${escapeHtml(cat)}</option>`;
+  });
+
+  select.innerHTML = html;
+  if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+    select.value = currentVal;
+  }
+}
+
+function handleServCategoryChange(val) {
+  if (val === '__NEW__') {
+    openModal('modalNewCategory');
+    document.getElementById('servCategory').selectedIndex = 0;
+  }
+}
+
+// Save New Custom Category
+function saveNewCategory(e) {
+  e.preventDefault();
+  const name = document.getElementById('newCatName').value.trim();
+  if (!name) return;
+
+  if (!SERVICE_CATEGORIES.includes(name)) {
+    SERVICE_CATEGORIES.push(name);
+  }
+
+  closeModal('modalNewCategory');
+  document.getElementById('formNewCategory').reset();
+
+  populateServCategorySelect();
+  const select = document.getElementById('servCategory');
+  if (select) select.value = name;
+}
+
+// Guantera Digital Functions
+function renderGuantera() {
+  renderEmergencyContacts();
+  const container = document.getElementById('documentList');
   if (!container) return;
 
   const veh = getActiveVehicle();
   if (!veh) {
-    container.innerHTML = `<p class="subtitle" style="padding:10px;">No hay vehículo activo.</p>`;
+    container.innerHTML = '<p class="subtitle" style="text-align:center; padding:20px;">No hay vehículo activo.</p>';
     return;
   }
 
-  const list = (appState.reminders || []).filter(r => r.vehicleId === veh.id);
-  if (list.length === 0) {
-    container.innerHTML = `
-      <div class="predictive-card">
-        <div>
-          <div class="predictive-title">Sin recordatorios configurados</div>
-          <div class="predictive-desc">Agrega alertas personalizadas para aceite, llantas o marchamo.</div>
-        </div>
-      </div>
-    `;
+  const docs = (appState.documents || []).filter(d => d.vehicleId === veh.id);
+
+  if (docs.length === 0) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">No has agregado ningún documento a la Guantera Digital.<br>Toca "+ Documento" para registrar tu Póliza, RTV o Licencia.</p>`;
     return;
   }
 
-  let html = '';
-  list.forEach(r => {
-    let statusClass = r.completed ? 'completed' : 'pending';
-    let kmText = r.targetKm ? `${r.targetKm.toLocaleString()} km` : '';
-    let dateText = r.targetDate ? r.targetDate : '';
-    let targetStr = [kmText, dateText].filter(Boolean).join(' • ');
+  docs.sort((a, b) => new Date(a.expDate) - new Date(b.expDate));
 
-    html += `
+  const today = new Date().toISOString().split('T')[0];
+
+  container.innerHTML = docs.map(d => {
+    let badgeClass = 'badge-green';
+    let statusText = 'Vigente';
+
+    const diffDays = Math.ceil((new Date(d.expDate) - new Date(today)) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      badgeClass = 'badge-red';
+      statusText = `VENCIDO (${Math.abs(diffDays)}d)`;
+    } else if (diffDays <= 30) {
+      badgeClass = 'badge-yellow';
+      statusText = `Vence en ${diffDays}d`;
+    }
+
+    return `
       <div class="swipe-container">
         <div class="swipe-action-bg">
-          <button class="swipe-action-btn" onclick="deleteReminderDirect('${r.id}')">
-            ${SVG_ICONS.trash} <span>Borrar</span>
+          <button class="swipe-action-btn" onclick="deleteDocumentDirect('${d.id}')">
+            ${SVG_ICONS.trash}
+            <span>Eliminar</span>
           </button>
         </div>
-        <div class="swipe-content" style="${r.completed ? 'opacity:0.6;' : ''}">
-          <div style="flex:1;">
-            <div style="font-weight:700; font-size:0.92rem; ${r.completed ? 'text-decoration:line-through;' : ''}">
-              ${escapeHtml(r.title)}
+        <div class="swipe-content log-item-card" onclick="openDocumentModal('${d.id}')">
+          <div class="log-item-main">
+            <div class="log-icon-badge">${SVG_ICONS.document}</div>
+            <div>
+              <div class="log-title">${escapeHtml(d.title)}</div>
+              <div class="log-meta">Vence: <strong>${d.expDate}</strong> ${d.phone ? '• Tel: ' + escapeHtml(d.phone) : ''}</div>
+              ${d.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(d.notes)}</div>` : ''}
             </div>
-            <div class="veh-info-sub">${escapeHtml(r.category || 'Mantenimiento')} ${targetStr ? '• ' + targetStr : ''} ${r.repeat && r.repeat !== 'none' ? '↻ Recurrente' : ''}</div>
           </div>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <button class="btn ${r.completed ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="toggleReminderCompleted('${r.id}')">
-              ${r.completed ? '✓ Listo' : 'Marcar Completado'}
-            </button>
-            <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar recordatorio">
-              ${SVG_ICONS.trash}
-            </button>
+          <div class="log-item-side">
+            <span class="badge-subtle ${badgeClass}">${statusText}</span>
+            ${d.file ? `<button class="btn btn-secondary btn-sm" style="margin-top:6px; padding:2px 8px; font-size:0.75rem;" onclick="event.stopPropagation(); viewDocumentFile('${d.id}')">Ver Adjunto</button>` : ''}
           </div>
         </div>
       </div>
     `;
-  });
-  container.innerHTML = html;
-  setTimeout(initSwipeListeners, 30);
+  }).join('');
 }
 
 function openDocumentModal(docId = null) {
-  const form = document.getElementById('formDocument');
-  form.reset();
+  document.getElementById('formDocument').reset();
+  document.getElementById('docId').value = '';
+  document.getElementById('modalDocumentTitle').textContent = 'Agregar Documento';
+
   if (docId) {
-    const doc = appState.documents.find(d => d.id === docId);
-    if (doc) {
-      document.getElementById('docId').value = doc.id;
-      document.getElementById('docType').value = doc.type;
-      document.getElementById('docTitle').value = doc.title;
-      document.getElementById('docExpDate').value = doc.expDate;
-      document.getElementById('docPhone').value = doc.phone || '';
-      document.getElementById('docNotes').value = doc.notes || '';
+    const d = (appState.documents || []).find(item => item.id === docId);
+    if (d) {
+      document.getElementById('modalDocumentTitle').textContent = 'Editar Documento';
+      document.getElementById('docId').value = d.id;
+      document.getElementById('docType').value = d.type;
+      document.getElementById('docTitle').value = d.title;
+      document.getElementById('docExpDate').value = d.expDate;
+      document.getElementById('docPhone').value = d.phone || '';
+      if (document.getElementById('docNotes')) document.getElementById('docNotes').value = d.notes || '';
     }
-  } else {
-    document.getElementById('docId').value = '';
   }
+
   openModal('modalDocument');
 }
 
 function saveDocument(e) {
   e.preventDefault();
   const veh = getActiveVehicle();
-  if (!veh) return;
+  if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
 
-  const id = document.getElementById('docId').value;
+  const docId = document.getElementById('docId').value;
   const type = document.getElementById('docType').value;
-  const title = document.getElementById('docTitle').value.trim();
+  const title = document.getElementById('docTitle').value;
   const expDate = document.getElementById('docExpDate').value;
-  const phone = document.getElementById('docPhone').value.trim();
-  const notes = document.getElementById('docNotes').value.trim();
+  const phone = document.getElementById('docPhone').value;
+  const notes = document.getElementById('docNotes') ? document.getElementById('docNotes').value.trim() : '';
   const fileInput = document.getElementById('docFile');
 
-  const processSave = (fileData = '') => {
-    if (id) {
-      const doc = appState.documents.find(d => d.id === id);
-      if (doc) {
-        doc.type = type; doc.title = title; doc.expDate = expDate;
-        doc.phone = phone; doc.notes = notes;
-        if (fileData) doc.file = fileData;
-      }
+  let targetDoc = docId ? (appState.documents || []).find(d => d.id === docId) : null;
+
+  const processAndSave = (fileBase64) => {
+    if (targetDoc) {
+      targetDoc.type = type;
+      targetDoc.title = title;
+      targetDoc.expDate = expDate;
+      targetDoc.phone = phone;
+      targetDoc.notes = notes;
+      if (fileBase64) targetDoc.file = fileBase64;
     } else {
-      appState.documents.push({
+      const newDoc = {
         id: 'd_' + Date.now(),
         vehicleId: veh.id,
-        type, title, expDate, phone, notes,
-        file: fileData
-      });
+        type, title, expDate, phone, notes, file: fileBase64
+      };
+      appState.documents = appState.documents || [];
+      appState.documents.push(newDoc);
     }
+
     saveState();
     closeModal('modalDocument');
-    renderGuantera();
+    document.getElementById('formDocument').reset();
+    renderApp();
   };
 
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-    const reader = new FileReader();
-    reader.onload = (evt) => processSave(evt.target.result);
-    reader.readAsDataURL(fileInput.files[0]);
+  if (fileInput.files && fileInput.files[0]) {
+    readAndCompressImage(fileInput.files[0], processAndSave);
   } else {
-    const existing = appState.documents.find(d => d.id === id);
-    processSave(existing ? existing.file : '');
+    processAndSave('');
   }
 }
 
-function renderGuantera() {
-  const docContainer = document.getElementById('documentsList');
-  const contactsContainer = document.getElementById('emergencyContactsList');
-  const veh = getActiveVehicle();
-
-  if (contactsContainer) {
-    let cHtml = '';
-    (appState.emergencyContacts || []).forEach(c => {
-      cHtml += `
-        <div class="swipe-container">
-          <div class="swipe-action-bg">
-            <button class="swipe-action-btn" onclick="deleteEmergencyContact('${c.id}')">
-              ${SVG_ICONS.trash} <span>Borrar</span>
-            </button>
-          </div>
-          <div class="swipe-content">
-            <div style="flex:1; min-width:0;">
-              <strong style="color:#ffffff; display:block;">${escapeHtml(c.name)}</strong>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(c.category || 'Contacto')}</div>
-            </div>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:var(--text-primary); border-color:var(--border-color); white-space:nowrap;">
-                📞 ${escapeHtml(c.phone)}
-              </a>
-              <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContact('${c.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar contacto">
-                ${SVG_ICONS.trash}
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    contactsContainer.innerHTML = cHtml;
-  }
-
-  if (!docContainer) return;
-  if (!veh) {
-    docContainer.innerHTML = `<p class="subtitle">No hay vehículo activo.</p>`;
-    return;
-  }
-
-  const docs = (appState.documents || []).filter(d => d.vehicleId === veh.id);
-  if (docs.length === 0) {
-    docContainer.innerHTML = `<div class="text-center" style="padding:20px; color:var(--text-secondary);">No hay documentos registrados para este vehículo.</div>`;
-    return;
-  }
-
-  let html = '';
-  docs.forEach(doc => {
-    html += `
-      <div class="swipe-container">
-        <div class="swipe-action-bg">
-          <button class="swipe-action-btn" onclick="deleteDocumentDirect('${doc.id}')">
-            ${SVG_ICONS.trash} <span>Borrar</span>
-          </button>
-        </div>
-        <div class="swipe-content">
-          <div class="log-item-main" style="flex:1;">
-            <div class="log-icon-badge">${SVG_ICONS.document}</div>
-            <div>
-              <div class="log-title">${escapeHtml(doc.title)}</div>
-              <div class="log-meta">${escapeHtml(doc.type)} • Vence: ${doc.expDate} ${doc.phone ? '• ' + escapeHtml(doc.phone) : ''}</div>
-            </div>
-          </div>
-          <div class="veh-actions">
-            <button class="btn btn-tertiary btn-sm" onclick="openDocumentModal('${doc.id}')">${SVG_ICONS.edit}</button>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  docContainer.innerHTML = html;
-  setTimeout(initSwipeListeners, 30);
-}
-
-function deleteDocumentDirect(id) {
-  appState.documents = appState.documents.filter(d => d.id !== id);
-  saveState();
-  renderGuantera();
-}
-
-function openContactModal() {
-  document.getElementById('formContact').reset();
-  openModal('modalContact');
-}
-
-function saveEmergencyContact(e) {
-  e.preventDefault();
-  const name = document.getElementById('contactName').value.trim();
-  const phone = document.getElementById('contactPhone').value.trim();
-  const category = document.getElementById('contactCategory').value;
-
-  if (name && phone) {
-    appState.emergencyContacts.push({
-      id: 'c_' + Date.now(),
-      name, phone, category
-    });
+function deleteDocumentDirect(docId) {
+  if (confirm('¿Eliminar este documento de la Guantera?')) {
+    appState.documents = (appState.documents || []).filter(d => d.id !== docId);
     saveState();
-    renderGuantera();
-  }
-  closeModal('modalContact');
-}
-
-function deleteEmergencyContact(id) {
-  if (!confirm('¿Eliminar este contacto?')) return;
-  appState.emergencyContacts = appState.emergencyContacts.filter(c => c.id !== id);
-  saveState();
-  renderGuantera();
-}
-
-function renderReports() {
-  const veh = getActiveVehicle();
-  if (!veh) return;
-
-  const services = (appState.services || []).filter(s => s.vehicleId === veh.id);
-  const fuels = (appState.fuels || []).filter(f => f.vehicleId === veh.id);
-
-  const totalServ = services.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-  const totalFuel = fuels.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-
-  if (document.getElementById('totalServiceSpend')) {
-    document.getElementById('totalServiceSpend').textContent = formatCurrency(totalServ);
-  }
-  if (document.getElementById('totalFuelSpend')) {
-    document.getElementById('totalFuelSpend').textContent = formatCurrency(totalFuel);
-  }
-
-  const catBreakdown = {};
-  services.forEach(s => {
-    catBreakdown[s.category] = (catBreakdown[s.category] || 0) + (s.cost || 0);
-  });
-
-  const catContainer = document.getElementById('reportsCategoryBreakdown');
-  if (catContainer) {
-    let html = '';
-    const keys = Object.keys(catBreakdown);
-    if (keys.length === 0) {
-      html = `<p class="subtitle">Sin gastos de mantenimiento registrados.</p>`;
-    } else {
-      keys.forEach(cat => {
-        html += `
-          <div class="settings-row">
-            <span>${escapeHtml(cat)}</span>
-            <strong>${formatCurrency(catBreakdown[cat])}</strong>
-          </div>
-        `;
-      });
-    }
-    catContainer.innerHTML = html;
+    renderApp();
   }
 }
 
-function generateCertifiedReport() {
-  const veh = getActiveVehicle();
-  if (!veh) {
-    alert('Selecciona un vehículo primero.');
-    return;
+function viewDocumentFile(docId) {
+  const doc = (appState.documents || []).find(d => d.id === docId);
+  if (doc && doc.file) {
+    document.getElementById('receiptContainer').innerHTML = `
+      <img src="${doc.file}" alt="Documento ${escapeHtml(doc.title)}">
+    `;
+    openModal('modalReceiptViewer');
   }
-  const services = (appState.services || []).filter(s => s.vehicleId === veh.id);
-  const container = document.getElementById('certifiedDocumentContent');
+}
+
+// AI Mechanical Diagnostic Engine
+function renderAIDiagnostic() {
+  const container = document.getElementById('aiDiagnosticCard');
   if (!container) return;
 
-  let html = `
-    <div class="cert-header">
+  const veh = getActiveVehicle();
+  if (!veh) {
+    container.innerHTML = '<p class="subtitle" style="text-align:center; padding:10px;">Agrega tu primer vehículo en la pestaña Garaje para generar un diagnóstico inteligente.</p>';
+    return;
+  }
+
+  const services = appState.services.filter(s => s.vehicleId === veh.id);
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed);
+  const docs = (appState.documents || []).filter(d => d.vehicleId === veh.id);
+
+  let currentYear = new Date().getFullYear();
+  let vehicleAge = Math.max(1, currentYear - veh.year);
+  let avgKmPerYear = Math.round(veh.km / vehicleAge);
+
+  let lastService = services.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+
+  container.innerHTML = `
+    <div class="ai-header" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
       <div>
-        <h2 style="margin:0; font-size:1.4rem;">EXPEDIENTE TÉCNICO DE VEHÍCULO</h2>
-        <p style="margin:4px 0 0 0; font-size:0.85rem; color:#64748b;">Reporte Certificado de Mantenimientos y Reparaciones</p>
+        <h3 style="margin:0; font-size:1.05rem;">Diagnóstico IA - ${escapeHtml(veh.name)}</h3>
+        <span style="font-size:0.78rem; color:var(--text-secondary);">${veh.year} • ${escapeHtml(veh.plate || 'Sin Placa')} • ${veh.km.toLocaleString()} KM</span>
       </div>
-      <div style="text-align:right;">
-        <strong style="font-size:1.1rem; color:#0f172a;">${escapeHtml(veh.name)}</strong>
-        <div style="font-size:0.85rem; color:#64748b;">Placa: ${escapeHtml(veh.plate) || 'N/A'} • Odómetro: ${veh.km.toLocaleString()} km</div>
+      <span class="ai-badge" style="background:#0a84ff; color:#fff; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:700;">Perfil Activo</span>
+    </div>
+
+    <div class="ai-item-row" style="margin-bottom:8px;">
+      <div class="ai-item-title" style="font-weight:700; color:#ffffff;">Expediente de este Vehículo</div>
+      <div class="ai-item-body" style="font-size:0.85rem; color:#cbd5e1;">
+        • <strong>${services.length} Mantenimiento(s)</strong> (${lastService ? 'Último: ' + escapeHtml(lastService.title) + ' el ' + lastService.date : 'Sin registros recientes'}).<br>
+        • <strong>${fuels.length} Recarga(s)</strong> de gasolina acumuladas.<br>
+        • <strong>${reminders.length} Recordatorio(s)</strong> personalizados pendientes.<br>
+        • <strong>${docs.length} Documento(s)</strong> en la Guantera Digital.
       </div>
     </div>
-    <table class="cert-table">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Kilometraje</th>
-          <th>Categoría / Servicio</th>
-          <th>Título / Descripción</th>
-          <th>Taller / Proveedor</th>
-          <th>Costo</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
 
-  if (services.length === 0) {
-    html += `<tr><td colspan="6" style="text-align:center; padding:12px;">Sin registros de mantenimiento.</td></tr>`;
-  } else {
-    services.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(s => {
-      html += `
-        <tr>
-          <td>${s.date}</td>
-          <td>${s.km.toLocaleString()} km</td>
-          <td>${escapeHtml(s.category)}</td>
-          <td>${escapeHtml(s.title)}</td>
-          <td>${escapeHtml(s.shop || 'N/A')}</td>
-          <td>${formatCurrency(s.cost)}</td>
-        </tr>
-      `;
-    });
-  }
-
-  html += `
-      </tbody>
-    </table>
+    <div class="ai-item-row">
+      <div class="ai-item-title" style="font-weight:700; color:#ffffff;">Uso y Asesoría Técnica</div>
+      <div class="ai-item-body" style="font-size:0.85rem; color:#cbd5e1;">
+        Promedio de uso estimado: <strong>${avgKmPerYear.toLocaleString()} km/año</strong>.<br>
+        ${veh.km >= 50000 
+          ? `Al superar los 50.000 km en este ${escapeHtml(veh.name)}, es recomendable revisar fajas de distribución, bujías, líquido de frenos y soportes de motor.` 
+          : `Revisa la presión de inflado en llantas en frío y mantén el aceite limpio para maximizar el rendimiento.`}
+      </div>
+    </div>
   `;
-  container.innerHTML = html;
-  openModal('modalCertifiedReport');
 }
 
-function renderUserSettings() {
-  const nameEl = document.getElementById('userProfileName');
-  const emailEl = document.getElementById('userProfileEmail');
-  const currEl = document.getElementById('settingCurrency');
-
-  if (currentUser) {
-    if (nameEl) nameEl.textContent = currentUser.name;
-    if (emailEl) emailEl.textContent = currentUser.email;
+// Quick Prompt Handler for Chip Buttons
+function askQuickPrompt(promptText) {
+  const input = document.getElementById('aiUserQuestion');
+  if (input) {
+    input.value = promptText;
+    const form = document.getElementById('formAIChat');
+    if (form) {
+      askAIAssistantDirect(promptText);
+    }
   }
-  if (currEl) currEl.value = appState.currency || 'CRC';
+}
+
+function askAIAssistant(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('aiUserQuestion');
+  const question = input ? input.value.trim() : '';
+  if (question) askAIAssistantDirect(question);
+}
+
+// Conversational & Fine-Tuned AI Assistant
+async function askAIAssistantDirect(question) {
+  const input = document.getElementById('aiUserQuestion');
+  const responseBox = document.getElementById('aiChatResponse');
+
+  if (!question || !responseBox) return;
+
+  responseBox.style.display = 'block';
+  responseBox.innerHTML = '<em>Analizando tu consulta con la Inteligencia Mecánica...</em>';
+
+  const veh = getActiveVehicle();
+  const services = veh ? appState.services.filter(s => s.vehicleId === veh.id) : [];
+  const fuels = veh ? appState.fuels.filter(f => f.vehicleId === veh.id) : [];
+  const reminders = veh ? (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed) : [];
+
+  const vehContext = veh 
+    ? `${veh.name} (${veh.year}, ${veh.type}, ${veh.km.toLocaleString()} KM acumulados)` 
+    : 'tu vehículo';
+
+  const formatText = (txt) => {
+    return txt
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  };
+
+  const qLower = question.toLowerCase();
+  const greetings = ['hola', 'buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'que tal', 'hi', 'saludos', 'quien eres', 'quien sos', 'ayuda'];
+
+  if (greetings.some(g => qLower === g || qLower.startsWith(g + ' ') || qLower.endsWith(' ' + g))) {
+    setTimeout(() => {
+      const userName = currentUser ? currentUser.name.split(' ')[0] : '';
+      responseBox.innerHTML = formatText(`**¡Hola${userName ? ' ' + escapeHtml(userName) : ''}! Soy tu Asistente Mecánico IA de GarageOne.**\n\nEstoy analizando específicamente tu **${escapeHtml(vehContext)}**.\n\nPuedo responder cualquier duda sobre averías, ruidos, testigos del tablero, servicios recomendados o fallas.\n\n¿En qué te puedo asesorar hoy?`);
+      if (input) input.value = '';
+    }, 250);
+    return;
+  }
+
+  if (appState.geminiApiKey) {
+    try {
+      const promptText = `Eres un Asistente en Ingeniería Mecánica Automotriz de GarageOne. Analiza la consulta para este vehículo específico: ${vehContext}.
+Historial: ${services.length} servicios realizados, ${fuels.length} recargas de combustible, ${reminders.length} recordatorios pendientes.
+Pregunta del usuario: "${question}".
+Instrucciones: Responde de forma amigable, muy profesional, clara y estructurada en español (máximo 3 párrafos), usando negritas en conceptos clave. Especifica posibles causas, nivel de urgencia y recomendaciones.`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+
+      const data = await res.json();
+      if (data.candidates && data.candidates[0].content.parts[0].text) {
+        responseBox.innerHTML = formatText(data.candidates[0].content.parts[0].text);
+        if (input) input.value = '';
+        return;
+      }
+    } catch (err) {
+      console.log('Error calling Gemini API:', err);
+    }
+  }
+
+  setTimeout(() => {
+    let response = '';
+
+    if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo')) {
+      response = `**Diagnóstico Especializado de Motor (${escapeHtml(vehContext)}):**\n\n• **Posibles Orígenes:** Tapa de combustible floja, falla en el sensor de oxígeno (O2), sensor MAF sucio, válvula EGR obstruida o falla en bujías/bobinas.\n• **Acción Recomendada:** Conectar escáner OBD2 en taller para leer el código de falla exacto (P0xxx).\n• **Urgencia:** Si la luz permanece encendida sin parpadear, conduce despacio al taller. **Si parpadea, detén el vehículo de inmediato** para evitar daños en el catalizador.`;
+    } else if (qLower.includes('calienta') || qLower.includes('temperatura') || qLower.includes('refrigerante') || qLower.includes('humo')) {
+      response = `**Alerta de Enfriamiento (${escapeHtml(vehContext)}):**\n\n• **Diagnóstico:** Fugas de refrigerante, falla en el termostato, tapón de radiador defectuoso o abanico inactivo.\n• **Procedimiento de Seguridad:** Apaga el motor y aguarda al menos 30 minutos a que enfríe. **NUNCA quites el tapón del radiador caliente.**`;
+    } else if (qLower.includes('freno') || qLower.includes('chillido') || qLower.includes('pedal')) {
+      response = `**Inspección del Sistema de Frenos (${escapeHtml(vehContext)}):**\n\n• **Chillido Agudo:** Contacto del avisador acústico metálico por pastillas desgastadas.\n• **Pedal Suave:** Aire en el sistema hidráulico o desgaste del líquido de frenos.\n• **Acción:** Reemplazar pastillas de freno y verificar estado de discos.`;
+    } else if (qLower.includes('vibra') || qLower.includes('vibracion') || qLower.includes('volante')) {
+      response = `**Análisis de Vibraciones para ${escapeHtml(vehContext)}:**\n\n• **Al rodar a velocidad:** Desbalanceo de neumáticos o llantas deformadas.\n• **Al frenar:** Discos de freno alabeados / deformados por calor.\n• **Al acelerar:** Desgaste en soporte de motor o junta homocinética (flechas).`;
+    } else if (qLower.includes('bateria') || qLower.includes('arranca') || qLower.includes('lento')) {
+      response = `**Sistema Eléctrico y Encendido:**\n\n• **Diagnóstico:** Chasquido o encendido pesado sugiere batería descargada, bornes sulfatados o falla de motor de arranque.\n• **Revisión:** Probar voltaje con multímetro (12.6V reposo / 13.8V-14.4V encendido).`;
+    } else if (qLower.includes('aceite') || qLower.includes('filtro') || qLower.includes('lubricante')) {
+      response = `**Plan de Lubricación para ${escapeHtml(vehContext)}:**\n\n• **Intervalo Ideal:** Cambiar el aceite sintético cada 5.000 a 7.500 km junto al filtro de aceite OEM.\n• **Nivel de Aceite:** Verificar nivel en frío en superficie plana. Si presenta color café lechoso, hay mezcla con refrigerante.`;
+    } else {
+      response = `**Asesoría Técnica Automotriz para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n• **Recomendación:** Para mantener tu ${escapeHtml(veh.name)} en estado óptimo a los ${veh.km.toLocaleString()} KM, realiza inspección regular de fluidos, fajas y neumáticos.\n• Registra tus mantenimientos en la pestaña **Servicios** para mantener el historial certificado del auto.`;
+    }
+
+    responseBox.innerHTML = formatText(response);
+    if (input) input.value = '';
+  }, 350);
+}
+
+function saveGeminiKey(key) {
+  appState.geminiApiKey = key.trim();
+  saveState();
+}
+
+// Mini Vehicle List (iOS Swipe-to-Delete)
+function renderMiniVehiclesList() {
+  const container = document.getElementById('allVehiclesList');
+  if (!container) return;
+
+  if (appState.vehicles.length === 0) {
+    container.innerHTML = '<p class="subtitle">No hay vehículos registrados.</p>';
+    return;
+  }
+
+  container.innerHTML = appState.vehicles.map(v => `
+    <div class="swipe-container">
+      <div class="swipe-action-bg">
+        <button class="swipe-action-btn" onclick="deleteVehicleDirect('${v.id}')">
+          ${SVG_ICONS.trash}
+          <span>Eliminar</span>
+        </button>
+      </div>
+      <div class="swipe-content vehicle-mini-item ${v.id === appState.activeVehicleId ? 'active-veh' : ''}">
+        <div style="cursor:pointer; flex:1;" onclick="selectActiveVehicle('${v.id}')">
+          <strong>${escapeHtml(v.name)} (${v.year}) ${v.id === appState.activeVehicleId ? '✓' : ''}</strong>
+          <div class="veh-info-sub">${escapeHtml(v.plate) || 'Sin Placa'} • ${v.km.toLocaleString()} km</div>
+        </div>
+        <div class="veh-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editVehicle('${v.id}')">${SVG_ICONS.edit} Editar</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Vehicle CRUD
+function openVehicleModal(vehId = null) {
+  document.getElementById('formVehicle').reset();
+  document.getElementById('vehId').value = '';
+  document.getElementById('modalVehicleTitle').textContent = 'Nuevo Vehículo';
+
+  if (vehId) {
+    const v = appState.vehicles.find(item => item.id === vehId);
+    if (v) {
+      document.getElementById('modalVehicleTitle').textContent = 'Editar Vehículo';
+      document.getElementById('vehId').value = v.id;
+      document.getElementById('vehType').value = v.type;
+      document.getElementById('vehName').value = v.name;
+      document.getElementById('vehYear').value = v.year;
+      document.getElementById('vehPlate').value = v.plate || '';
+      document.getElementById('vehKm').value = v.km;
+    }
+  }
+
+  openModal('modalVehicle');
+}
+
+function editVehicle(vehId) {
+  openVehicleModal(vehId);
+}
+
+function saveVehicle(e) {
+  e.preventDefault();
+  const vehId = document.getElementById('vehId').value;
+  const type = document.getElementById('vehType').value;
+  const name = document.getElementById('vehName').value;
+  const year = parseInt(document.getElementById('vehYear').value);
+  const plate = document.getElementById('vehPlate').value;
+  const km = parseInt(document.getElementById('vehKm').value);
+  const photoInput = document.getElementById('vehPhoto');
+
+  let targetVeh = vehId ? appState.vehicles.find(v => v.id === vehId) : null;
+
+  const processAndSave = (photoBase64) => {
+    if (targetVeh) {
+      targetVeh.type = type;
+      targetVeh.name = name;
+      targetVeh.year = year;
+      targetVeh.plate = plate;
+      targetVeh.km = km;
+      if (photoBase64) targetVeh.photo = photoBase64;
+    } else {
+      const newVeh = {
+        id: 'v_' + Date.now(),
+        type, name, year, plate, km, photo: photoBase64
+      };
+      appState.vehicles.push(newVeh);
+      appState.activeVehicleId = newVeh.id;
+    }
+
+    saveState();
+    closeModal('modalVehicle');
+    document.getElementById('formVehicle').reset();
+    renderApp();
+  };
+
+  if (photoInput.files && photoInput.files[0]) {
+    readAndCompressImage(photoInput.files[0], processAndSave);
+  } else {
+    processAndSave('');
+  }
+}
+
+// Maintenance Log List (iOS Swipe-to-Delete)
+let currentFilter = 'all';
+
+function filterLogs(cat, el) {
+  currentFilter = cat;
+  document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderServiceList(appState.activeVehicleId);
+}
+
+function renderServiceList(vehId) {
+  const container = document.getElementById('serviceLogList');
+  let list = appState.services.filter(s => s.vehicleId === vehId);
+
+  if (currentFilter !== 'all') {
+    list = list.filter(s => s.category === currentFilter);
+  }
+
+  list.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (list.length === 0) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros en esta categoría.</p>`;
+    return;
+  }
+
+  const svgCategoryMap = {
+    'Aceite': SVG_ICONS.oil,
+    'Frenos': SVG_ICONS.brakes,
+    'Llantas': SVG_ICONS.tires,
+    'Filtros': SVG_ICONS.filters,
+    'Bujías': SVG_ICONS.spark,
+    'Batería': SVG_ICONS.battery,
+    'Transmisión': SVG_ICONS.transmission,
+    'Correa': SVG_ICONS.belt,
+    'Trámite': SVG_ICONS.document,
+    'Otro': SVG_ICONS.wrench
+  };
+
+  container.innerHTML = list.map(s => `
+    <div class="swipe-container">
+      <div class="swipe-action-bg">
+        <button class="swipe-action-btn" onclick="deleteServiceDirect('${s.id}')">
+          ${SVG_ICONS.trash}
+          <span>Eliminar</span>
+        </button>
+      </div>
+      <div class="swipe-content log-item-card" onclick="openServiceModal('${s.id}')">
+        <div class="log-item-main">
+          <div class="log-icon-badge">${svgCategoryMap[s.category] || SVG_ICONS.wrench}</div>
+          <div>
+            <div class="log-title">${escapeHtml(s.title)}</div>
+            <div class="log-meta">${s.date} • ${s.km.toLocaleString()} km ${s.shop ? `• ${escapeHtml(s.shop)}` : ''}</div>
+            ${s.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(s.notes)}</div>` : ''}
+            ${s.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewReceipt('${s.id}')">${SVG_ICONS.document} Factura</span>` : ''}
+          </div>
+        </div>
+        <div class="log-item-side">
+          <div class="log-cost">${formatCurrency(s.cost)}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openServiceModal(servId = null) {
+  document.getElementById('formService').reset();
+  document.getElementById('servId').value = '';
+  document.getElementById('modalServiceTitle').textContent = 'Registrar Mantenimiento';
+  populateServCategorySelect();
+  setTodayDates();
+
+  if (servId) {
+    const s = appState.services.find(item => item.id === servId);
+    if (s) {
+      document.getElementById('modalServiceTitle').textContent = 'Editar Mantenimiento';
+      document.getElementById('servId').value = s.id;
+      document.getElementById('servCategory').value = s.category;
+      document.getElementById('servTitle').value = s.title;
+      document.getElementById('servCost').value = s.cost;
+      document.getElementById('servDate').value = s.date;
+      document.getElementById('servKm').value = s.km;
+      document.getElementById('servShop').value = s.shop || '';
+      if (document.getElementById('servNotes')) document.getElementById('servNotes').value = s.notes || '';
+    }
+  }
+
+  openModal('modalService');
+}
+
+// Fuel Log List (iOS Swipe-to-Delete)
+function renderFuelList(vehId) {
+  const container = document.getElementById('fuelLogList');
+  let list = appState.fuels.filter(f => f.vehicleId === vehId);
+  list.sort((a, b) => b.km - a.km);
+
+  if (list.length >= 2) {
+    let totalKmDiff = list[0].km - list[list.length - 1].km;
+    let totalVolume = list.slice(0, -1).reduce((sum, f) => sum + f.volume, 0);
+    let totalCost = list.reduce((sum, f) => sum + f.cost, 0);
+
+    let efficiency = totalVolume > 0 ? (totalKmDiff / totalVolume).toFixed(1) : 0;
+    let costPerKm = totalKmDiff > 0 ? (totalCost / totalKmDiff) : 0;
+
+    document.getElementById('fuelEfficiencyVal').textContent = `${efficiency} km/L`;
+    document.getElementById('costPerKmVal').textContent = `${formatCurrency(costPerKm)}/km`;
+  } else {
+    document.getElementById('fuelEfficiencyVal').textContent = `N/A`;
+    document.getElementById('costPerKmVal').textContent = `N/A`;
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros de gasolina.</p>`;
+    return;
+  }
+
+  container.innerHTML = list.map(f => `
+    <div class="swipe-container">
+      <div class="swipe-action-bg">
+        <button class="swipe-action-btn" onclick="deleteFuelDirect('${f.id}')">
+          ${SVG_ICONS.trash}
+          <span>Eliminar</span>
+        </button>
+      </div>
+      <div class="swipe-content log-item-card" onclick="openFuelModal('${f.id}')">
+        <div class="log-item-main">
+          <div class="log-icon-badge">${SVG_ICONS.fuel}</div>
+          <div>
+            <div class="log-title">${f.volume} Litros</div>
+            <div class="log-meta">${f.date} • Odómetro: ${f.km.toLocaleString()} km</div>
+            ${f.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(f.notes)}</div>` : ''}
+          </div>
+        </div>
+        <div class="log-item-side">
+          <div class="log-cost">${formatCurrency(f.cost)}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openFuelModal(fuelId = null) {
+  document.getElementById('formFuel').reset();
+  document.getElementById('fuelId').value = '';
+  document.getElementById('modalFuelTitle').textContent = 'Registrar Gasolina';
+  setTodayDates();
+
+  if (fuelId) {
+    const f = appState.fuels.find(item => item.id === fuelId);
+    if (f) {
+      document.getElementById('modalFuelTitle').textContent = 'Editar Gasolina';
+      document.getElementById('fuelId').value = f.id;
+      document.getElementById('fuelCost').value = f.cost;
+      document.getElementById('fuelVolume').value = f.volume;
+      document.getElementById('fuelKm').value = f.km;
+      document.getElementById('fuelDate').value = f.date;
+      if (document.getElementById('fuelNotes')) document.getElementById('fuelNotes').value = f.notes || '';
+    }
+  }
+
+  openModal('modalFuel');
+}
+
+// User Settings Render
+function renderUserSettings() {
+  if (currentUser) {
+    document.getElementById('userProfileName').textContent = currentUser.name;
+    document.getElementById('userProfileEmail').textContent = currentUser.email;
+  }
+  document.getElementById('settingCurrency').value = appState.currency || 'CRC';
+  if (document.getElementById('geminiApiKeyInput')) {
+    document.getElementById('geminiApiKeyInput').value = appState.geminiApiKey || '';
+  }
+  
+  const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
+  document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 }
 
 function changeCurrencySetting(val) {
   appState.currency = val;
   saveState();
+  renderUserSettings();
   renderApp();
-  renderReports();
+}
+
+// Reports & Financial Overview
+function renderReports() {
+  const vehId = appState.activeVehicleId;
+  const services = appState.services.filter(s => s.vehicleId === vehId);
+  const fuels = appState.fuels.filter(f => f.vehicleId === vehId);
+
+  const totalServSpend = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuelSpend = fuels.reduce((sum, f) => sum + f.cost, 0);
+
+  document.getElementById('totalServiceSpend').textContent = formatCurrency(totalServSpend);
+  document.getElementById('totalFuelSpend').textContent = formatCurrency(totalFuelSpend);
+
+  renderCategoryDonutChart(services);
+}
+
+function renderCategoryDonutChart(services) {
+  const chartContainer = document.getElementById('categoryChart');
+  if (services.length === 0) {
+    chartContainer.innerHTML = '<p class="subtitle">Registra servicios para ver desglose de gastos.</p>';
+    return;
+  }
+
+  const categoryTotals = {};
+  services.forEach(s => {
+    categoryTotals[s.category] = (categoryTotals[s.category] || 0) + s.cost;
+  });
+
+  const categories = Object.keys(categoryTotals);
+  let html = `<div style="display:flex; flex-direction:column; gap:8px; width:100%;">`;
+  let grandTotal = services.reduce((sum, s) => sum + s.cost, 0);
+
+  categories.forEach((cat) => {
+    let cost = categoryTotals[cat];
+    let percent = grandTotal > 0 ? Math.round((cost / grandTotal) * 100) : 0;
+
+    html += `
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
+          <span>${escapeHtml(cat)}</span>
+          <span style="font-weight:700;">${formatCurrency(cost)} (${percent}%)</span>
+        </div>
+        <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+          <div style="width:${percent}%; height:100%; background:#ffffff; border-radius:3px;"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  chartContainer.innerHTML = html;
+}
+
+// Modals
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.add('open');
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove('open');
+}
+
+// Forms
+function saveOdometer(e) {
+  e.preventDefault();
+  const km = parseInt(document.getElementById('quickOdometerInput').value);
+  const veh = getActiveVehicle();
+  if (veh && km) {
+    veh.km = km;
+    saveState();
+    closeModal('modalOdometer');
+    renderApp();
+  }
+}
+
+function saveService(e) {
+  e.preventDefault();
+  const veh = getActiveVehicle();
+  if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
+  const servId = document.getElementById('servId').value;
+  const category = document.getElementById('servCategory').value;
+  const title = document.getElementById('servTitle').value;
+  const cost = parseFloat(document.getElementById('servCost').value);
+  const date = document.getElementById('servDate').value;
+  const km = parseInt(document.getElementById('servKm').value);
+  const shop = document.getElementById('servShop').value;
+  const notes = document.getElementById('servNotes') ? document.getElementById('servNotes').value.trim() : '';
+  const receiptInput = document.getElementById('servReceipt');
+
+  let targetServ = servId ? appState.services.find(s => s.id === servId) : null;
+
+  const processAndSave = (receiptBase64) => {
+    if (targetServ) {
+      targetServ.category = category;
+      targetServ.title = title;
+      targetServ.cost = cost;
+      targetServ.date = date;
+      targetServ.km = km;
+      targetServ.shop = shop;
+      targetServ.notes = notes;
+      if (receiptBase64) targetServ.receipt = receiptBase64;
+    } else {
+      const newServ = {
+        id: 's_' + Date.now(),
+        vehicleId: veh.id,
+        category, title, cost, date, km, shop, notes, receipt: receiptBase64
+      };
+      appState.services.push(newServ);
+    }
+    if (km > veh.km) veh.km = km;
+    saveState();
+    closeModal('modalService');
+    document.getElementById('formService').reset();
+    setTodayDates();
+    renderApp();
+  };
+
+  if (receiptInput.files && receiptInput.files[0]) {
+    readAndCompressImage(receiptInput.files[0], processAndSave);
+  } else {
+    processAndSave('');
+  }
+}
+
+function saveFuel(e) {
+  e.preventDefault();
+  const veh = getActiveVehicle();
+  if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
+  const fuelId = document.getElementById('fuelId').value;
+  const cost = parseFloat(document.getElementById('fuelCost').value);
+  const volume = parseFloat(document.getElementById('fuelVolume').value);
+  const km = parseInt(document.getElementById('fuelKm').value);
+  const date = document.getElementById('fuelDate').value;
+  const notes = document.getElementById('fuelNotes') ? document.getElementById('fuelNotes').value.trim() : '';
+
+  let targetFuel = fuelId ? appState.fuels.find(f => f.id === fuelId) : null;
+
+  if (targetFuel) {
+    targetFuel.cost = cost;
+    targetFuel.volume = volume;
+    targetFuel.km = km;
+    targetFuel.date = date;
+    targetFuel.notes = notes;
+  } else {
+    const newFuel = {
+      id: 'f_' + Date.now(),
+      vehicleId: veh.id,
+      cost, volume, km, date, notes
+    };
+    appState.fuels.push(newFuel);
+  }
+
+  if (km > veh.km) veh.km = km;
+  saveState();
+  closeModal('modalFuel');
+  document.getElementById('formFuel').reset();
+  setTodayDates();
+  renderApp();
+}
+
+function viewReceipt(serviceId) {
+  const serv = appState.services.find(s => s.id === serviceId);
+  if (serv && serv.receipt) {
+    document.getElementById('receiptContainer').innerHTML = `
+      <img src="${serv.receipt}" alt="Factura de ${escapeHtml(serv.title)}">
+    `;
+    openModal('modalReceiptViewer');
+  }
+}
+
+function generateCertifiedReport() {
+  const veh = getActiveVehicle();
+  if (!veh) return;
+  const services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const totalSpend = services.reduce((sum, s) => sum + s.cost, 0);
+
+  const container = document.getElementById('certifiedDocumentContent');
+  container.innerHTML = `
+    <div class="cert-header">
+      <div>
+        <h1 style="color:#000000; margin-bottom:4px; font-size:1.4rem;">HISTORIAL DE MANTENIMIENTOS Y REPARACIONES</h1>
+        <p style="color:#64748b; font-size:0.85rem;">Reporte Oficial de Mantenimientos y Reparaciones Mecánicas</p>
+      </div>
+      <div style="text-align:right;">
+        <strong style="font-size:1rem; color:#000000;">${escapeHtml(veh.name)}</strong>
+        <div>Año: ${veh.year} | Placa: ${escapeHtml(veh.plate) || 'N/A'}</div>
+        <div>Odómetro: ${veh.km.toLocaleString()} KM</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px; font-size:0.85rem;">
+      <strong>Total de Servicios:</strong> ${services.length} registros | 
+      <strong>Inversión Total:</strong> ${formatCurrency(totalSpend)}
+    </div>
+
+    <table class="cert-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>KM</th>
+          <th>Categoría</th>
+          <th>Trabajo Realizado</th>
+          <th>Taller</th>
+          <th>Costo</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${services.map(s => `
+          <tr>
+            <td>${s.date}</td>
+            <td>${s.km.toLocaleString()}</td>
+            <td><strong>${escapeHtml(s.category)}</strong></td>
+            <td>${escapeHtml(s.title)}</td>
+            <td>${escapeHtml(s.shop) || 'Privado'}</td>
+            <td>${formatCurrency(s.cost)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div style="margin-top:24px; font-size:0.75rem; color:#94a3b8; text-align:center;">
+      Propietario: ${currentUser ? escapeHtml(currentUser.name) : 'Usuario'} | Generado el ${new Date().toLocaleDateString('es-CR')}
+    </div>
+  `;
+
+  openModal('modalCertifiedReport');
+}
+
+function readAndCompressImage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const maxDim = 800;
+
+      if (width > height && width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      callback(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function exportDataJSON() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `GarageOne_Backup_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.setAttribute("download", `autocare_respaldo_${new Date().toISOString().split('T')[0]}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -1424,95 +1875,20 @@ function importDataJSON(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (evt) => {
+  reader.onload = function(evt) {
     try {
       const imported = JSON.parse(evt.target.result);
-      if (imported && typeof imported === 'object') {
-        appState = { ...appState, ...imported };
+      if (imported.vehicles && Array.isArray(imported.vehicles) && imported.services && Array.isArray(imported.services)) {
+        appState = imported;
         saveState();
         renderApp();
-        alert('Datos importados con éxito.');
+        alert('Copia de seguridad cargada con éxito.');
+      } else {
+        alert('Formato JSON no válido.');
       }
-    } catch (err) { alert('Error al leer archivo JSON.'); }
+    } catch (err) {
+      alert('Error al leer archivo JSON.');
+    }
   };
   reader.readAsText(file);
-}
-
-function requestNotificationPermission() {
-  if ('Notification' in window && Notification.permission !== 'granted') {
-    Notification.requestPermission();
-  }
-}
-
-function checkAndSendDueNotifications() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const veh = getActiveVehicle();
-  if (!veh) return;
-
-  const due = (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed);
-  due.forEach(r => {
-    if (r.targetKm && veh.km >= r.targetKm) {
-      new Notification('GarageOne Recordatorio', {
-        body: `Atención: ${r.title} para ${veh.name} alcanzó los ${r.targetKm.toLocaleString()} km.`,
-        icon: 'icons/apple-touch-icon.png'
-      });
-    }
-  });
-}
-
-function openModal(id) {
-  const m = document.getElementById(id);
-  if (m) m.classList.add('open');
-}
-
-function closeModal(id) {
-  const m = document.getElementById(id);
-  if (m) m.classList.remove('open');
-}
-
-function renderAIDiagnostic() {
-  const card = document.getElementById('aiDiagnosticCard');
-  if (!card) return;
-  const veh = getActiveVehicle();
-  if (!veh) {
-    card.innerHTML = `<p class="subtitle">Agrega un vehículo para el diagnóstico inteligente.</p>`;
-    return;
-  }
-  card.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <h3 style="margin:0;">Diagnóstico Preventivo IA</h3>
-        <p class="subtitle" style="margin:2px 0 0 0;">Análisis para ${escapeHtml(veh.name)} (${veh.km.toLocaleString()} km)</p>
-      </div>
-      <span class="badge-subtle badge-green">Sistema Óptimo</span>
-    </div>
-  `;
-}
-
-function askQuickPrompt(question) {
-  const input = document.getElementById('aiUserQuestion');
-  if (input) {
-    input.value = question;
-    document.getElementById('formAIChat').dispatchEvent(new Event('submit'));
-  }
-}
-
-function askAIAssistant(e) {
-  e.preventDefault();
-  const input = document.getElementById('aiUserQuestion');
-  const responseBox = document.getElementById('aiChatResponse');
-  const question = input.value.trim();
-  if (!question) return;
-
-  responseBox.style.display = 'block';
-  responseBox.innerHTML = `<p class="subtitle">Consultando al Ingeniero Mecánico GarageOne...</p>`;
-
-  setTimeout(() => {
-    responseBox.innerHTML = `
-      <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px;">Respuesta del Especialista:</div>
-      <p style="margin:0; line-height:1.5; font-size:0.9rem;">
-        Para "${escapeHtml(question)}": Se recomienda realizar una inspección visual directa del componente y revisar el nivel de fluidos. Si el síntoma persiste, consulta con un mecánico certificado.
-      </p>
-    `;
-  }, 800);
 }
