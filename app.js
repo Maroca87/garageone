@@ -1477,28 +1477,32 @@ Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente
 4. 📋 **Relación con Historial / Kilometraje** (Analiza si según sus ${veh ? veh.km.toLocaleString() : 0} KM o historial previo se requiere cambio).
 5. ⏱️ **Acción Inmediata Recomendada** (Qué debe hacer el conductor ahora mismo).`;
 
-      const endpoints = [
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`,
+      const candidateUrls = [
+        appState.geminiWorkingUrl,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${appState.geminiApiKey}`,
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${appState.geminiApiKey}`,
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${appState.geminiApiKey}`
-      ];
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`
+      ].filter(Boolean);
 
       let resData = null;
-      for (const endpoint of endpoints) {
+      for (const url of candidateUrls) {
         try {
-          const res = await fetch(endpoint, {
+          const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
           });
           if (res.ok) {
             resData = await res.json();
-            if (resData.candidates && resData.candidates[0].content.parts[0].text) {
+            if (resData && resData.candidates && resData.candidates[0].content.parts[0].text) {
+              appState.geminiWorkingUrl = url;
+              saveState();
               break;
             }
           }
         } catch (e) {
-          console.log('Error testing endpoint:', endpoint, e);
+          console.log('Error testing endpoint:', url, e);
         }
       }
 
@@ -1541,8 +1545,15 @@ Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente
 
 function toggleApiKeyVisibility() {
   const input = document.getElementById('geminiApiKeyInput');
+  const btn = document.getElementById('btnToggleApiKey');
   if (!input) return;
-  input.type = input.type === 'password' ? 'text' : 'password';
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (btn) btn.textContent = 'Ocultar';
+  } else {
+    input.type = 'password';
+    if (btn) btn.textContent = 'Mostrar';
+  }
 }
 
 async function testAndSaveGeminiKey() {
@@ -1554,6 +1565,7 @@ async function testAndSaveGeminiKey() {
 
   if (!key) {
     appState.geminiApiKey = '';
+    delete appState.geminiWorkingUrl;
     saveState();
     if (badge) {
       badge.className = 'badge-subtle badge-yellow';
@@ -1570,42 +1582,70 @@ async function testAndSaveGeminiKey() {
   if (msgBox) {
     msgBox.style.display = 'block';
     msgBox.style.color = '#38bdf8';
-    msgBox.textContent = 'Probando conexión con Google Gemini API...';
+    msgBox.textContent = 'Verificando API Key con Google Gemini...';
   }
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Prueba de conexion de GarageOne' }] }]
-      })
-    });
+  const candidateEndpoints = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`
+  ];
 
-    const data = await res.json();
+  let success = false;
+  let workingUrl = '';
+  let lastErrorMessage = '';
 
-    if (res.ok && data.candidates) {
-      appState.geminiApiKey = key;
-      saveState();
-      if (badge) {
-        badge.className = 'badge-subtle badge-green';
-        badge.textContent = 'Conectada ✓';
+  for (const url of candidateEndpoints) {
+    try {
+      const isGet = url.includes('/models?key=');
+      const res = await fetch(url, {
+        method: isGet ? 'GET' : 'POST',
+        headers: isGet ? {} : { 'Content-Type': 'application/json' },
+        body: isGet ? undefined : JSON.stringify({ contents: [{ parts: [{ text: 'Hola' }] }] })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        if (isGet && data.models && data.models.length > 0) {
+          success = true;
+          const genModel = data.models.find(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'));
+          if (genModel) {
+            const mName = genModel.name.replace(/^models\//, '');
+            workingUrl = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${key}`;
+          }
+          break;
+        } else if (data.candidates && data.candidates.length > 0) {
+          success = true;
+          workingUrl = url;
+          break;
+        }
+      } else if (data.error) {
+        lastErrorMessage = data.error.message;
       }
-      if (msgBox) {
-        msgBox.style.color = '#30d158';
-        msgBox.textContent = '¡Conexión exitosa! Tu API Key de Google Gemini IA está activa y funcionando.';
-      }
-    } else {
-      const errDetail = data.error ? data.error.message : 'API Key no válida o respuesta no permitida por Google.';
-      if (msgBox) {
-        msgBox.style.color = '#ff453a';
-        msgBox.textContent = `❌ Error: ${errDetail}`;
-      }
+    } catch (e) {
+      console.log('Error testing endpoint:', url, e);
     }
-  } catch (err) {
+  }
+
+  if (success) {
+    appState.geminiApiKey = key;
+    if (workingUrl) appState.geminiWorkingUrl = workingUrl;
+    saveState();
+    if (badge) {
+      badge.className = 'badge-subtle badge-green';
+      badge.textContent = 'Conectada ✓';
+    }
+    if (msgBox) {
+      msgBox.style.color = '#30d158';
+      msgBox.textContent = '¡Conexión exitosa! Tu API Key de Google Gemini IA está activa y lista para usar.';
+    }
+  } else {
     if (msgBox) {
       msgBox.style.color = '#ff453a';
-      msgBox.textContent = '❌ Error de red al conectar con Google Gemini.';
+      msgBox.textContent = `❌ Error: ${lastErrorMessage || 'No se pudo validar la API Key con Google.'}`;
     }
   }
 }
