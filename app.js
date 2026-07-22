@@ -246,7 +246,6 @@ function handleRegister(e) {
   const userInput = document.getElementById('regUser');
   const passInput = document.getElementById('regPassword');
   const confirmPassInput = document.getElementById('regConfirmPassword');
-  const githubInput = document.getElementById('regGithubUser');
 
   const userError = document.getElementById('userError');
   const passError = document.getElementById('passError');
@@ -261,7 +260,6 @@ function handleRegister(e) {
   const username = userInput ? userInput.value.trim() : '';
   const password = passInput ? passInput.value.trim() : '';
   const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
-  const githubUser = githubInput ? githubInput.value.trim() : '';
 
   if (!username || username.length < 3) {
     if (userError) {
@@ -305,7 +303,6 @@ function handleRegister(e) {
     username: username,
     name: username,
     password: password,
-    githubUser: githubUser || username,
     pinEnabled: false,
     pin: '',
     createdAt: new Date().toISOString()
@@ -2174,12 +2171,6 @@ function renderUserSettings() {
     const profileNameEl = document.getElementById('userProfileName');
     if (profileNameEl) profileNameEl.textContent = currentUser.username || currentUser.name || '-';
 
-    const ghStatusEl = document.getElementById('userGithubStatus');
-    if (ghStatusEl) {
-      const gh = currentUser.githubUser || currentUser.username || 'Web';
-      ghStatusEl.textContent = `Sincronizado (@${gh}) ✓`;
-    }
-
     const togglePin = document.getElementById('togglePinSetting');
     const pinStatusText = document.getElementById('pinStatusText');
     const pinContainer = document.getElementById('pinSetupContainer');
@@ -2699,10 +2690,18 @@ function readAndCompressImage(file, callback) {
 }
 
 function exportDataJSON() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+  const usersList = getUsersList();
+  const exportPayload = {
+    appState: appState,
+    currentUser: currentUser,
+    usersList: usersList,
+    version: 'V14',
+    exportDate: new Date().toISOString()
+  };
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `autocare_respaldo_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.setAttribute("download", `garageone_respaldo_${new Date().toISOString().split('T')[0]}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -2715,16 +2714,34 @@ function importDataJSON(e) {
   reader.onload = function(evt) {
     try {
       const imported = JSON.parse(evt.target.result);
-      if (imported.vehicles && Array.isArray(imported.vehicles) && imported.services && Array.isArray(imported.services)) {
-        appState = imported;
+      let targetState = imported;
+
+      if (imported.appState && imported.vehicles === undefined) {
+        targetState = imported.appState;
+      }
+
+      if (targetState.vehicles && Array.isArray(targetState.vehicles)) {
+        appState = sanitizeState(targetState);
+        
+        if (imported.usersList && Array.isArray(imported.usersList)) {
+          saveUsersList(imported.usersList);
+        }
+        if (imported.currentUser) {
+          saveUser(imported.currentUser);
+          isAuthenticated = true;
+        } else if (!currentUser && appState.vehicles && appState.vehicles.length > 0) {
+          isAuthenticated = true;
+        }
+
         saveState();
         renderApp();
-        alert('Copia de seguridad cargada con éxito.');
+        checkAuth();
+        alert('¡Copia de seguridad (JSON) restaurada con éxito! Todos tus vehículos, registros, facturas e información fueron recuperados.');
       } else {
-        alert('Formato JSON no válido.');
+        alert('El archivo JSON no tiene un formato válido de GarageOne.');
       }
     } catch (err) {
-      alert('Error al leer archivo JSON.');
+      alert('Error al leer el archivo JSON: ' + err.message);
     }
   };
   reader.readAsText(file);

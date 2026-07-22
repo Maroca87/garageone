@@ -40,17 +40,17 @@
       <!-- Login Form -->
       <form id="formLogin" onsubmit="handleLogin(event)">
         <div class="form-group">
-          <label>Nombre de Usuario</label>
-          <input type="text" id="loginUser" class="form-control" placeholder="Ingresa tu usuario (ej: mario)" autocomplete="username">
+          <label>Usuario</label>
+          <input type="text" id="loginUser" class="form-control" placeholder="Ingresa tu usuario" autocomplete="username">
         </div>
         <div class="form-group">
-          <label id="loginPassLabel">Contraseña o PIN de Acceso</label>
+          <label id="loginPassLabel">Contraseña o PIN</label>
           <input type="password" id="loginPin" class="form-control pin-input text-center" placeholder="••••" autocomplete="current-password">
           <div id="loginError" class="error-text"></div>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Ingresar a la App / Web</button>
+        <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
         <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; text-align:center;">
-          <button type="button" class="btn btn-tertiary btn-block" onclick="showRegisterForm()" style="font-size:0.8rem; color:#38bdf8;">¿No tienes cuenta? Registrar Nuevo Usuario</button>
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showRegisterForm()" style="font-size:0.8rem; color:#38bdf8;">¿No tienes cuenta? Registrar Cuenta</button>
           <button type="button" class="btn btn-tertiary btn-block" onclick="resetUserPin(event)" style="font-size:0.8rem; color:var(--text-secondary);">Restablecer Credenciales</button>
         </div>
       </form>
@@ -58,13 +58,9 @@
       <!-- Register Form -->
       <form id="formRegister" onsubmit="handleRegister(event)" style="display:none;">
         <div class="form-group">
-          <label>Crear Nombre de Usuario</label>
-          <input type="text" id="regUser" class="form-control" placeholder="Nombre único de usuario" autocomplete="username">
+          <label>Nombre de Usuario</label>
+          <input type="text" id="regUser" class="form-control" placeholder="Ingresa un usuario único" autocomplete="username">
           <div id="userError" class="error-text"></div>
-        </div>
-        <div class="form-group">
-          <label>Usuario GitHub / Acceso Web (Opcional)</label>
-          <input type="text" id="regGithubUser" class="form-control" placeholder="Tu usuario de GitHub o correo web" autocomplete="off">
         </div>
         <div class="form-group">
           <label>Contraseña</label>
@@ -76,11 +72,20 @@
           <input type="password" id="regConfirmPassword" class="form-control" placeholder="Repite tu contraseña" autocomplete="new-password">
           <div id="confirmPassError" class="error-text"></div>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Crear Cuenta Sincronizada (Web & App)</button>
+        <button type="submit" class="btn btn-primary btn-block">Crear Cuenta</button>
         <div style="margin-top:12px; text-align:center;" id="alreadyHasUserContainer">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes cuenta? Iniciar Sesión</button>
         </div>
       </form>
+
+      <!-- Universal Backup Restore Option -->
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); text-align:center;">
+        <label class="btn btn-outline btn-block btn-sm" style="text-align:center; cursor:pointer; font-size:0.82rem;">
+          📁 Restaurar Copia de Seguridad (JSON)
+          <input type="file" id="authImportJsonInput" accept=".json" onchange="importDataJSON(event)" style="display:none;">
+        </label>
+        <span class="subtitle" style="font-size:0.75rem; display:block; margin-top:4px; color:#cbd5e1;">Recupera tus vehículos y datos desde cualquier dispositivo o navegador</span>
+      </div>
     </div>
   </div>
 
@@ -381,15 +386,11 @@
         <div class="settings-card">
           <h3>Perfil de Usuario</h3>
           <div class="settings-row">
-            <span>Usuario</span>
+            <span>Usuario Actual</span>
             <strong id="userProfileName">-</strong>
           </div>
-          <div class="settings-row" style="margin-top:8px;">
-            <span>Acceso GitHub / Web</span>
-            <span id="userGithubStatus" class="badge-subtle badge-green">Conectado ✓</span>
-          </div>
           <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="handleLogout()" style="margin-top:10px;">
-            Cambiar de Usuario / Iniciar Sesión
+            Cerrar Sesión / Cambiar de Usuario
           </button>
         </div>
 
