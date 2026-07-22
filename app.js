@@ -201,7 +201,13 @@ async function syncUsersDatabase() {
     try {
       localStorage.setItem(USERS_KEY, JSON.stringify(merged));
     } catch (e) {}
-    await saveUsersList(merged);
+    try {
+      const db = await openIDB();
+      if (db) {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(merged, 'usersList');
+      }
+    } catch (e) {}
     return merged;
   } catch (e) {
     console.warn('Error in syncUsersDatabase:', e);
@@ -796,25 +802,13 @@ async function initAsyncStorage() {
   }
 
   try {
-    // Complete Wipe of all old test users from LocalStorage and IndexedDB to start 100% clean
-    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15'].forEach(k => {
-      try { localStorage.removeItem(k); } catch (e) {}
-    });
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(USERS_KEY);
-
-    const db = await openIDB();
-    if (db) {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).delete('usersList');
-    }
+    await syncUsersDatabase();
   } catch (e) {
-    console.warn('Error purging old users database:', e);
+    console.warn('Error syncing users database on startup:', e);
   }
 
-  currentUser = null;
-  isAuthenticated = false;
-  showRegisterForm();
+  currentUser = loadUser();
+  checkAuth();
 }
 
 async function saveStateToIDB(data) {
