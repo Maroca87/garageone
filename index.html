@@ -13,12 +13,91 @@
   <meta name="theme-color" content="#0b1329" media="(prefers-color-scheme: dark)">
   
   <!-- App Icons for iOS & PWA -->
-  <link rel="manifest" href="manifest.json?v=500">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png?v=500">
-  <link rel="apple-touch-icon-precomposed" href="icons/icon-192.png?v=500">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=500">
-  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=500">
-  <link rel="shortcut icon" href="icons/icon-192.png?v=500">
+  <link rel="manifest" href="manifest.json?v=600">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png?v=600">
+  <link rel="apple-touch-icon-precomposed" href="icons/icon-192.png?v=600">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png?v=600">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png?v=600">
+  <link rel="shortcut icon" href="icons/icon-192.png?v=600">
+
+  <!-- Engine to process User's exact PNG car logo into 100% full-bleed iOS icon -->
+  <script>
+    (function processUserExactCarIcon() {
+      const userImg = new Image();
+      userImg.crossOrigin = 'Anonymous';
+      userImg.onload = function() {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 180;
+          canvas.height = 180;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+
+          // 1. FULL BLEED OPAQUE SOLID GRADIENT (Royal Blue to Midnight Indigo)
+          const grad = ctx.createLinearGradient(0, 0, 144, 180);
+          grad.addColorStop(0, '#0f62fe');
+          grad.addColorStop(0.5, '#0d50d1');
+          grad.addColorStop(1, '#052370');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 180, 180);
+
+          // Ambient Glow
+          const glow = ctx.createRadialGradient(90, 60, 0, 90, 60, 100);
+          glow.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+          glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 0, 180, 180);
+
+          // 2. Process User's exact car artwork (Invert black strokes to pure crisp white)
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = userImg.width || 512;
+          tempCanvas.height = userImg.height || 512;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(userImg, 0, 0);
+
+          const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 30) {
+              data[i] = 255;
+              data[i + 1] = 255;
+              data[i + 2] = 255;
+            }
+          }
+          tempCtx.putImageData(imgData, 0, 0);
+
+          // 3. Composite User's exact car logo centered with safe 15% padding
+          ctx.save();
+          ctx.shadowColor = 'rgba(2, 6, 23, 0.5)';
+          ctx.shadowBlur = 10;
+          ctx.shadowOffsetY = 4;
+
+          const padding = 180 * 0.15;
+          const drawW = 180 - padding * 2;
+          const drawH = 180 - padding * 2;
+          ctx.drawImage(tempCanvas, padding, padding, drawW, drawH);
+          ctx.restore();
+
+          const fullBleedDataUrl = canvas.toDataURL('image/png');
+
+          window.addEventListener('DOMContentLoaded', function() {
+            const appleLinks = document.querySelectorAll('link[rel*="apple-touch-icon"], link[rel="shortcut icon"], link[rel="icon"]');
+            appleLinks.forEach(function(link) {
+              link.href = fullBleedDataUrl;
+            });
+
+            const authLogo = document.querySelector('.auth-symbol img');
+            if (authLogo) authLogo.src = fullBleedDataUrl;
+            const headerLogo = document.querySelector('.header-logo-img');
+            if (headerLogo) headerLogo.src = fullBleedDataUrl;
+          });
+        } catch (err) {
+          console.warn('User car icon processor:', err);
+        }
+      };
+      userImg.src = 'icons/icon-192.png?v=' + Date.now();
+    })();
+  </script>
 
   <!-- Font & CSS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -798,10 +877,10 @@
     </div>
   </div>
 
-  <script src="app.js?v=500"></script>
+  <script src="app.js?v=600"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=500').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=600').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>

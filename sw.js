@@ -1,4 +1,4 @@
-const CACHE_NAME = 'garageone-v500';
+const CACHE_NAME = 'garageone-v600';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

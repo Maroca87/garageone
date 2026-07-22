@@ -444,7 +444,16 @@ function renderApp() {
         <span class="hero-odometer-val">${veh.km.toLocaleString()} km</span>
       </div>
     </div>
-    ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo">` : ''}
+    ${veh.photo ? `
+      <div class="hero-photo-wrapper">
+        <img src="${veh.photo}" class="hero-image-preview" alt="Foto ${escapeHtml(veh.name)}">
+      </div>
+    ` : `
+      <div class="hero-photo-placeholder" onclick="openVehicleModal('${veh.id}')" title="Toca para agregar foto a tu auto">
+        <div class="hero-placeholder-icon">${SVG_ICONS.car}</div>
+        <span class="hero-placeholder-text">+ Agregar foto a tu ${escapeHtml(veh.name)}</span>
+      </div>
+    `}
   `;
 
   renderServiceList(veh.id);
@@ -606,7 +615,7 @@ function saveVehicle(e) {
   };
 
   if (photoInput && photoInput.files && photoInput.files[0]) {
-    compressImageFile(photoInput.files[0], 600, 0.7, (compressed) => processSave(compressed));
+    compressImageFile(photoInput.files[0], 500, 0.65, (compressed) => processSave(compressed));
   } else {
     const existingVeh = appState.vehicles.find(v => v.id === id);
     processSave(existingVeh ? existingVeh.photo : '');
@@ -632,8 +641,9 @@ function renderMiniVehiclesList() {
           </button>
         </div>
         <div class="swipe-content ${isActive ? 'vehicle-mini-item active-veh' : 'vehicle-mini-item'}">
-          <div style="flex:1;">
-            <div style="font-weight:700; font-size:0.95rem;">
+          ${v.photo ? `<img src="${v.photo}" class="veh-mini-thumb" alt="${escapeHtml(v.name)}">` : `<div class="veh-mini-icon-badge">${SVG_ICONS.car}</div>`}
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:700; font-size:0.95rem; display:flex; align-items:center;">
               ${escapeHtml(v.name)} ${isActive ? '<span class="badge-subtle badge-green" style="margin-left:6px; font-size:0.68rem;">Activo</span>' : ''}
             </div>
             <div class="veh-info-sub">${escapeHtml(v.plate) || 'Sin Placa'} • ${v.year} • ${v.km.toLocaleString()} km</div>
@@ -1190,7 +1200,7 @@ function renderGuantera() {
               <div style="font-size:0.75rem; color:var(--text-secondary);">${escapeHtml(c.category || 'Contacto')}</div>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
-              <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:#30d158; border-color:rgba(48,209,88,0.3); white-space:nowrap;">
+              <a href="tel:${escapeHtml(c.phone)}" class="btn btn-secondary btn-sm" style="color:var(--text-primary); border-color:var(--border-color); white-space:nowrap;">
                 📞 ${escapeHtml(c.phone)}
               </a>
               <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContact('${c.id}')" style="color:var(--status-red); padding:6px 8px;" title="Eliminar contacto">

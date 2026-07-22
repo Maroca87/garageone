@@ -292,13 +292,76 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 .hero-odometer-lbl { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .hero-odometer-val { font-size: 1.25rem; font-weight: 800; color: var(--text-primary); }
 
-.hero-image-preview {
+.hero-photo-wrapper {
   margin-top: 14px;
   width: 100%;
-  height: 140px;
-  object-fit: cover;
   border-radius: var(--radius-md);
+  overflow: hidden;
   border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.hero-image-preview {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.hero-photo-placeholder {
+  margin-top: 14px;
+  width: 100%;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hero-photo-placeholder:active {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: #0f62fe;
+}
+
+.hero-placeholder-icon {
+  color: var(--text-muted);
+}
+
+.hero-placeholder-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.veh-mini-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+  margin-right: 10px;
+}
+
+.veh-mini-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 10px;
 }
 
 /* iOS Pure Swipe Container System */
