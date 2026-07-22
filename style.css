@@ -722,11 +722,15 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .close-btn { background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); width: 30px; height: 30px; border-radius: 50%; font-size: 0.9rem; cursor: pointer; }
 
-.form-group { margin-bottom: 12px; }
-.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
-.form-control { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-primary); font-family: inherit; font-size: 0.95rem; padding: 10px 12px; outline: none; }
+.form-group { margin-bottom: 14px; min-width: 0; width: 100%; box-sizing: border-box; }
+.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; box-sizing: border-box; }
+.form-group label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; white-space: normal; word-break: break-word; }
+.form-control { width: 100%; max-width: 100%; box-sizing: border-box; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-primary); font-family: inherit; font-size: 0.95rem; padding: 10px 12px; outline: none; }
 .form-control:focus { border-color: #ffffff; }
+
+@media (max-width: 520px) {
+  .form-row { grid-template-columns: 1fr; gap: 10px; }
+}
 .form-help { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-bottom: 14px; flex-wrap: wrap; }
 

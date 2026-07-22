@@ -418,7 +418,7 @@ function renderStorageStats() {
   if (!container) return;
 
   const usage = getStorageUsage();
-  let barColor = '#30d158';
+  let barColor = '#38bdf8';
   if (usage.percent > 70) barColor = '#ffd60a';
   if (usage.percent > 90) barColor = '#ff453a';
 
@@ -2194,22 +2194,39 @@ function downloadReportPDF() {
   const cleanName = (veh.plate || veh.name).replace(/[^a-zA-Z0-9]/g, '_');
   const fileName = `Expediente_Mecanico_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-  // Create an off-screen container with explicit white background and dark text for clean PDF generation
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '750px';
-  container.style.background = '#ffffff';
-  container.style.color = '#0f172a';
-  container.style.padding = '20px';
-  container.style.boxSizing = 'border-box';
-  container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+  // Create in-DOM overlay container for WebKit / iOS compatibility (avoids blank -9999px paint bug)
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '0';
+  wrapper.style.width = '100vw';
+  wrapper.style.height = '100vh';
+  wrapper.style.zIndex = '999999';
+  wrapper.style.background = '#ffffff';
+  wrapper.style.color = '#0f172a';
+  wrapper.style.overflowY = 'auto';
+  wrapper.style.padding = '20px';
+  wrapper.style.boxSizing = 'border-box';
 
-  // Clone element content
   const clone = element.cloneNode(true);
-  container.appendChild(clone);
-  document.body.appendChild(container);
+  clone.style.maxWidth = '750px';
+  clone.style.margin = '0 auto';
+  clone.style.background = '#ffffff';
+  clone.style.color = '#0f172a';
+  clone.style.fontFamily = 'Arial, Helvetica, sans-serif';
+
+  // Ensure all text inside clone is dark black/slate
+  const allNodes = clone.querySelectorAll('*');
+  allNodes.forEach(el => {
+    if (el.tagName === 'TH' || el.style.background.includes('0f172a')) {
+      el.style.color = '#ffffff';
+    } else {
+      el.style.color = '#0f172a';
+    }
+  });
+
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
 
   if (window.html2pdf) {
     const opt = {
@@ -2217,25 +2234,25 @@ function downloadReportPDF() {
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
-        scale: 2, 
-        useCORS: true, 
+        scale: 1.5, 
+        useCORS: false, 
+        allowTaint: true,
         scrollY: 0, 
         scrollX: 0,
-        windowWidth: 800,
         backgroundColor: '#ffffff'
       },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    html2pdf().set(opt).from(container).save().then(() => {
-      if (container.parentNode) container.parentNode.removeChild(container);
+    html2pdf().set(opt).from(clone).save().then(() => {
+      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     }).catch(err => {
       console.error('Error al generar PDF con html2pdf:', err);
-      if (container.parentNode) container.parentNode.removeChild(container);
+      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
       window.print();
     });
   } else {
-    if (container.parentNode) container.parentNode.removeChild(container);
+    if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     window.print();
   }
 }
