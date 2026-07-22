@@ -213,31 +213,28 @@
       <section id="tabGuantera" class="tab-content">
         <div class="section-header">
           <div class="section-header-title">
-            <h1>Guantera Digital</h1>
-            <p class="subtitle">Papeles, seguro, RTV y directorio de asistencia</p>
-          </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="openModal('modalContact')">+ Guardar Contacto</button>
-            <button class="btn btn-primary btn-sm" onclick="openModal('modalDocument')">+ Guardar Documento</button>
+            <h1 data-i18n="guanteraTitle">Guantera Digital</h1>
+            <p class="subtitle" data-i18n="guanteraSubtitle">Papeles, seguro, RTV y directorio de asistencia</p>
           </div>
         </div>
 
         <!-- Directory of Saved Important Phone Numbers -->
-        <div class="hero-card" style="margin-bottom:20px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255,255,255,0.1);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div class="chart-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
             <div>
-              <h3 style="margin:0 0 2px 0; font-size:1rem; color:#ffffff;">Números Importantes</h3>
-              <p class="subtitle" style="margin:0; font-size:0.8rem;">Toca para llamar directamente a talleres, grúa o seguro</p>
+              <h3 style="margin:0 0 2px 0; font-size:1rem;" data-i18n="contactsTitle">Números Importantes</h3>
+              <p class="subtitle" style="margin:0; font-size:0.8rem;" data-i18n="contactsSubtitle">Desliza para borrar. Toca para llamar a talleres, grúa o seguro</p>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="openContactModal()" style="font-size:0.75rem; padding:4px 10px;">+ Guardar Número</button>
+            <button class="btn btn-secondary btn-sm" onclick="openContactModal()" data-i18n="btnAddContact">+ Guardar Número</button>
           </div>
           <div id="emergencyContactsList" class="contacts-grid">
             <!-- Dynamic contacts rendering -->
           </div>
         </div>
 
-        <div class="section-title-row">
-          <h2>Documentos del Vehículo</h2>
+        <div class="section-title-row" style="margin-top:16px;">
+          <h2 data-i18n="docsTitle">Documentos del Vehículo</h2>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalDocument')" data-i18n="btnAddDoc">+ Agregar Documento</button>
         </div>
 
         <div id="documentList" class="log-list">
@@ -319,9 +316,13 @@
         </div>
 
         <div class="report-actions-card">
-          <h3>Historial de Mantenimientos y Reparaciones</h3>
-          <p class="subtitle">Genera un documento formal con todas las reparaciones mecánicas, servicios, talleres y fechas registradas para este vehículo, listo para ver o imprimir en PDF.</p>
-          <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()">Ver / Imprimir Historial de Reparaciones</button>
+          <h3 data-i18n="reportTitle">Historial de Mantenimientos y Reparaciones</h3>
+          <p class="subtitle" data-i18n="reportSubtitle">Genera un documento formal con todas las reparaciones mecánicas, servicios, talleres y fechas registradas para este vehículo, listo para compartir o imprimir en PDF.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;" data-i18n="btnViewReport">Ver / Imprimir Expediente (PDF)</button>
+            <button class="btn btn-secondary btn-block" onclick="shareReportWhatsApp()" style="flex:1; min-width:140px; background:#25D366; color:#ffffff; border:none;" data-i18n="btnShareWA">📱 WhatsApp</button>
+            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:140px;" data-i18n="btnShareEmail">✉️ Correo</button>
+          </div>
         </div>
       </section>
 
@@ -376,9 +377,16 @@
         </div>
 
         <div class="settings-card">
-          <h3>Preferencias</h3>
+          <h3 data-i18n="prefTitle">Preferencias</h3>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label data-i18n="lblLanguage">Idioma de la App / App Language</label>
+            <select id="settingLanguage" class="form-control" onchange="changeLanguageSetting(this.value)">
+              <option value="es">Español (Spanish)</option>
+              <option value="en">English (Inglés)</option>
+            </select>
+          </div>
           <div class="form-group">
-            <label>Moneda del Sistema</label>
+            <label data-i18n="lblCurrency">Moneda del Sistema</label>
             <select id="settingCurrency" class="form-control" onchange="changeCurrencySetting(this.value)">
               <option value="CRC">Colones costarricenses (₡)</option>
               <option value="USD">Dólares estadounidenses ($)</option>
@@ -629,9 +637,11 @@
   <div id="modalCertifiedReport" class="modal-backdrop">
     <div class="modal-card print-wrapper">
       <div class="modal-header no-print">
-        <h3>Expediente de Venta</h3>
-        <div>
-          <button class="btn btn-primary btn-sm" onclick="window.print()">Imprimir / PDF</button>
+        <h3 data-i18n="certifiedModalTitle">Expediente de Venta</h3>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="btn btn-secondary btn-sm" onclick="shareReportWhatsApp()" style="background:#25D366; color:#fff; border:none;">WhatsApp</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
+          <button class="btn btn-primary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir / PDF</button>
           <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
         </div>
       </div>

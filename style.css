@@ -947,4 +947,101 @@ input:checked + .slider:before {
   transform: translateX(20px);
 }
 
+/* App Logo & Icon Mode Adaptability */
+.auth-symbol {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: #ffffff !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  forced-color-adjust: none;
+  -webkit-print-color-adjust: exact;
+}
+
+.header-logo-img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  forced-color-adjust: none;
+  -webkit-print-color-adjust: exact;
+}
+
+/* PDF Print & Export Layout Margins */
+@media print {
+  @page {
+    size: auto;
+    margin: 15mm 12mm 15mm 12mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 12pt !important;
+  }
+
+  .no-print, .app-top-header, .bottom-nav, .modal-header, .close-btn {
+    display: none !important;
+  }
+
+  .modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .modal-card.print-wrapper {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+  }
+
+  .certified-document {
+    color: #000000 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  .cert-header h1, .cert-header p, .cert-header strong, .cert-header div {
+    color: #000000 !important;
+  }
+
+  .cert-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 15px !important;
+  }
+
+  .cert-table th, .cert-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 8px 10px !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  .cert-table th {
+    background-color: #f1f5f9 !important;
+    font-weight: 700 !important;
+  }
+}
+
+
 

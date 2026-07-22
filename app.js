@@ -931,21 +931,30 @@ function renderEmergencyContacts() {
   }
 
   container.innerHTML = contacts.map(c => `
-    <div class="contact-card-item" onclick="openContactModal('${c.id}')">
-      <div class="contact-info">
-        <span class="contact-name">${escapeHtml(c.name)}</span>
-        <span class="contact-sub">${escapeHtml(c.category)} • ${escapeHtml(c.phone)}</span>
-        ${c.notes ? `<span class="contact-sub" style="font-style:italic;">Nota: ${escapeHtml(c.notes)}</span>` : ''}
-      </div>
-      <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
-        <button class="btn-call-direct" onclick="callContact('${escapeHtml(c.phone)}')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-          <span>Llamar</span>
+    <div class="swipe-container">
+      <div class="swipe-action-bg">
+        <button class="swipe-action-btn" onclick="deleteEmergencyContactDirect('${c.id}')">
+          ${SVG_ICONS.trash}
+          <span>Eliminar</span>
         </button>
-        <button class="btn btn-tertiary btn-sm" onclick="deleteEmergencyContactDirect('${c.id}')" style="color:#ff453a; padding:2px 6px;">✕</button>
+      </div>
+      <div class="swipe-content contact-card-item" onclick="openContactModal('${c.id}')">
+        <div class="contact-info">
+          <span class="contact-name">${escapeHtml(c.name)}</span>
+          <span class="contact-sub">${escapeHtml(c.category)} • ${escapeHtml(c.phone)}</span>
+          ${c.notes ? `<span class="contact-sub" style="font-style:italic;">Nota: ${escapeHtml(c.notes)}</span>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
+          <button class="btn-call-direct" onclick="callContact('${escapeHtml(c.phone)}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span>Llamar</span>
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
+
+  setTimeout(initSwipeListeners, 50);
 }
 
 function openContactModal(contactId = null) {
@@ -1003,11 +1012,9 @@ function saveEmergencyContact(e) {
 }
 
 function deleteEmergencyContactDirect(contactId) {
-  if (confirm('¿Eliminar este número de teléfono?')) {
-    appState.emergencyContacts = (appState.emergencyContacts || []).filter(c => c.id !== contactId);
-    saveState();
-    renderEmergencyContacts();
-  }
+  appState.emergencyContacts = (appState.emergencyContacts || []).filter(c => c.id !== contactId);
+  saveState();
+  renderEmergencyContacts();
 }
 
 function callContact(phone) {
@@ -1333,10 +1340,14 @@ async function askAIAssistantDirect(question) {
 
   if (appState.geminiApiKey) {
     try {
-      const promptText = `Eres un Asistente en Ingeniería Mecánica Automotriz de GarageOne. Analiza la consulta para este vehículo específico: ${vehContext}.
-Historial: ${services.length} servicios realizados, ${fuels.length} recargas de combustible, ${reminders.length} recordatorios pendientes.
-Pregunta del usuario: "${question}".
-Instrucciones: Responde de forma amigable, muy profesional, clara y estructurada en español (máximo 3 párrafos), usando negritas en conceptos clave. Especifica posibles causas, nivel de urgencia y recomendaciones.`;
+      const promptText = `Eres un Ingeniero Mecánico Automotriz Experto de GarageOne. Analiza con alta precisión la siguiente consulta para este vehículo específico: ${vehContext}.
+Historial: ${services.length} servicios registrados, ${fuels.length} recargas de combustible, ${reminders.length} recordatorios pendientes.
+Consulta del usuario: "${question}".
+Instrucciones: Estructura tu respuesta en Markdown técnico preciso con los siguientes encabezados:
+1. 🔴/🟡/🟢 **Nivel de Severidad y Riesgo**
+2. 🛠️ **Diagnóstico Técnico y Causas Probables**
+3. 🔍 **Componentes Específicos a Inspeccionar**
+4. ⏱️ **Acción Inmediata Recomendada**`;
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`, {
         method: 'POST',
@@ -1361,24 +1372,22 @@ Instrucciones: Responde de forma amigable, muy profesional, clara y estructurada
     let response = '';
 
     if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo')) {
-      response = `**Diagnóstico Especializado de Motor (${escapeHtml(vehContext)}):**\n\n• **Posibles Orígenes:** Tapa de combustible floja, falla en el sensor de oxígeno (O2), sensor MAF sucio, válvula EGR obstruida o falla en bujías/bobinas.\n• **Acción Recomendada:** Conectar escáner OBD2 en taller para leer el código de falla exacto (P0xxx).\n• **Urgencia:** Si la luz permanece encendida sin parpadear, conduce despacio al taller. **Si parpadea, detén el vehículo de inmediato** para evitar daños en el catalizador.`;
+      response = `🔴 **Nivel de Severidad: URGENCIA ALTA / MODERADA**\n\n🛠️ **Diagnóstico Técnico (${escapeHtml(vehContext)}):**\n• Sensor de Oxígeno (O2) defectuoso o fuera de rango.\n• Tapa de combustible sin sellar correctamente.\n• Sensor de Flujo de Aire (MAF) sucio.\n• Falla de combustión (misfire) en bobina o bujía.\n\n🔍 **Componentes a Inspeccionar:**\n• Escáner OBD2 (Código P0xxx), bujías, bobinas de encendido y empaque de tapón de gasolina.\n\n⏱️ **Acción Inmediata:**\n• Si la luz parpadea, **detén el vehículo de inmediato**. Si está fija, conduce a baja velocidad al taller.`;
+    } else if (qLower.includes('fuga') || qLower.includes('gota') || qLower.includes('charco')) {
+      response = `🔴 **Nivel de Severidad: ALTA**\n\n🛠️ **Diagnóstico Técnico de Fugas (${escapeHtml(vehContext)}):**\n• Líquido rojo/marrón: Aceite de caja o fluido de dirección asistida.\n• Líquido negro/marrón oscuro: Aceite de motor (retén de cigüeñal o cárter).\n• Líquido verde/rosado/naranja: Refrigerante de motor.\n• Líquido transparente suave: Fluido de frenos.\n\n🔍 **Componentes a Inspeccionar:**\n• Empaque de tapa de válvulas, tapón de cárter, mangueras de radiador y cilindro maestro de frenos.\n\n⏱️ **Acción Inmediata:**\n• Verificar niveles de fluido inmediatamente antes de encender el motor.`;
     } else if (qLower.includes('calienta') || qLower.includes('temperatura') || qLower.includes('refrigerante') || qLower.includes('humo')) {
-      response = `**Alerta de Enfriamiento (${escapeHtml(vehContext)}):**\n\n• **Diagnóstico:** Fugas de refrigerante, falla en el termostato, tapón de radiador defectuoso o abanico inactivo.\n• **Procedimiento de Seguridad:** Apaga el motor y aguarda al menos 30 minutos a que enfríe. **NUNCA quites el tapón del radiador caliente.**`;
+      response = `🔴 **Nivel de Severidad: URGENCIA CRÍTICA**\n\n🛠️ **Diagnóstico de Sobrecalentamiento:**\n• Fuga en manguera de radiador o depósito de expansión.\n• Termostato pegado en posición cerrada.\n• Abanico o electroventilador quemado o con relé dañado.\n• Empaque de cabezote / culata soplado.\n\n🔍 **Componentes a Inspeccionar:**\n• Tapón de radiador, electroventilador, bomba de agua y nivel de coolent.\n\n⏱️ **Acción Inmediata:**\n• Apaga el motor. Espera 30 minutos a que enfríe. **NUNCA abras el radiador caliente.**`;
     } else if (qLower.includes('freno') || qLower.includes('chillido') || qLower.includes('pedal')) {
-      response = `**Inspección del Sistema de Frenos (${escapeHtml(vehContext)}):**\n\n• **Chillido Agudo:** Contacto del avisador acústico metálico por pastillas desgastadas.\n• **Pedal Suave:** Aire en el sistema hidráulico o desgaste del líquido de frenos.\n• **Acción:** Reemplazar pastillas de freno y verificar estado de discos.`;
-    } else if (qLower.includes('vibra') || qLower.includes('vibracion') || qLower.includes('volante')) {
-      response = `**Análisis de Vibraciones para ${escapeHtml(vehContext)}:**\n\n• **Al rodar a velocidad:** Desbalanceo de neumáticos o llantas deformadas.\n• **Al frenar:** Discos de freno alabeados / deformados por calor.\n• **Al acelerar:** Desgaste en soporte de motor o junta homocinética (flechas).`;
-    } else if (qLower.includes('bateria') || qLower.includes('arranca') || qLower.includes('lento')) {
-      response = `**Sistema Eléctrico y Encendido:**\n\n• **Diagnóstico:** Chasquido o encendido pesado sugiere batería descargada, bornes sulfatados o falla de motor de arranque.\n• **Revisión:** Probar voltaje con multímetro (12.6V reposo / 13.8V-14.4V encendido).`;
-    } else if (qLower.includes('aceite') || qLower.includes('filtro') || qLower.includes('lubricante')) {
-      response = `**Plan de Lubricación para ${escapeHtml(vehContext)}:**\n\n• **Intervalo Ideal:** Cambiar el aceite sintético cada 5.000 a 7.500 km junto al filtro de aceite OEM.\n• **Nivel de Aceite:** Verificar nivel en frío en superficie plana. Si presenta color café lechoso, hay mezcla con refrigerante.`;
+      response = `🟡 **Nivel de Severidad: MODERADA / ALTA**\n\n🛠️ **Diagnóstico del Sistema de Frenado:**\n• Chillido agudo: Desgaste en pastillas alcanzando el sensor metálico.\n• Pedal esponjoso / suave: Aire en líneas hidráulicas o fluido vencido.\n• Vibración al frenar: Discos de freno alabeados / torcidos por shock térmico.\n\n🔍 **Componentes a Inspeccionar:**\n• Espesor de pastillas de freno, rectificado de discos y nivel de líquido DOT4.\n\n⏱️ **Acción Inmediata:**\n• Reemplazar pastillas de freno e inspeccionar discos de inmediato.`;
+    } else if (qLower.includes('transmision') || qLower.includes('caja') || qLower.includes('cambio') || qLower.includes('cloch') || qLower.includes('embrague')) {
+      response = `🟡 **Nivel de Severidad: MODERADA**\n\n🛠️ **Diagnóstico de Transmisión / Embrague:**\n• Golpe al realizar cambios: Desgaste de soportes de caja o fluido ATF degradado.\n• Auto se patina al acelerar: Disco de embrague / cloch gastado.\n\n🔍 **Componentes a Inspeccionar:**\n• Nivel de aceite ATF / valvulina, bomba auxiliar de embrague y soportes.\n\n⏱️ **Acción Inmediata:**\n• Revisar nivel de fluido de transmisión.`;
     } else {
-      response = `**Asesoría Técnica Automotriz para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n• **Recomendación:** Para mantener tu ${escapeHtml(veh.name)} en estado óptimo a los ${veh.km.toLocaleString()} KM, realiza inspección regular de fluidos, fajas y neumáticos.\n• Registra tus mantenimientos en la pestaña **Servicios** para mantener el historial certificado del auto.`;
+      response = `🟢 **Nivel de Severidad: PREVENTIVA / INFORMATIVA**\n\n🛠️ **Diagnóstico Técnico para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n🔍 **Recomendaciones:**\n• Para un vehículo con ${veh.km.toLocaleString()} KM, realiza revisión periódica de fluidos, fajas de distribución y estado de batería.\n• Mantén actualizado el historial en la pestaña **Servicios** de GarageOne.`;
     }
 
     responseBox.innerHTML = formatText(response);
     if (input) input.value = '';
-  }, 350);
+  }, 300);
 }
 
 function saveGeminiKey(key) {
@@ -1671,12 +1680,17 @@ function renderUserSettings() {
   const settingCurr = document.getElementById('settingCurrency');
   if (settingCurr) settingCurr.value = appState.currency || 'CRC';
 
+  const settingLang = document.getElementById('settingLanguage');
+  if (settingLang) settingLang.value = appState.language || 'es';
+
   if (document.getElementById('geminiApiKeyInput')) {
     document.getElementById('geminiApiKeyInput').value = appState.geminiApiKey || '';
   }
 
   const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
+
+  applyLanguageTranslations();
 }
 
 function changeCurrencySetting(val) {
@@ -2034,3 +2048,110 @@ function importDataJSON(e) {
   };
   reader.readAsText(file);
 }
+
+// Report Sharing (WhatsApp & Email)
+function shareReportWhatsApp() {
+  const veh = getActiveVehicle();
+  if (!veh) return;
+  const services = appState.services.filter(s => s.vehicleId === veh.id);
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
+
+  const text = `🚗 *Expediente de Vehículo - GarageOne*\n\n` +
+    `• *Vehículo:* ${veh.name} (${veh.year})\n` +
+    `• *Placa:* ${veh.plate || 'N/A'}\n` +
+    `• *Odómetro:* ${veh.km.toLocaleString()} KM\n\n` +
+    `📊 *Resumen de Inversión:*\n` +
+    `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
+    `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
+    `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+    `Generado con GarageOne.`;
+
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+function shareReportEmail() {
+  const veh = getActiveVehicle();
+  if (!veh) return;
+  const services = appState.services.filter(s => s.vehicleId === veh.id);
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
+
+  const subject = `Expediente de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`;
+  const body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
+    `Vehículo: ${veh.name} (${veh.year})\n` +
+    `Placa: ${veh.plate || 'N/A'}\n` +
+    `Odómetro Actual: ${veh.km.toLocaleString()} KM\n\n` +
+    `RESUMEN FINANCIERO:\n` +
+    `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
+    `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
+    `- Inversión Total: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+    `Generado por GarageOne.`;
+
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+// Internationalization (i18n) Engine
+const I18N_DICT = {
+  es: {
+    guanteraTitle: 'Guantera Digital',
+    guanteraSubtitle: 'Papeles, seguro, RTV y directorio de asistencia',
+    contactsTitle: 'Números Importantes',
+    contactsSubtitle: 'Desliza para borrar. Toca para llamar a talleres, grúa o seguro',
+    btnAddContact: '+ Guardar Número',
+    docsTitle: 'Documentos del Vehículo',
+    btnAddDoc: '+ Agregar Documento',
+    reportTitle: 'Historial de Mantenimientos y Reparaciones',
+    reportSubtitle: 'Genera un documento formal con todas las reparaciones mecánicas, servicios, talleres y fechas registradas para este vehículo, listo para compartir o imprimir en PDF.',
+    btnViewReport: 'Ver / Imprimir Expediente (PDF)',
+    btnShareWA: '📱 WhatsApp',
+    btnShareEmail: '✉️ Correo',
+    prefTitle: 'Preferencias',
+    lblLanguage: 'Idioma de la App / App Language',
+    lblCurrency: 'Moneda del Sistema',
+    certifiedModalTitle: 'Expediente de Venta',
+    btnPrint: 'Imprimir / PDF'
+  },
+  en: {
+    guanteraTitle: 'Digital Glovebox',
+    guanteraSubtitle: 'Documents, insurance, inspection & emergency contacts',
+    contactsTitle: 'Important Numbers',
+    contactsSubtitle: 'Swipe left to delete. Tap to call mechanic, tow or insurance',
+    btnAddContact: '+ Save Number',
+    docsTitle: 'Vehicle Documents',
+    btnAddDoc: '+ Add Document',
+    reportTitle: 'Maintenance & Service History',
+    reportSubtitle: 'Generate an official certified vehicle report with all mechanical repairs, services, and costs ready to share or print to PDF.',
+    btnViewReport: 'View / Print Report (PDF)',
+    btnShareWA: '📱 WhatsApp',
+    btnShareEmail: '✉️ Email',
+    prefTitle: 'Preferences',
+    lblLanguage: 'App Language / Idioma de la App',
+    lblCurrency: 'System Currency',
+    certifiedModalTitle: 'Vehicle Service Record',
+    btnPrint: 'Print / PDF'
+  }
+};
+
+function changeLanguageSetting(lang) {
+  appState.language = lang || 'es';
+  saveState();
+  applyLanguageTranslations();
+  renderUserSettings();
+  renderApp();
+}
+
+function applyLanguageTranslations() {
+  const lang = appState.language || 'es';
+  const dict = I18N_DICT[lang] || I18N_DICT.es;
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key]) {
+      el.textContent = dict[key];
+    }
+  });
+}
+
