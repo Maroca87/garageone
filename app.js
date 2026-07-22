@@ -394,7 +394,118 @@ function resetAllSwipeItems() {
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  } catch (e) { alert('Aviso: Memoria local llena.'); }
+  } catch (e) {
+    console.error('Error al guardar estado en LocalStorage:', e);
+    alert('Aviso de Almacenamiento: El espacio local está cerca de su límite. Ve a Ajustes -> Almacenamiento y Producción para optimizar las fotos almacenadas.');
+  }
+}
+
+function getStorageUsage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || '';
+    const bytes = raw.length * 2;
+    const kb = (bytes / 1024).toFixed(1);
+    const mb = (bytes / (1024 * 1024)).toFixed(2);
+    const percent = Math.min(100, Math.round((bytes / (5 * 1024 * 1024)) * 100));
+    return { bytes, kb, mb, percent };
+  } catch (e) {
+    return { bytes: 0, kb: '0', mb: '0', percent: 0 };
+  }
+}
+
+function renderStorageStats() {
+  const container = document.getElementById('storageUsageContainer');
+  if (!container) return;
+
+  const usage = getStorageUsage();
+  let barColor = '#30d158';
+  if (usage.percent > 70) barColor = '#ffd60a';
+  if (usage.percent > 90) barColor = '#ff453a';
+
+  const totalPhotos = (appState.services || []).filter(s => s.receipt).length +
+                     (appState.documents || []).filter(d => d.file).length +
+                     (appState.vehicles || []).filter(v => v.photo).length;
+
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px;">
+      <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
+      <span style="font-weight:700; color:${barColor};">${usage.percent}% de 5MB</span>
+    </div>
+    <div style="width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; margin-bottom:6px;">
+      <div style="width:${usage.percent}%; height:100%; background:${barColor}; border-radius:4px; transition:width 0.3s ease;"></div>
+    </div>
+    <div style="font-size:0.78rem; color:#cbd5e1;">
+      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s)/foto(s) comprimidos.
+    </div>
+  `;
+}
+
+function optimizeStorageImages() {
+  let count = 0;
+
+  const compressDataUrl = (dataUrl, maxDim = 500, quality = 0.5, callback) => {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) return callback(dataUrl);
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w <= maxDim && h <= maxDim && dataUrl.length < 40000) return callback(dataUrl);
+
+      if (w > h && w > maxDim) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else if (h > maxDim) {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      count++;
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => callback(dataUrl);
+    img.src = dataUrl;
+  };
+
+  let tasks = [];
+  (appState.services || []).forEach(s => {
+    if (s.receipt && s.receipt.length > 40000) {
+      tasks.push(cb => compressDataUrl(s.receipt, 500, 0.5, res => { s.receipt = res; cb(); }));
+    }
+  });
+
+  (appState.documents || []).forEach(d => {
+    if (d.file && d.file.length > 40000) {
+      tasks.push(cb => compressDataUrl(d.file, 500, 0.5, res => { d.file = res; cb(); }));
+    }
+  });
+
+  (appState.vehicles || []).forEach(v => {
+    if (v.photo && v.photo.length > 40000) {
+      tasks.push(cb => compressDataUrl(v.photo, 500, 0.5, res => { v.photo = res; cb(); }));
+    }
+  });
+
+  if (tasks.length === 0) {
+    alert('¡Tus datos e imágenes ya están 100% optimizados!');
+    renderStorageStats();
+    return;
+  }
+
+  let completed = 0;
+  tasks.forEach(fn => {
+    fn(() => {
+      completed++;
+      if (completed === tasks.length) {
+        saveState();
+        renderStorageStats();
+        alert(`¡Optimización finalizada! Se comprimieron ${count} imagen(es) liberando memoria para uso en producción.`);
+      }
+    });
+  });
 }
 
 function setTodayDates() {
@@ -805,7 +916,8 @@ function renderRemindersTab() {
 }
 
 function openReminderModal(remId = null) {
-  document.getElementById('formReminder').reset();
+  const form = document.getElementById('formReminder');
+  if (form) form.reset();
   document.getElementById('remId').value = '';
   document.getElementById('modalReminderTitle').textContent = 'Nuevo Recordatorio';
 
@@ -957,7 +1069,8 @@ function renderEmergencyContacts() {
 }
 
 function openContactModal(contactId = null) {
-  document.getElementById('formContact').reset();
+  const form = document.getElementById('formContact');
+  if (form) form.reset();
   document.getElementById('contactId').value = '';
   document.getElementById('modalContactTitle').textContent = 'Nuevo Contacto Importante';
 
@@ -1143,8 +1256,10 @@ function renderGuantera() {
 }
 
 function openDocumentModal(docId = null) {
-  document.getElementById('formDocument').reset();
+  const form = document.getElementById('formDocument');
+  if (form) form.reset();
   document.getElementById('docId').value = '';
+  if (document.getElementById('docFile')) document.getElementById('docFile').value = '';
   document.getElementById('modalDocumentTitle').textContent = 'Agregar Documento';
 
   if (docId) {
@@ -1427,8 +1542,10 @@ function renderMiniVehiclesList() {
 
 // Vehicle CRUD
 function openVehicleModal(vehId = null) {
-  document.getElementById('formVehicle').reset();
+  const form = document.getElementById('formVehicle');
+  if (form) form.reset();
   document.getElementById('vehId').value = '';
+  if (document.getElementById('vehPhoto')) document.getElementById('vehPhoto').value = '';
   document.getElementById('modalVehicleTitle').textContent = 'Nuevo Vehículo';
 
   if (vehId) {
@@ -1558,8 +1675,10 @@ function renderServiceList(vehId) {
 }
 
 function openServiceModal(servId = null) {
-  document.getElementById('formService').reset();
+  const form = document.getElementById('formService');
+  if (form) form.reset();
   document.getElementById('servId').value = '';
+  if (document.getElementById('servReceipt')) document.getElementById('servReceipt').value = '';
   document.getElementById('modalServiceTitle').textContent = 'Registrar Mantenimiento';
   populateServCategorySelect();
   setTodayDates();
@@ -1634,7 +1753,8 @@ function renderFuelList(vehId) {
 }
 
 function openFuelModal(fuelId = null) {
-  document.getElementById('formFuel').reset();
+  const form = document.getElementById('formFuel');
+  if (form) form.reset();
   document.getElementById('fuelId').value = '';
   document.getElementById('modalFuelTitle').textContent = 'Registrar Gasolina';
   setTodayDates();
@@ -1689,6 +1809,7 @@ function renderUserSettings() {
   const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 
+  renderStorageStats();
   applyLanguageTranslations();
 }
 
@@ -1813,7 +1934,24 @@ function renderCategoryDonutChart(services) {
 // Modals
 function openModal(id) {
   const modal = document.getElementById(id);
-  if (modal) modal.classList.add('open');
+  if (modal) {
+    modal.classList.add('open');
+    if (id === 'modalService' && !document.getElementById('servId').value) {
+      const form = document.getElementById('formService');
+      if (form) form.reset();
+      document.getElementById('servId').value = '';
+      setTodayDates();
+    } else if (id === 'modalFuel' && !document.getElementById('fuelId').value) {
+      const form = document.getElementById('formFuel');
+      if (form) form.reset();
+      document.getElementById('fuelId').value = '';
+      setTodayDates();
+    } else if (id === 'modalDocument' && !document.getElementById('docId').value) {
+      const form = document.getElementById('formDocument');
+      if (form) form.reset();
+      document.getElementById('docId').value = '';
+    }
+  }
 }
 
 function closeModal(id) {
@@ -1932,62 +2070,178 @@ function viewReceipt(serviceId) {
 function generateCertifiedReport() {
   const veh = getActiveVehicle();
   if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const totalSpend = services.reduce((sum, s) => sum + s.cost, 0);
+  const services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed);
+
+  const totalServSpend = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuelSpend = fuels.reduce((sum, f) => sum + f.cost, 0);
+  const totalSpend = totalServSpend + totalFuelSpend;
+
+  const lastService = services[0];
+  const emissionDate = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const container = document.getElementById('certifiedDocumentContent');
   container.innerHTML = `
-    <div class="cert-header">
-      <div>
-        <h1 style="color:#000000; margin-bottom:4px; font-size:1.4rem;">HISTORIAL DE MANTENIMIENTOS Y REPARACIONES</h1>
-        <p style="color:#64748b; font-size:0.85rem;">Reporte Oficial de Mantenimientos y Reparaciones Mecánicas</p>
-      </div>
-      <div style="text-align:right;">
-        <strong style="font-size:1rem; color:#000000;">${escapeHtml(veh.name)}</strong>
-        <div>Año: ${veh.year} | Placa: ${escapeHtml(veh.plate) || 'N/A'}</div>
-        <div>Odómetro: ${veh.km.toLocaleString()} KM</div>
+    <div class="cert-header" style="border-bottom:2px solid #000000; padding-bottom:12px; margin-bottom:16px; background:#ffffff; color:#000000;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h1 style="color:#000000; margin:0 0 4px 0; font-size:1.4rem; text-transform:uppercase; letter-spacing:0.5px;">GARAGEONE - EXPEDIENTE TÉCNICO Y MANTENIMIENTO</h1>
+          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Reporte Detallado de Servicios Mecánicos para Taller</p>
+        </div>
+        <div style="text-align:right; font-size:0.8rem; color:#475569;">
+          <div>Emisión: <strong style="color:#000000;">${emissionDate}</strong></div>
+          <div>Propietario: <strong style="color:#000000;">${currentUser ? escapeHtml(currentUser.name) : 'Cliente'}</strong></div>
+        </div>
       </div>
     </div>
 
-    <div style="margin-bottom:14px; font-size:0.85rem;">
-      <strong>Total de Servicios:</strong> ${services.length} registros | 
-      <strong>Inversión Total:</strong> ${formatCurrency(totalSpend)}
+    <!-- Vehicle Specs Box -->
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:16px; color:#0f172a;">
+      <h3 style="margin:0 0 8px 0; font-size:1rem; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">Ficha del Vehículo</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:0.85rem; color:#1e293b;">
+        <div><strong style="color:#0f172a;">Vehículo:</strong> ${escapeHtml(veh.name)}</div>
+        <div><strong style="color:#0f172a;">Placa / Matrícula:</strong> ${escapeHtml(veh.plate) || 'SIN PLACA'}</div>
+        <div><strong style="color:#0f172a;">Año:</strong> ${veh.year}</div>
+        <div><strong style="color:#0f172a;">Tipo:</strong> ${escapeHtml(veh.type)}</div>
+        <div><strong style="color:#0f172a;">Odómetro Actual:</strong> ${veh.km.toLocaleString()} KM</div>
+        <div><strong style="color:#0f172a;">Última Revisión:</strong> ${lastService ? lastService.date : 'Sin registro'}</div>
+      </div>
     </div>
 
-    <table class="cert-table">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>KM</th>
-          <th>Categoría</th>
-          <th>Trabajo Realizado</th>
-          <th>Taller</th>
-          <th>Costo</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${services.map(s => `
-          <tr>
-            <td>${s.date}</td>
-            <td>${s.km.toLocaleString()}</td>
-            <td><strong>${escapeHtml(s.category)}</strong></td>
-            <td>${escapeHtml(s.title)}</td>
-            <td>${escapeHtml(s.shop) || 'Privado'}</td>
-            <td>${formatCurrency(s.cost)}</td>
+    <!-- Financial & Service Overview -->
+    <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
+        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Total Servicios</span>
+        <strong style="font-size:1.1rem; color:#0f172a;">${services.length} Mantenimiento(s)</strong>
+      </div>
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
+        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Inversión Mantenimiento</span>
+        <strong style="font-size:1.1rem; color:#0f172a;">${formatCurrency(totalServSpend)}</strong>
+      </div>
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
+        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Total Combustible</span>
+        <strong style="font-size:1.1rem; color:#0f172a;">${formatCurrency(totalFuelSpend)} (${fuels.length} cargas)</strong>
+      </div>
+    </div>
+
+    <!-- Detailed Services Table -->
+    <h3 style="margin:16px 0 8px 0; font-size:1.05rem; color:#0f172a; border-bottom:2px solid #0f172a; padding-bottom:4px;">
+      Historial Detallado de Trabajos y Repuestos
+    </h3>
+
+    ${services.length === 0 ? `
+      <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este vehículo.</p>
+    ` : `
+      <table class="cert-table" style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.82rem; background:#ffffff; color:#0f172a;">
+        <thead>
+          <tr style="background:#0f172a; color:#ffffff; text-align:left;">
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">KM</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos / Garantía</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller / Mecánico</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${services.map((s, idx) => `
+            <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${s.km.toLocaleString()} km</td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700;">${formatCurrency(s.cost)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
 
-    <div style="margin-top:24px; font-size:0.75rem; color:#94a3b8; text-align:center;">
-      Propietario: ${currentUser ? escapeHtml(currentUser.name) : 'Usuario'} | Generado el ${new Date().toLocaleDateString('es-CR')}
+    <!-- Pending / Recommended Maintenance for Mechanic -->
+    ${reminders.length > 0 ? `
+      <div style="margin-top:16px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:12px; color:#78350f;">
+        <h4 style="margin:0 0 6px 0; color:#b45309; font-size:0.95rem;">⚠️ Mantenimientos Pendientes y Próximos (Para Atención del Mecánico)</h4>
+        <ul style="margin:0; padding-left:20px; font-size:0.83rem; color:#78350f;">
+          ${reminders.map(r => `
+            <li style="margin-bottom:4px;">
+              <strong style="color:#78350f;">${escapeHtml(r.title)}</strong> (${escapeHtml(r.category)}) 
+              ${r.targetKm ? ` • Meta: ${r.targetKm.toLocaleString()} KM` : ''}
+              ${r.targetDate ? ` • Fecha Meta: ${r.targetDate}` : ''}
+              ${r.notes ? ` — <em>${escapeHtml(r.notes)}</em>` : ''}
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    ` : ''}
+
+    <div style="margin-top:24px; border-top:1px solid #cbd5e1; padding-top:10px; font-size:0.75rem; color:#64748b; text-align:center; background:#ffffff;">
+      GarageOne • Expediente Vehicular Inteligente • Documento preparado para entrega al Taller / Mecánico
     </div>
   `;
 
   openModal('modalCertifiedReport');
 }
 
+function downloadReportPDF() {
+  const veh = getActiveVehicle();
+  const element = document.getElementById('certifiedDocumentContent');
+  if (!element || !veh) return;
+
+  const cleanName = (veh.plate || veh.name).replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = `Expediente_Mecanico_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+  // Create an off-screen container with explicit white background and dark text for clean PDF generation
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '750px';
+  container.style.background = '#ffffff';
+  container.style.color = '#0f172a';
+  container.style.padding = '20px';
+  container.style.boxSizing = 'border-box';
+  container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+
+  // Clone element content
+  const clone = element.cloneNode(true);
+  container.appendChild(clone);
+  document.body.appendChild(container);
+
+  if (window.html2pdf) {
+    const opt = {
+      margin:       [8, 8, 8, 8],
+      filename:     fileName,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        scrollY: 0, 
+        scrollX: 0,
+        windowWidth: 800,
+        backgroundColor: '#ffffff'
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(container).save().then(() => {
+      if (container.parentNode) container.parentNode.removeChild(container);
+    }).catch(err => {
+      console.error('Error al generar PDF con html2pdf:', err);
+      if (container.parentNode) container.parentNode.removeChild(container);
+      window.print();
+    });
+  } else {
+    if (container.parentNode) container.parentNode.removeChild(container);
+    window.print();
+  }
+}
+
 function readAndCompressImage(file, callback) {
+  if (!file) return callback('');
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
@@ -1995,7 +2249,7 @@ function readAndCompressImage(file, callback) {
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      const maxDim = 800;
+      const maxDim = 600;
 
       if (width > height && width > maxDim) {
         height = Math.round((height * maxDim) / width);
@@ -2009,7 +2263,10 @@ function readAndCompressImage(file, callback) {
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      callback(canvas.toDataURL('image/jpeg', 0.75));
+      callback(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = function() {
+      callback(e.target.result);
     };
     img.src = e.target.result;
   };

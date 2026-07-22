@@ -1048,5 +1048,22 @@ input:checked + .slider:before {
   }
 }
 
+.modal-card.print-wrapper {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  max-width: 820px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.certified-document {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+
 
 

@@ -22,6 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=105">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -164,7 +165,7 @@
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-secondary btn-sm" onclick="openModal('modalNewCategory')">+ Tipo de Servicio</button>
-            <button class="btn btn-primary btn-sm" onclick="openModal('modalService')">+ Registrar Servicio</button>
+            <button class="btn btn-primary btn-sm" onclick="openServiceModal()">+ Registrar Servicio</button>
           </div>
         </div>
 
@@ -184,7 +185,7 @@
             <h1>Combustible</h1>
             <p class="subtitle">Rendimiento y costo por distancia</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openModal('modalFuel')">+ Registrar Recarga</button>
+          <button class="btn btn-primary btn-sm" onclick="openFuelModal()">+ Registrar Recarga</button>
         </div>
 
         <div class="stats-row">
@@ -234,7 +235,7 @@
 
         <div class="section-title-row" style="margin-top:16px;">
           <h2 data-i18n="docsTitle">Documentos del Vehículo</h2>
-          <button class="btn btn-primary btn-sm" onclick="openModal('modalDocument')" data-i18n="btnAddDoc">+ Agregar Documento</button>
+          <button class="btn btn-primary btn-sm" onclick="openDocumentModal()" data-i18n="btnAddDoc">+ Agregar Documento</button>
         </div>
 
         <div id="documentList" class="log-list">
@@ -399,6 +400,19 @@
               <option value="EUR">Euros (€)</option>
             </select>
           </div>
+        </div>
+
+        <div class="settings-card" id="storageSettingsCard">
+          <h3>Almacenamiento y Producción</h3>
+          <p class="subtitle" style="margin-bottom:10px;">Garantía de uso continuo y optimización de memoria local.</p>
+          
+          <div id="storageUsageContainer" style="margin-bottom:12px;">
+            <!-- Dynamic storage bar rendered by JavaScript -->
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="optimizeStorageImages()">
+            ⚡ Optimizar y Comprimir Fotos Almacenadas
+          </button>
         </div>
 
         <div class="settings-card">
@@ -644,10 +658,11 @@
     <div class="modal-card print-wrapper">
       <div class="modal-header no-print">
         <h3 data-i18n="certifiedModalTitle">Expediente de Venta</h3>
-        <div style="display:flex; gap:6px; align-items:center;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="downloadReportPDF()" style="background:#0a84ff; color:#fff; border:none; font-weight:700;">Descargar PDF</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir</button>
           <button class="btn btn-secondary btn-sm" onclick="shareReportWhatsApp()" style="background:#25D366; color:#fff; border:none;">WhatsApp</button>
           <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
-          <button class="btn btn-primary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir / PDF</button>
           <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
         </div>
       </div>
