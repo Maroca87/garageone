@@ -280,7 +280,7 @@ function sendRecoveryVerificationCode() {
   if (step1) step1.style.display = 'none';
   if (step2) step2.style.display = 'block';
 
-  alert(`📩 VERIFICACIÓN DE SEGURIDAD GARAGEONE\n\nSe ha enviado un código de recuperación a tu correo:\n${targetEmail}\n\nTu Código de Verificación de 6 dígitos es:\n👉  ${code}  👈\n\nIngresa este código para cambiar tu contraseña de forma segura.`);
+  alert(`VERIFICACIÓN DE SEGURIDAD GARAGEONE\n\nSe ha enviado un código de recuperación a tu correo:\n${targetEmail}\n\nTu Código de Verificación de 6 dígitos es:\n ${code} \n\nIngresa este código para cambiar tu contraseña de forma segura.`);
 }
 
 function handleForgotPassword(e) {
@@ -460,38 +460,10 @@ function handleRegister(e) {
 
   saveUser(newUser);
 
-  if (jsonFileInput && jsonFileInput.files && jsonFileInput.files[0]) {
-    const file = jsonFileInput.files[0];
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      try {
-        const imported = JSON.parse(evt.target.result);
-        let targetState = imported;
-        if (imported.appState && imported.vehicles === undefined) {
-          targetState = imported.appState;
-        }
-
-        if (targetState.vehicles && Array.isArray(targetState.vehicles)) {
-          appState = sanitizeState(targetState);
-          saveState();
-          renderApp();
-          alert('¡Cuenta creada y datos del archivo JSON cargados exitosamente!');
-        }
-      } catch (err) {
-        console.warn('Error importando JSON durante registro:', err);
-      }
-      isAuthenticated = true;
-      failedLoginAttempts = 0;
-      lockoutUntil = 0;
-      checkAuth();
-    };
-    reader.readAsText(file);
-  } else {
-    isAuthenticated = true;
-    failedLoginAttempts = 0;
-    lockoutUntil = 0;
-    checkAuth();
-  }
+  isAuthenticated = true;
+  failedLoginAttempts = 0;
+  lockoutUntil = 0;
+  checkAuth();
 }
 
 function handleLogin(e) {

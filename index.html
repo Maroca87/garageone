@@ -77,10 +77,6 @@
           <input type="password" id="regConfirmPassword" class="form-control" placeholder="Repite tu contraseña" autocomplete="new-password">
           <div id="confirmPassError" class="error-text"></div>
         </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label style="font-size:0.8rem; color:#38bdf8;">Recuperar / Cargar datos desde JSON (Opcional)</label>
-          <input type="file" id="regJsonFile" class="form-control" accept=".json" style="font-size:0.8rem; padding:6px;">
-        </div>
         <button type="submit" class="btn btn-primary btn-block">Crear Cuenta</button>
         <div style="margin-top:12px; text-align:center;" id="alreadyHasUserContainer">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes cuenta? Iniciar Sesión</button>
@@ -96,13 +92,13 @@
             <div id="forgotUserError" class="error-text"></div>
           </div>
           <button type="button" class="btn btn-primary btn-block" onclick="sendRecoveryVerificationCode()">
-            📩 Enviar Código de Verificación al Correo
+            Enviar Código de Verificación al Correo
           </button>
         </div>
 
         <div id="forgotStep2" style="display:none;">
           <div style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); padding:10px 12px; border-radius:10px; font-size:0.83rem; margin-bottom:12px; color:#38bdf8; text-align:center;">
-            📩 Código de seguridad enviado a:<br>
+            Código de seguridad enviado a:<br>
             <strong id="forgotEmailSentTarget" style="color:#ffffff; font-size:0.9rem;">-</strong>
           </div>
           <div class="form-group">
