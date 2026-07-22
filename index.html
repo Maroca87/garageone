@@ -38,11 +38,15 @@
       <!-- Login Form -->
       <form id="formLogin" onsubmit="handleLogin(event)">
         <div class="form-group">
-          <label>PIN de Acceso</label>
-          <input type="password" id="loginPin" class="form-control text-center pin-input" maxlength="6" placeholder="••••" autocomplete="current-password">
+          <label id="loginPassLabel">Contraseña o PIN de Acceso</label>
+          <input type="password" id="loginPin" class="form-control text-center pin-input" placeholder="••••" autocomplete="current-password">
           <div id="loginError" class="error-text"></div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Ingresar a la App</button>
+        <button type="button" id="btnFaceIdLogin" class="btn btn-secondary btn-block" onclick="handleBiometricLogin()" style="display:none; margin-top:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:middle;"><path d="M9 3H5a2 2 0 0 0-2 2v4m0 6v4a2 2 0 0 0 2 2h4m6-18h4a2 2 0 0 1 2 2v4m0 6v4a2 2 0 0 1-2 2h-4"/><path d="M9 9a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z"/></svg>
+          Ingresar con Face ID / Biometría
+        </button>
         <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; text-align:center;">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showRegisterForm()" style="font-size:0.8rem; color:#38bdf8;">¿No tienes cuenta? Crear Cuenta</button>
           <button type="button" class="btn btn-tertiary btn-block" onclick="resetUserPin(event)" style="font-size:0.8rem; color:var(--text-secondary);">Restablecer / Crear nueva cuenta</button>
@@ -52,23 +56,23 @@
       <!-- Register Form -->
       <form id="formRegister" onsubmit="handleRegister(event)" style="display:none;">
         <div class="form-group">
-          <label>Nombre Completo</label>
-          <input type="text" id="regName" class="form-control" placeholder="Ej. Mario Rodríguez" required>
-          <div id="nameError" class="error-text"></div>
+          <label>Crear Usuario</label>
+          <input type="text" id="regUser" class="form-control" placeholder="Ingresa un nombre de usuario" autocomplete="username">
+          <div id="userError" class="error-text"></div>
         </div>
         <div class="form-group">
-          <label>Correo Electrónico</label>
-          <input type="email" id="regEmail" class="form-control" placeholder="nombre@correo.com" required>
-          <div id="emailError" class="error-text"></div>
+          <label>Contraseña</label>
+          <input type="password" id="regPassword" class="form-control" placeholder="Ingresa tu contraseña" autocomplete="new-password">
+          <div id="passError" class="error-text"></div>
         </div>
         <div class="form-group">
-          <label>PIN de Seguridad (4 a 6 números)</label>
-          <input type="password" id="regPin" class="form-control text-center pin-input" maxlength="6" placeholder="••••" required>
-          <div id="pinError" class="error-text"></div>
+          <label>Confirmar Contraseña</label>
+          <input type="password" id="regConfirmPassword" class="form-control" placeholder="Repite tu contraseña" autocomplete="new-password">
+          <div id="confirmPassError" class="error-text"></div>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Crear Cuenta y Empezar</button>
         <div style="margin-top:12px; text-align:center;" id="alreadyHasUserContainer">
-          <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes usuario? Ingresar con PIN</button>
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes cuenta? Iniciar Sesión</button>
         </div>
       </form>
     </div>
@@ -337,13 +341,49 @@
         <div class="settings-card">
           <h3>Perfil de Usuario</h3>
           <div class="settings-row">
-            <span>Nombre</span>
+            <span>Usuario</span>
             <strong id="userProfileName">-</strong>
           </div>
-          <div class="settings-row">
-            <span>Correo</span>
-            <strong id="userProfileEmail">-</strong>
+        </div>
+
+        <div class="settings-card">
+          <h3>Seguridad y Autenticación</h3>
+
+          <!-- PIN Option -->
+          <div class="settings-row-toggle" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="display:block; font-size:0.95rem;">Acceso con PIN</strong>
+              <span class="subtitle" style="font-size:0.8rem;" id="pinStatusText">Permite desbloquear la app con un PIN numérico</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="togglePinSetting" onchange="togglePinOption(this.checked)">
+              <span class="slider round"></span>
+            </label>
           </div>
+          
+          <div id="pinSetupContainer" style="display:none; margin-top:10px; padding:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px;">
+            <div class="form-group" style="margin-bottom:8px;">
+              <label style="font-size:0.8rem;">Establecer PIN (4 a 6 números)</label>
+              <input type="password" id="settingPinInput" class="form-control pin-input text-center" maxlength="6" placeholder="••••">
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm btn-block" onclick="saveNewPin()">Guardar PIN</button>
+            <div id="settingPinStatus" class="error-text" style="margin-top:6px; font-size:0.8rem;"></div>
+          </div>
+
+          <hr style="border:0; border-top:1px solid rgba(255,255,255,0.08); margin:14px 0;">
+
+          <!-- Face ID / Biometrics Option -->
+          <div class="settings-row-toggle" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="display:block; font-size:0.95rem;">Face ID / Biometría</strong>
+              <span class="subtitle" style="font-size:0.8rem;" id="faceIdStatusText">Desbloquea la app con rostro o huella dactilar</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleFaceIdSetting" onchange="toggleFaceIdOption(this.checked)">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div id="faceIdMessage" class="error-text" style="margin-top:6px; font-size:0.8rem;"></div>
         </div>
 
         <div class="settings-card">

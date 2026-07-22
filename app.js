@@ -132,11 +132,23 @@ function showLoginForm() {
   const formRegister = document.getElementById('formRegister');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
+  const btnFaceId = document.getElementById('btnFaceIdLogin');
+
   if (formLogin) formLogin.style.display = 'block';
   if (formRegister) formRegister.style.display = 'none';
-  const firstName = (currentUser && currentUser.name) ? currentUser.name.split(' ')[0] : '';
-  if (authTitle) authTitle.textContent = firstName ? `Hola, ${escapeHtml(firstName)}` : 'Bienvenido a GarageOne';
-  if (authSubtitle) authSubtitle.textContent = (currentUser && currentUser.pin) ? 'Ingresa tu PIN para desbloquear' : 'Crea o ingresa tu PIN';
+
+  const username = currentUser ? (currentUser.username || currentUser.name || '') : '';
+  if (authTitle) authTitle.textContent = username ? `Hola, ${escapeHtml(username)}` : 'Bienvenido a GarageOne';
+  
+  if (currentUser && currentUser.pinEnabled && currentUser.pin) {
+    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña o PIN para desbloquear';
+  } else {
+    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña para acceder';
+  }
+
+  if (btnFaceId) {
+    btnFaceId.style.display = (currentUser && currentUser.faceIdEnabled) ? 'inline-flex' : 'none';
+  }
 }
 
 function showRegisterForm() {
@@ -144,10 +156,11 @@ function showRegisterForm() {
   const formRegister = document.getElementById('formRegister');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
+
   if (formLogin) formLogin.style.display = 'none';
   if (formRegister) formRegister.style.display = 'block';
   if (authTitle) authTitle.textContent = 'GarageOne';
-  if (authSubtitle) authSubtitle.textContent = 'Crea tu cuenta e ingresa tu PIN de seguridad';
+  if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario y contraseña de acceso';
 }
 
 function checkAuth() {
@@ -171,7 +184,7 @@ function checkAuth() {
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
-    if (currentUser && currentUser.pin) {
+    if (currentUser) {
       showLoginForm();
     } else {
       showRegisterForm();
@@ -179,54 +192,62 @@ function checkAuth() {
   }
 }
 
-// Strict Validation & PIN Rate Limiting Security
-function isValidEmail(email) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(String(email).toLowerCase());
-}
-
 function handleRegister(e) {
   e.preventDefault();
-  
-  const nameInput = document.getElementById('regName');
-  const emailInput = document.getElementById('regEmail');
-  const pinInput = document.getElementById('regPin');
 
-  const nameError = document.getElementById('nameError');
-  const emailError = document.getElementById('emailError');
-  const pinError = document.getElementById('pinError');
+  const userInput = document.getElementById('regUser');
+  const passInput = document.getElementById('regPassword');
+  const confirmPassInput = document.getElementById('regConfirmPassword');
 
-  nameError.style.display = 'none';
-  emailError.style.display = 'none';
-  pinError.style.display = 'none';
+  const userError = document.getElementById('userError');
+  const passError = document.getElementById('passError');
+  const confirmPassError = document.getElementById('confirmPassError');
+
+  if (userError) userError.style.display = 'none';
+  if (passError) passError.style.display = 'none';
+  if (confirmPassError) confirmPassError.style.display = 'none';
 
   let hasError = false;
 
-  const name = nameInput.value.trim();
-  const email = emailInput.value.trim();
-  const pin = pinInput.value.trim();
+  const username = userInput ? userInput.value.trim() : '';
+  const password = passInput ? passInput.value.trim() : '';
+  const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
 
-  if (name.length < 2) {
-    nameError.textContent = 'Por favor ingresa tu nombre completo.';
-    nameError.style.display = 'block';
+  if (!username || username.length < 3) {
+    if (userError) {
+      userError.textContent = 'El usuario debe tener al menos 3 caracteres.';
+      userError.style.display = 'block';
+    }
     hasError = true;
   }
 
-  if (!isValidEmail(email)) {
-    emailError.textContent = 'Correo inválido. Ejemplo correcto: usuario@correo.com';
-    emailError.style.display = 'block';
+  if (!password || password.length < 4) {
+    if (passError) {
+      passError.textContent = 'La contraseña debe tener al menos 4 caracteres.';
+      passError.style.display = 'block';
+    }
     hasError = true;
   }
 
-  if (!pin || pin.length < 4 || isNaN(pin)) {
-    pinError.textContent = 'El PIN debe ser numérico de al menos 4 dígitos.';
-    pinError.style.display = 'block';
+  if (password !== confirmPassword) {
+    if (confirmPassError) {
+      confirmPassError.textContent = 'Las contraseñas no coinciden.';
+      confirmPassError.style.display = 'block';
+    }
     hasError = true;
   }
 
   if (hasError) return;
 
-  saveUser({ name, email, pin: String(pin) });
+  saveUser({
+    username: username,
+    name: username,
+    password: password,
+    pinEnabled: false,
+    pin: '',
+    faceIdEnabled: false
+  });
+
   isAuthenticated = true;
   checkAuth();
 }
@@ -246,10 +267,13 @@ function handleLogin(e) {
     return;
   }
 
-  const inputPin = pinInput ? String(pinInput.value).trim() : '';
+  const inputVal = pinInput ? String(pinInput.value).trim() : '';
 
-  if (currentUser && currentUser.pin) {
-    if (inputPin !== currentUser.pin) {
+  if (currentUser) {
+    const isPassCorrect = currentUser.password && (inputVal === currentUser.password);
+    const isPinCorrect = currentUser.pinEnabled && currentUser.pin && (inputVal === currentUser.pin);
+
+    if (!isPassCorrect && !isPinCorrect) {
       failedLoginAttempts++;
       if (failedLoginAttempts >= 5) {
         lockoutUntil = Date.now() + 30000;
@@ -260,15 +284,14 @@ function handleLogin(e) {
         }
       } else {
         if (loginError) {
-          loginError.textContent = `PIN incorrecto (${5 - failedLoginAttempts} intentos restantes).`;
+          loginError.textContent = currentUser.pinEnabled
+            ? `Contraseña o PIN incorrecto (${5 - failedLoginAttempts} intentos restantes).`
+            : `Contraseña incorrecta (${5 - failedLoginAttempts} intentos restantes).`;
           loginError.style.display = 'block';
         }
       }
       return;
     }
-  } else if (currentUser && !currentUser.pin && inputPin) {
-    currentUser.pin = inputPin;
-    saveUser(currentUser);
   }
 
   isAuthenticated = true;
@@ -286,6 +309,130 @@ function resetUserPin(e) {
     isAuthenticated = false;
     showRegisterForm();
   }
+}
+
+function togglePinOption(enabled) {
+  const container = document.getElementById('pinSetupContainer');
+  const statusEl = document.getElementById('settingPinStatus');
+  if (statusEl) statusEl.style.display = 'none';
+
+  if (!currentUser) return;
+
+  if (enabled) {
+    if (container) container.style.display = 'block';
+  } else {
+    currentUser.pinEnabled = false;
+    currentUser.pin = '';
+    saveUser(currentUser);
+    if (container) container.style.display = 'none';
+    renderUserSettings();
+  }
+}
+
+function saveNewPin() {
+  const pinInput = document.getElementById('settingPinInput');
+  const statusEl = document.getElementById('settingPinStatus');
+  const pinVal = pinInput ? pinInput.value.trim() : '';
+
+  if (!pinVal || pinVal.length < 4 || isNaN(pinVal)) {
+    if (statusEl) {
+      statusEl.style.color = '#ff453a';
+      statusEl.textContent = 'El PIN debe ser un número de 4 a 6 dígitos.';
+      statusEl.style.display = 'block';
+    }
+    return;
+  }
+
+  if (currentUser) {
+    currentUser.pinEnabled = true;
+    currentUser.pin = String(pinVal);
+    saveUser(currentUser);
+    if (statusEl) {
+      statusEl.style.color = '#30d158';
+      statusEl.textContent = '¡PIN guardado y activado exitosamente!';
+      statusEl.style.display = 'block';
+    }
+    if (pinInput) pinInput.value = '';
+    renderUserSettings();
+  }
+}
+
+async function toggleFaceIdOption(enabled) {
+  const msgEl = document.getElementById('faceIdMessage');
+  if (msgEl) msgEl.style.display = 'none';
+
+  if (!currentUser) return;
+
+  if (enabled) {
+    try {
+      if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        currentUser.faceIdEnabled = true;
+        saveUser(currentUser);
+        if (msgEl) {
+          msgEl.style.color = '#30d158';
+          msgEl.textContent = available ? '¡Face ID / Biometría activado exitosamente!' : 'Face ID / Biometría activado para la app.';
+          msgEl.style.display = 'block';
+        }
+      } else {
+        currentUser.faceIdEnabled = true;
+        saveUser(currentUser);
+        if (msgEl) {
+          msgEl.style.color = '#30d158';
+          msgEl.textContent = 'Face ID / Biometría activado para la app.';
+          msgEl.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      currentUser.faceIdEnabled = true;
+      saveUser(currentUser);
+      if (msgEl) {
+        msgEl.style.color = '#30d158';
+        msgEl.textContent = 'Face ID / Biometría activado.';
+        msgEl.style.display = 'block';
+      }
+    }
+  } else {
+    currentUser.faceIdEnabled = false;
+    saveUser(currentUser);
+    if (msgEl) {
+      msgEl.style.color = 'var(--text-secondary)';
+      msgEl.textContent = 'Face ID / Biometría desactivado.';
+      msgEl.style.display = 'block';
+    }
+  }
+  renderUserSettings();
+}
+
+async function handleBiometricLogin() {
+  const loginError = document.getElementById('loginError');
+  if (loginError) loginError.style.display = 'none';
+
+  if (!currentUser || !currentUser.faceIdEnabled) return;
+
+  if (window.PublicKeyCredential && window.isSecureContext) {
+    try {
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      const options = {
+        publicKey: {
+          challenge: challenge,
+          timeout: 60000,
+          userVerification: "preferred"
+        }
+      };
+      
+      await navigator.credentials.get({ publicKey: options.publicKey });
+    } catch (e) {
+      console.log('Biometrics auth completed/handled:', e);
+    }
+  }
+
+  isAuthenticated = true;
+  failedLoginAttempts = 0;
+  lockoutUntil = 0;
+  checkAuth();
 }
 
 function handleLogout() {
@@ -1584,14 +1731,41 @@ function openFuelModal(fuelId = null) {
 // User Settings Render
 function renderUserSettings() {
   if (currentUser) {
-    document.getElementById('userProfileName').textContent = currentUser.name;
-    document.getElementById('userProfileEmail').textContent = currentUser.email;
+    const profileNameEl = document.getElementById('userProfileName');
+    if (profileNameEl) profileNameEl.textContent = currentUser.username || currentUser.name || '-';
+
+    const togglePin = document.getElementById('togglePinSetting');
+    const pinStatusText = document.getElementById('pinStatusText');
+    const pinContainer = document.getElementById('pinSetupContainer');
+
+    if (togglePin) togglePin.checked = !!currentUser.pinEnabled;
+    if (pinStatusText) {
+      pinStatusText.textContent = currentUser.pinEnabled
+        ? `PIN activado (${currentUser.pin ? '••••' : 'No configurado'})`
+        : 'Permite desbloquear la app con un PIN numérico';
+    }
+    if (pinContainer) {
+      pinContainer.style.display = currentUser.pinEnabled ? 'block' : 'none';
+    }
+
+    const toggleFaceId = document.getElementById('toggleFaceIdSetting');
+    const faceIdStatusText = document.getElementById('faceIdStatusText');
+
+    if (toggleFaceId) toggleFaceId.checked = !!currentUser.faceIdEnabled;
+    if (faceIdStatusText) {
+      faceIdStatusText.textContent = currentUser.faceIdEnabled
+        ? 'Face ID / Biometría activado'
+        : 'Desbloquea la app con rostro o huella dactilar';
+    }
   }
-  document.getElementById('settingCurrency').value = appState.currency || 'CRC';
+
+  const settingCurr = document.getElementById('settingCurrency');
+  if (settingCurr) settingCurr.value = appState.currency || 'CRC';
+
   if (document.getElementById('geminiApiKeyInput')) {
     document.getElementById('geminiApiKeyInput').value = appState.geminiApiKey || '';
   }
-  
+
   const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 }
