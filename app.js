@@ -175,15 +175,20 @@ function saveUser(user) {
   saveUsersList(list);
 }
 
+let currentRecoveryOTP = null;
+let currentRecoveryTargetUser = null;
+
 function showLoginForm() {
   const formLogin = document.getElementById('formLogin');
   const formRegister = document.getElementById('formRegister');
+  const formForgotPass = document.getElementById('formForgotPass');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
   const loginUser = document.getElementById('loginUser');
 
   if (formLogin) formLogin.style.display = 'block';
   if (formRegister) formRegister.style.display = 'none';
+  if (formForgotPass) formForgotPass.style.display = 'none';
 
   if (loginUser && currentUser && !loginUser.value) {
     loginUser.value = currentUser.username || currentUser.name || '';
@@ -191,24 +196,156 @@ function showLoginForm() {
 
   const username = currentUser ? (currentUser.username || currentUser.name || '') : '';
   if (authTitle) authTitle.textContent = username ? `Hola, ${escapeHtml(username)}` : 'Bienvenido a GarageOne';
-
-  if (currentUser && currentUser.pinEnabled && currentUser.pin) {
-    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña o PIN para acceder (Web & App)';
-  } else {
-    if (authSubtitle) authSubtitle.textContent = 'Ingresa tu usuario y contraseña de acceso';
-  }
+  if (authSubtitle) authSubtitle.textContent = 'Ingresa tu usuario y contraseña para acceder';
 }
 
 function showRegisterForm() {
   const formLogin = document.getElementById('formLogin');
   const formRegister = document.getElementById('formRegister');
+  const formForgotPass = document.getElementById('formForgotPass');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
 
   if (formLogin) formLogin.style.display = 'none';
   if (formRegister) formRegister.style.display = 'block';
+  if (formForgotPass) formForgotPass.style.display = 'none';
   if (authTitle) authTitle.textContent = 'GarageOne';
-  if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario único de acceso (Web & App)';
+  if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario único de acceso';
+}
+
+function showForgotPasswordForm() {
+  const formLogin = document.getElementById('formLogin');
+  const formRegister = document.getElementById('formRegister');
+  const formForgotPass = document.getElementById('formForgotPass');
+  const authTitle = document.getElementById('authTitle');
+  const authSubtitle = document.getElementById('authSubtitle');
+
+  const step1 = document.getElementById('forgotStep1');
+  const step2 = document.getElementById('forgotStep2');
+  if (step1) step1.style.display = 'block';
+  if (step2) step2.style.display = 'none';
+
+  if (formLogin) formLogin.style.display = 'none';
+  if (formRegister) formRegister.style.display = 'none';
+  if (formForgotPass) formForgotPass.style.display = 'block';
+  if (authTitle) authTitle.textContent = 'Recuperar Contraseña';
+  if (authSubtitle) authSubtitle.textContent = 'Verificación por correo electrónico registrado';
+}
+
+function sendRecoveryVerificationCode() {
+  const inputEl = document.getElementById('forgotUserOrEmail');
+  const errorEl = document.getElementById('forgotUserError');
+  if (errorEl) errorEl.style.display = 'none';
+
+  const val = inputEl ? inputEl.value.trim().toLowerCase() : '';
+  if (!val) {
+    if (errorEl) {
+      errorEl.textContent = 'Ingresa tu correo electrónico o nombre de usuario.';
+      errorEl.style.display = 'block';
+    }
+    return;
+  }
+
+  const usersList = getUsersList();
+  let targetUser = usersList.find(u => 
+    (u.email && u.email.toLowerCase() === val) || 
+    (u.username && u.username.toLowerCase() === val)
+  );
+
+  if (!targetUser && currentUser && (
+    (currentUser.email && currentUser.email.toLowerCase() === val) ||
+    (currentUser.username && currentUser.username.toLowerCase() === val)
+  )) {
+    targetUser = currentUser;
+  }
+
+  if (!targetUser) {
+    if (errorEl) {
+      errorEl.textContent = `No se encontró ninguna cuenta registrada con "${val}".`;
+      errorEl.style.display = 'block';
+    }
+    return;
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  currentRecoveryOTP = code;
+  currentRecoveryTargetUser = targetUser;
+
+  const targetEmail = targetUser.email || `${targetUser.username}@garageone.app`;
+  const emailSentTargetEl = document.getElementById('forgotEmailSentTarget');
+  if (emailSentTargetEl) emailSentTargetEl.textContent = targetEmail;
+
+  const step1 = document.getElementById('forgotStep1');
+  const step2 = document.getElementById('forgotStep2');
+  if (step1) step1.style.display = 'none';
+  if (step2) step2.style.display = 'block';
+
+  alert(`📩 VERIFICACIÓN DE SEGURIDAD GARAGEONE\n\nSe ha enviado un código de recuperación a tu correo:\n${targetEmail}\n\nTu Código de Verificación de 6 dígitos es:\n👉  ${code}  👈\n\nIngresa este código para cambiar tu contraseña de forma segura.`);
+}
+
+function handleForgotPassword(e) {
+  if (e) e.preventDefault();
+
+  const codeInput = document.getElementById('forgotCodeInput');
+  const newPassInput = document.getElementById('forgotNewPassword');
+  const confirmPassInput = document.getElementById('forgotConfirmPassword');
+
+  const codeError = document.getElementById('forgotCodeError');
+  const passError = document.getElementById('forgotPassError');
+
+  if (codeError) codeError.style.display = 'none';
+  if (passError) passError.style.display = 'none';
+
+  const enteredCode = codeInput ? codeInput.value.trim() : '';
+  const newPassword = newPassInput ? newPassInput.value.trim() : '';
+  const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
+
+  if (!currentRecoveryOTP || !currentRecoveryTargetUser) {
+    if (codeError) {
+      codeError.textContent = 'Debes solicitar primero un código de verificación.';
+      codeError.style.display = 'block';
+    }
+    return;
+  }
+
+  if (enteredCode !== currentRecoveryOTP) {
+    if (codeError) {
+      codeError.textContent = 'El código de verificación es incorrecto. Revisa el código enviado.';
+      codeError.style.display = 'block';
+    }
+    return;
+  }
+
+  if (!newPassword || newPassword.length < 4) {
+    if (passError) {
+      passError.textContent = 'La nueva contraseña debe tener al menos 4 caracteres.';
+      passError.style.display = 'block';
+    }
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    if (passError) {
+      passError.textContent = 'Las contraseñas no coinciden.';
+      passError.style.display = 'block';
+    }
+    return;
+  }
+
+  currentRecoveryTargetUser.password = newPassword;
+  if (currentRecoveryTargetUser.pinEnabled) {
+    currentRecoveryTargetUser.pin = newPassword.length <= 6 && !isNaN(newPassword) ? newPassword : currentRecoveryTargetUser.pin;
+  }
+
+  saveUser(currentRecoveryTargetUser);
+  isAuthenticated = true;
+  failedLoginAttempts = 0;
+  lockoutUntil = 0;
+  currentRecoveryOTP = null;
+  currentRecoveryTargetUser = null;
+
+  alert('¡Verificación por correo exitosa! Tu contraseña ha sido cambiada de forma segura.');
+  checkAuth();
 }
 
 function checkAuth() {
@@ -244,20 +381,25 @@ function handleRegister(e) {
   if (e) e.preventDefault();
 
   const userInput = document.getElementById('regUser');
+  const emailInput = document.getElementById('regEmail');
   const passInput = document.getElementById('regPassword');
   const confirmPassInput = document.getElementById('regConfirmPassword');
+  const jsonFileInput = document.getElementById('regJsonFile');
 
   const userError = document.getElementById('userError');
+  const emailError = document.getElementById('emailError');
   const passError = document.getElementById('passError');
   const confirmPassError = document.getElementById('confirmPassError');
 
   if (userError) userError.style.display = 'none';
+  if (emailError) emailError.style.display = 'none';
   if (passError) passError.style.display = 'none';
   if (confirmPassError) confirmPassError.style.display = 'none';
 
   let hasError = false;
 
   const username = userInput ? userInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim() : '';
   const password = passInput ? passInput.value.trim() : '';
   const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
 
@@ -268,7 +410,6 @@ function handleRegister(e) {
     }
     hasError = true;
   } else {
-    // DUPLICATE USERNAME VALIDATION Across Web & App
     const usersList = getUsersList();
     const isDuplicate = usersList.some(u => u.username && u.username.toLowerCase() === username.toLowerCase());
     if (isDuplicate) {
@@ -278,6 +419,14 @@ function handleRegister(e) {
       }
       hasError = true;
     }
+  }
+
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    if (emailError) {
+      emailError.textContent = 'Ingresa un correo electrónico válido para recuperar tu cuenta.';
+      emailError.style.display = 'block';
+    }
+    hasError = true;
   }
 
   if (!password || password.length < 4) {
@@ -302,6 +451,7 @@ function handleRegister(e) {
     id: 'usr_' + Date.now(),
     username: username,
     name: username,
+    email: email,
     password: password,
     pinEnabled: false,
     pin: '',
@@ -310,10 +460,38 @@ function handleRegister(e) {
 
   saveUser(newUser);
 
-  isAuthenticated = true;
-  failedLoginAttempts = 0;
-  lockoutUntil = 0;
-  checkAuth();
+  if (jsonFileInput && jsonFileInput.files && jsonFileInput.files[0]) {
+    const file = jsonFileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        const imported = JSON.parse(evt.target.result);
+        let targetState = imported;
+        if (imported.appState && imported.vehicles === undefined) {
+          targetState = imported.appState;
+        }
+
+        if (targetState.vehicles && Array.isArray(targetState.vehicles)) {
+          appState = sanitizeState(targetState);
+          saveState();
+          renderApp();
+          alert('¡Cuenta creada y datos del archivo JSON cargados exitosamente!');
+        }
+      } catch (err) {
+        console.warn('Error importando JSON durante registro:', err);
+      }
+      isAuthenticated = true;
+      failedLoginAttempts = 0;
+      lockoutUntil = 0;
+      checkAuth();
+    };
+    reader.readAsText(file);
+  } else {
+    isAuthenticated = true;
+    failedLoginAttempts = 0;
+    lockoutUntil = 0;
+    checkAuth();
+  }
 }
 
 function handleLogin(e) {
@@ -2170,6 +2348,9 @@ function renderUserSettings() {
   if (currentUser) {
     const profileNameEl = document.getElementById('userProfileName');
     if (profileNameEl) profileNameEl.textContent = currentUser.username || currentUser.name || '-';
+
+    const profileEmailEl = document.getElementById('userProfileEmail');
+    if (profileEmailEl) profileEmailEl.textContent = currentUser.email || 'No registrado';
 
     const togglePin = document.getElementById('togglePinSetting');
     const pinStatusText = document.getElementById('pinStatusText');

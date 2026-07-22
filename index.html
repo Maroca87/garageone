@@ -51,7 +51,7 @@
         <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
         <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; text-align:center;">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showRegisterForm()" style="font-size:0.8rem; color:#38bdf8;">¿No tienes cuenta? Registrar Cuenta</button>
-          <button type="button" class="btn btn-tertiary btn-block" onclick="resetUserPin(event)" style="font-size:0.8rem; color:var(--text-secondary);">Restablecer Credenciales</button>
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showForgotPasswordForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Olvidaste tu contraseña?</button>
         </div>
       </form>
 
@@ -63,6 +63,11 @@
           <div id="userError" class="error-text"></div>
         </div>
         <div class="form-group">
+          <label>Correo Electrónico</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="correo@ejemplo.com" autocomplete="email">
+          <div id="emailError" class="error-text"></div>
+        </div>
+        <div class="form-group">
           <label>Contraseña</label>
           <input type="password" id="regPassword" class="form-control" placeholder="Ingresa tu contraseña" autocomplete="new-password">
           <div id="passError" class="error-text"></div>
@@ -72,20 +77,58 @@
           <input type="password" id="regConfirmPassword" class="form-control" placeholder="Repite tu contraseña" autocomplete="new-password">
           <div id="confirmPassError" class="error-text"></div>
         </div>
+        <div class="form-group" style="margin-top:10px;">
+          <label style="font-size:0.8rem; color:#38bdf8;">Recuperar / Cargar datos desde JSON (Opcional)</label>
+          <input type="file" id="regJsonFile" class="form-control" accept=".json" style="font-size:0.8rem; padding:6px;">
+        </div>
         <button type="submit" class="btn btn-primary btn-block">Crear Cuenta</button>
         <div style="margin-top:12px; text-align:center;" id="alreadyHasUserContainer">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">¿Ya tienes cuenta? Iniciar Sesión</button>
         </div>
       </form>
 
-      <!-- Universal Backup Restore Option -->
-      <div style="margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); text-align:center;">
-        <label class="btn btn-outline btn-block btn-sm" style="text-align:center; cursor:pointer; font-size:0.82rem;">
-          📁 Restaurar Copia de Seguridad (JSON)
-          <input type="file" id="authImportJsonInput" accept=".json" onchange="importDataJSON(event)" style="display:none;">
-        </label>
-        <span class="subtitle" style="font-size:0.75rem; display:block; margin-top:4px; color:#cbd5e1;">Recupera tus vehículos y datos desde cualquier dispositivo o navegador</span>
-      </div>
+      <!-- Forgot Password Form (2-Step Email Verification) -->
+      <form id="formForgotPass" onsubmit="handleForgotPassword(event)" style="display:none;">
+        <div id="forgotStep1">
+          <div class="form-group">
+            <label>Correo Electrónico o Usuario</label>
+            <input type="text" id="forgotUserOrEmail" class="form-control" placeholder="correo@ejemplo.com o tu usuario" autocomplete="username">
+            <div id="forgotUserError" class="error-text"></div>
+          </div>
+          <button type="button" class="btn btn-primary btn-block" onclick="sendRecoveryVerificationCode()">
+            📩 Enviar Código de Verificación al Correo
+          </button>
+        </div>
+
+        <div id="forgotStep2" style="display:none;">
+          <div style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); padding:10px 12px; border-radius:10px; font-size:0.83rem; margin-bottom:12px; color:#38bdf8; text-align:center;">
+            📩 Código de seguridad enviado a:<br>
+            <strong id="forgotEmailSentTarget" style="color:#ffffff; font-size:0.9rem;">-</strong>
+          </div>
+          <div class="form-group">
+            <label>Código de Verificación (6 dígitos)</label>
+            <input type="text" id="forgotCodeInput" class="form-control text-center" placeholder="••••••" maxlength="6" style="letter-spacing:6px; font-weight:800; font-size:1.2rem;">
+            <div id="forgotCodeError" class="error-text"></div>
+          </div>
+          <div class="form-group">
+            <label>Nueva Contraseña</label>
+            <input type="password" id="forgotNewPassword" class="form-control" placeholder="Ingresa tu nueva contraseña" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>Confirmar Nueva Contraseña</label>
+            <input type="password" id="forgotConfirmPassword" class="form-control" placeholder="Confirma tu nueva contraseña" autocomplete="new-password">
+            <div id="forgotPassError" class="error-text"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Verificar Código y Cambiar Contraseña</button>
+          <button type="button" class="btn btn-tertiary btn-block" onclick="sendRecoveryVerificationCode()" style="font-size:0.8rem; color:#38bdf8; margin-top:6px;">
+            Reenviar Código de Verificación
+          </button>
+        </div>
+
+        <div style="margin-top:14px; text-align:center;">
+          <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">Volver al Inicio de Sesión</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -388,6 +431,10 @@
           <div class="settings-row">
             <span>Usuario Actual</span>
             <strong id="userProfileName">-</strong>
+          </div>
+          <div class="settings-row" style="margin-top:6px;">
+            <span>Correo Registrado</span>
+            <strong id="userProfileEmail" style="color:#38bdf8;">-</strong>
           </div>
           <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="handleLogout()" style="margin-top:10px;">
             Cerrar Sesión / Cambiar de Usuario
