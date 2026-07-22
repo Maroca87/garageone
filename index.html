@@ -323,7 +323,7 @@
             <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;" data-i18n="btnViewReport">Ver / Imprimir Expediente (PDF)</button>
             <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:140px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-              <span>Compartir Texto</span>
+              <span>Compartir Datos</span>
             </button>
             <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:140px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -342,12 +342,30 @@
           </div>
         </div>
 
-        <div class="settings-card">
-          <h3>Conectar con Google Gemini IA (Opcional)</h3>
-          <p class="subtitle" style="margin-bottom:8px;">Ingresa una API Key gratuita de Gemini para obtener respuestas en vivo de Google.</p>
-          <div class="form-group">
-            <input type="password" id="geminiApiKeyInput" class="form-control" placeholder="API Key de Gemini (Opcional)" onchange="saveGeminiKey(this.value)">
+        <div class="settings-card" id="geminiSetupCard">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+            <h3 style="margin:0; font-size:1rem;">Asistente IA - Google Gemini</h3>
+            <span id="geminiStatusBadge" class="badge-subtle badge-yellow">No configurada</span>
           </div>
+          <p class="subtitle" style="margin-bottom:12px; font-size:0.83rem;">Conecta tu API Key gratuita de Google Gemini para obtener diagnósticos mecánicos y respuestas en vivo sobre cualquier falla o ruido de tu vehículo.</p>
+          
+          <div class="form-group" style="margin-bottom:10px;">
+            <label style="font-size:0.8rem; font-weight:600;">API Key de Google Gemini</label>
+            <div style="display:flex; gap:8px;">
+              <input type="password" id="geminiApiKeyInput" class="form-control" placeholder="AIzaSy..." style="flex:1;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleApiKeyVisibility()" title="Ver / Ocultar API Key">👁️</button>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="testAndSaveGeminiKey()" style="flex:1; min-width:160px;">
+              Probar y Guardar Key
+            </button>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-tertiary btn-sm" style="color:#38bdf8; text-decoration:none; font-size:0.8rem;">
+              🔗 Obtener API Key Gratis
+            </a>
+          </div>
+          <div id="geminiKeyStatusMsg" style="margin-top:8px; font-size:0.82rem; font-weight:600; display:none;"></div>
         </div>
 
         <div class="settings-card">
@@ -661,7 +679,7 @@
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="downloadReportPDF()" style="background:#0a84ff; color:#fff; border:none; font-weight:700;">Descargar PDF</button>
           <button class="btn btn-secondary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir</button>
-          <button class="btn btn-secondary btn-sm" onclick="shareReportText()">Compartir Texto</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareReportText()">Compartir Datos</button>
           <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
           <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
         </div>

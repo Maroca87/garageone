@@ -1422,21 +1422,27 @@ async function askAIAssistantDirect(question) {
   if (!question || !responseBox) return;
 
   responseBox.style.display = 'block';
-  responseBox.innerHTML = '<em>Analizando tu consulta con la Inteligencia Mecánica...</em>';
+  responseBox.innerHTML = '<div style="display:flex; align-items:center; gap:8px;"><span>🤖</span> <em>Analizando expediente del vehículo y consultando a la IA...</em></div>';
 
   const veh = getActiveVehicle();
-  const services = veh ? appState.services.filter(s => s.vehicleId === veh.id) : [];
+  const services = veh ? appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
   const fuels = veh ? appState.fuels.filter(f => f.vehicleId === veh.id) : [];
   const reminders = veh ? (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed) : [];
 
+  const recentServicesText = services.slice(0, 5).map(s => `- ${s.date}: ${s.category} (${s.title}) - ${formatCurrency(s.cost)}`).join('\n') || 'Sin servicios previos registrados';
+  const pendingRemindersText = reminders.map(r => `- ${r.title} (${r.category}) ${r.targetKm ? 'Meta: ' + r.targetKm.toLocaleString() + ' KM' : ''}`).join('\n') || 'Sin recordatorios pendientes';
+
   const vehContext = veh 
-    ? `${veh.name} (${veh.year}, ${veh.type}, ${veh.km.toLocaleString()} KM acumulados)` 
-    : 'tu vehículo';
+    ? `${veh.name} (Año ${veh.year}, ${veh.type}, ${veh.km.toLocaleString()} KM en Odómetro, Placa: ${veh.plate || 'N/A'})` 
+    : 'vehículo no seleccionado';
 
   const formatText = (txt) => {
     return txt
+      .replace(/### (.*?)\n/g, '<h4 style="color:#38bdf8; margin:12px 0 4px 0; font-size:0.95rem;">$1</h4>')
+      .replace(/## (.*?)\n/g, '<h3 style="color:#ffffff; margin:14px 0 6px 0; font-size:1.05rem;">$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1); padding:2px 5px; border-radius:4px;">$1</code>')
       .replace(/\n/g, '<br>');
   };
 
@@ -1446,62 +1452,162 @@ async function askAIAssistantDirect(question) {
   if (greetings.some(g => qLower === g || qLower.startsWith(g + ' ') || qLower.endsWith(' ' + g))) {
     setTimeout(() => {
       const userName = currentUser ? currentUser.name.split(' ')[0] : '';
-      responseBox.innerHTML = formatText(`**¡Hola${userName ? ' ' + escapeHtml(userName) : ''}! Soy tu Asistente Mecánico IA de GarageOne.**\n\nEstoy analizando específicamente tu **${escapeHtml(vehContext)}**.\n\nPuedo responder cualquier duda sobre averías, ruidos, testigos del tablero, servicios recomendados o fallas.\n\n¿En qué te puedo asesorar hoy?`);
+      responseBox.innerHTML = formatText(`**¡Hola${userName ? ' ' + escapeHtml(userName) : ''}! Soy tu Asistente Mecánico IA de GarageOne.**\n\nEstoy listo para asesorarte sobre tu **${escapeHtml(vehContext)}**.\n\nPuedo diagnosticar averías, analizar ruidos, revisar testigos del tablero (Check Engine), recomendar repuestos y verificar mantenimientos según tu kilometraje.\n\n¿Qué problema o duda tienes sobre tu auto?`);
       if (input) input.value = '';
     }, 250);
     return;
   }
 
+  // 1. LIVE GOOGLE GEMINI API ENGINE
   if (appState.geminiApiKey) {
     try {
-      const promptText = `Eres un Ingeniero Mecánico Automotriz Experto de GarageOne. Analiza con alta precisión la siguiente consulta para este vehículo específico: ${vehContext}.
-Historial: ${services.length} servicios registrados, ${fuels.length} recargas de combustible, ${reminders.length} recordatorios pendientes.
-Consulta del usuario: "${question}".
-Instrucciones: Estructura tu respuesta en Markdown técnico preciso con los siguientes encabezados:
-1. 🔴/🟡/🟢 **Nivel de Severidad y Riesgo**
-2. 🛠️ **Diagnóstico Técnico y Causas Probables**
-3. 🔍 **Componentes Específicos a Inspeccionar**
-4. ⏱️ **Acción Inmediata Recomendada**`;
+      const promptText = `Eres un Ingeniero Mecánico Automotriz Experto y Asistente Técnico de GarageOne. 
+Analiza con máxima precisión la siguiente consulta para este vehículo:
+- Vehículo: ${vehContext}
+- Historial de Mantenimientos Recientes:\n${recentServicesText}
+- Recordatorios Pendientes:\n${pendingRemindersText}
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        })
-      });
+Consulta del Usuario: "${question}"
 
-      const data = await res.json();
-      if (data.candidates && data.candidates[0].content.parts[0].text) {
-        responseBox.innerHTML = formatText(data.candidates[0].content.parts[0].text);
+Instrucciones de Respuesta:
+Estructura la respuesta de manera ejecutiva, clara y directa usando el siguiente formato Markdown:
+1. 🔴 / 🟡 / 🟢 **Severidad y Nivel de Riesgo** (Explica brevemente el riesgo de circular así).
+2. 🛠️ **Diagnóstico Técnico y Causas Probables** (Lista las 2-3 causas más comunes).
+3. 🔍 **Componentes Específicos a Inspeccionar** (Menciona piezas exactas o pruebas).
+4. 📋 **Relación con Historial / Kilometraje** (Analiza si según sus ${veh ? veh.km.toLocaleString() : 0} KM o historial previo se requiere cambio).
+5. ⏱️ **Acción Inmediata Recomendada** (Qué debe hacer el conductor ahora mismo).`;
+
+      const endpoints = [
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${appState.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${appState.geminiApiKey}`
+      ];
+
+      let resData = null;
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+          });
+          if (res.ok) {
+            resData = await res.json();
+            if (resData.candidates && resData.candidates[0].content.parts[0].text) {
+              break;
+            }
+          }
+        } catch (e) {
+          console.log('Error testing endpoint:', endpoint, e);
+        }
+      }
+
+      if (resData && resData.candidates && resData.candidates[0].content.parts[0].text) {
+        responseBox.innerHTML = formatText(resData.candidates[0].content.parts[0].text);
         if (input) input.value = '';
         return;
       }
     } catch (err) {
-      console.log('Error calling Gemini API:', err);
+      console.error('Error calling Gemini API:', err);
     }
   }
 
+  // 2. ENHANCED OFFLINE EXPERT MECHANICAL ENGINE
   setTimeout(() => {
     let response = '';
 
-    if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo')) {
-      response = `🔴 **Nivel de Severidad: URGENCIA ALTA / MODERADA**\n\n🛠️ **Diagnóstico Técnico (${escapeHtml(vehContext)}):**\n• Sensor de Oxígeno (O2) defectuoso o fuera de rango.\n• Tapa de combustible sin sellar correctamente.\n• Sensor de Flujo de Aire (MAF) sucio.\n• Falla de combustión (misfire) en bobina o bujía.\n\n🔍 **Componentes a Inspeccionar:**\n• Escáner OBD2 (Código P0xxx), bujías, bobinas de encendido y empaque de tapón de gasolina.\n\n⏱️ **Acción Inmediata:**\n• Si la luz parpadea, **detén el vehículo de inmediato**. Si está fija, conduce a baja velocidad al taller.`;
-    } else if (qLower.includes('fuga') || qLower.includes('gota') || qLower.includes('charco')) {
-      response = `🔴 **Nivel de Severidad: ALTA**\n\n🛠️ **Diagnóstico Técnico de Fugas (${escapeHtml(vehContext)}):**\n• Líquido rojo/marrón: Aceite de caja o fluido de dirección asistida.\n• Líquido negro/marrón oscuro: Aceite de motor (retén de cigüeñal o cárter).\n• Líquido verde/rosado/naranja: Refrigerante de motor.\n• Líquido transparente suave: Fluido de frenos.\n\n🔍 **Componentes a Inspeccionar:**\n• Empaque de tapa de válvulas, tapón de cárter, mangueras de radiador y cilindro maestro de frenos.\n\n⏱️ **Acción Inmediata:**\n• Verificar niveles de fluido inmediatamente antes de encender el motor.`;
-    } else if (qLower.includes('calienta') || qLower.includes('temperatura') || qLower.includes('refrigerante') || qLower.includes('humo')) {
-      response = `🔴 **Nivel de Severidad: URGENCIA CRÍTICA**\n\n🛠️ **Diagnóstico de Sobrecalentamiento:**\n• Fuga en manguera de radiador o depósito de expansión.\n• Termostato pegado en posición cerrada.\n• Abanico o electroventilador quemado o con relé dañado.\n• Empaque de cabezote / culata soplado.\n\n🔍 **Componentes a Inspeccionar:**\n• Tapón de radiador, electroventilador, bomba de agua y nivel de coolent.\n\n⏱️ **Acción Inmediata:**\n• Apaga el motor. Espera 30 minutos a que enfríe. **NUNCA abras el radiador caliente.**`;
-    } else if (qLower.includes('freno') || qLower.includes('chillido') || qLower.includes('pedal')) {
-      response = `🟡 **Nivel de Severidad: MODERADA / ALTA**\n\n🛠️ **Diagnóstico del Sistema de Frenado:**\n• Chillido agudo: Desgaste en pastillas alcanzando el sensor metálico.\n• Pedal esponjoso / suave: Aire en líneas hidráulicas o fluido vencido.\n• Vibración al frenar: Discos de freno alabeados / torcidos por shock térmico.\n\n🔍 **Componentes a Inspeccionar:**\n• Espesor de pastillas de freno, rectificado de discos y nivel de líquido DOT4.\n\n⏱️ **Acción Inmediata:**\n• Reemplazar pastillas de freno e inspeccionar discos de inmediato.`;
-    } else if (qLower.includes('transmision') || qLower.includes('caja') || qLower.includes('cambio') || qLower.includes('cloch') || qLower.includes('embrague')) {
-      response = `🟡 **Nivel de Severidad: MODERADA**\n\n🛠️ **Diagnóstico de Transmisión / Embrague:**\n• Golpe al realizar cambios: Desgaste de soportes de caja o fluido ATF degradado.\n• Auto se patina al acelerar: Disco de embrague / cloch gastado.\n\n🔍 **Componentes a Inspeccionar:**\n• Nivel de aceite ATF / valvulina, bomba auxiliar de embrague y soportes.\n\n⏱️ **Acción Inmediata:**\n• Revisar nivel de fluido de transmisión.`;
+    if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo') || qLower.includes('obd')) {
+      response = `🔴 **Nivel de Severidad: URGENCIA MODERADA / ALTA**\n\n🛠️ **Diagnóstico Técnico para ${escapeHtml(vehContext)}:**\n• Sensor de Oxígeno (O2) defectuoso o descalibrado.\n• Tapón de combustible mal cerrado (fuga del sistema EVAP).\n• Sensor de Flujo de Aire (MAF) sucio o falla en cuerpo de aceleración.\n• Misfire (falla de encendido en cilindro) por bujía o bobina degradada.\n\n🔍 **Componentes a Inspeccionar:**\n• Escáner OBD2 (Verificar código P0300, P0420 o P0135).\n• Juego de bujías e inspección de cables/bobinas.\n\n📋 **Análisis por Kilometraje (${veh ? veh.km.toLocaleString() : 0} KM):**\n• Si no has cambiado bujías en los últimos 30.000 KM, es la causa #1 de Check Engine.\n\n⏱️ **Acción Recomendada:**\n• Si la luz es fija, conduce suavemente al taller. Si la luz **parpadea**, apaga el motor de inmediato.`;
+    } else if (qLower.includes('fuga') || qLower.includes('gota') || qLower.includes('charco') || qLower.includes('mancha')) {
+      response = `🔴 **Nivel de Severidad: ALTA**\n\n🛠️ **Diagnóstico Técnico de Fluidos (${escapeHtml(vehContext)}):**\n• **Líquido Marrón/Negro:** Aceite de motor (retén de cigüeñal, cárter o filtro flojo).\n• **Líquido Rojo/Transparente Aceitoso:** Aceite de caja automática (ATF) o dirección hidráulica.\n• **Líquido Verde/Rosa/Azul:** Coolant / Refrigerante (radiador o manguera perforada).\n• **Líquido Transparente Amarillento Olor Fuerte:** Fluido de frenos (URGENCIA).\n\n🔍 **Componentes a Inspeccionar:**\n• Empaque de tapa de válvulas, tapón de cárter y depósito de frenos.\n\n⏱️ **Acción Inmediata:**\n• Mide varilla de aceite y nivel de coolant antes de encender el motor.`;
+    } else if (qLower.includes('calienta') || qLower.includes('temperatura') || qLower.includes('refrigerante') || qLower.includes('vapor') || qLower.includes('radiador')) {
+      response = `🔴 **Nivel de Severidad: CRÍTICA (RIESGO DE DAÑO GRAVE)**\n\n🛠️ **Diagnóstico de Sobrecalentamiento (${escapeHtml(vehContext)}):**\n• Termostato trabado en posición cerrada.\n• Electroventilador quemado, fusible soplado o termoswitch fallado.\n• Fuga de refrigerante en manguera principal o tapón de radiador.\n• Empaque de cabezote (culata) soplado.\n\n🔍 **Componentes a Inspeccionar:**\n• Nivel de coolant en tanque de expansión, bomba de agua y abanico radiador.\n\n⏱️ **Acción Inmediata:**\n• **Apaga el motor de inmediato.** Espera 30 min. **NUNCA abras la tapa del radiador caliente.**`;
+    } else if (qLower.includes('freno') || qLower.includes('chillido') || qLower.includes('pedal') || qLower.includes('vibracion al frenar')) {
+      response = `🟡 **Nivel de Severidad: MODERADA / ALTA**\n\n🛠️ **Diagnóstico de Frenado:**\n• **Chillido Agudo Metal con Metal:** Pastillas al límite de desgaste.\n• **Pedal Esponjoso / Se va al fondo:** Aire en líneas o líquido DOT4 degradado por humedad.\n• **Vibración en Pedal/Volante al frenar:** Discos alabeados (torcidos por shock térmico).\n\n🔍 **Componentes a Inspeccionar:**\n• Grosor de pastillas, espesor de discos y cilindro maestro.\n\n⏱️ **Acción Inmediata:**\n• Inspeccionar espesor de pastillas de freno antes de viajes largos.`;
+    } else if (qLower.includes('ruido') || qLower.includes('golpe') || qLower.includes('crujido') || qLower.includes('volante') || qLower.includes('vibra')) {
+      response = `🟡 **Nivel de Severidad: MODERADA**\n\n🛠️ **Diagnóstico de Suspensión y Dirección:**\n• **Golpe seco al pasar huecos:** Bujes de meseta, bocinas o compensadores gastados.\n• **Vibración a más de 80 km/h:** Desbalanceo de ruedas o rin torcido.\n• **Crujido al girar todo el volante:** Punta de eje / triseta / junta homocinética.\n\n🔍 **Componentes a Inspeccionar:**\n• Terminales de dirección, rótulas, balanceo de llantas y bujes.\n\n⏱️ **Acción Inmediata:**\n• Realizar alineación y balanceo en centro de llantas.`;
+    } else if (qLower.includes('bateria') || qLower.includes('arranca') || qLower.includes('start') || qLower.includes('starter') || qLower.includes('alternador')) {
+      response = `🟡 **Nivel de Severidad: MODERADA**\n\n🛠️ **Diagnóstico del Sistema Eléctrico:**\n• **Sonido 'Tak-tak-tak' al encender:** Batería descargada o bornes sulfatados.\n• **Tablero tenue y testigo de batería en rojo:** Alternador no está cargando.\n• **Motor gira muy lento:** Batería cumplió su vida útil (2-3 años promedio).\n\n🔍 **Componentes a Inspeccionar:**\n• Voltaje de batería en reposo (>12.6V) y alternador cargando (13.8V - 14.4V).\n\n⏱️ **Acción Inmediata:**\n• Limpiar bornes con agua/bicarbonato o medir voltaje con multímetro.`;
+    } else if (qLower.includes('humo') || qLower.includes('escape')) {
+      response = `🟡 **Nivel de Severidad: MODERADA / ALTA**\n\n🛠️ **Diagnóstico de Humo en Escape:**\n• **Humo Azulado:** Aceite entrando a la cámara (sellos de válvula o anillos gastados).\n• **Humo Blanco Denso:** Refrigerante ingresando al motor (empaque de culata).\n• **Humo Negro:** Mezcla rica (exceso de gasolina / filtro de aire muy sucio / inyector goteando).\n\n🔍 **Componentes a Inspeccionar:**\n• Compresión de cilindros, filtro de aire y estado de inyectores.\n\n⏱️ **Acción Inmediata:**\n• Monitorear consumo de aceite y coolant diariamente.`;
     } else {
-      response = `🟢 **Nivel de Severidad: PREVENTIVA / INFORMATIVA**\n\n🛠️ **Diagnóstico Técnico para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n🔍 **Recomendaciones:**\n• Para un vehículo con ${veh.km.toLocaleString()} KM, realiza revisión periódica de fluidos, fajas de distribución y estado de batería.\n• Mantén actualizado el historial en la pestaña **Servicios** de GarageOne.`;
+      response = `🟢 **Nivel de Severidad: PREVENTIVA / INFORMATIVA**\n\n🛠️ **Asesoría Técnica Experta para ${escapeHtml(vehContext)}:**\n\nAcerca de *"<sup>${escapeHtml(question)}</sup>"*:\n\n🔍 **Recomendaciones de Mantenimiento:**\n• Para un vehículo con **${veh ? veh.km.toLocaleString() : 0} KM**, asegúrate de realizar cambio de aceite y filtro cada 5.000 KM (mineral) o 10.000 KM (sintético).\n• Inspecciona fajas de distribución y accesorios cada 40.000 KM.\n• Mantén al día tu bitácora registrando cada servicio en la pestaña **Servicios** de GarageOne.`;
     }
 
     responseBox.innerHTML = formatText(response);
     if (input) input.value = '';
   }, 300);
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('geminiApiKeyInput');
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function testAndSaveGeminiKey() {
+  const input = document.getElementById('geminiApiKeyInput');
+  const msgBox = document.getElementById('geminiKeyStatusMsg');
+  const badge = document.getElementById('geminiStatusBadge');
+
+  const key = input ? input.value.trim() : '';
+
+  if (!key) {
+    appState.geminiApiKey = '';
+    saveState();
+    if (badge) {
+      badge.className = 'badge-subtle badge-yellow';
+      badge.textContent = 'No configurada';
+    }
+    if (msgBox) {
+      msgBox.style.display = 'block';
+      msgBox.style.color = '#ffd60a';
+      msgBox.textContent = 'API Key removida.';
+    }
+    return;
+  }
+
+  if (msgBox) {
+    msgBox.style.display = 'block';
+    msgBox.style.color = '#38bdf8';
+    msgBox.textContent = 'Probando conexión con Google Gemini API...';
+  }
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'Prueba de conexion de GarageOne' }] }]
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.candidates) {
+      appState.geminiApiKey = key;
+      saveState();
+      if (badge) {
+        badge.className = 'badge-subtle badge-green';
+        badge.textContent = 'Conectada ✓';
+      }
+      if (msgBox) {
+        msgBox.style.color = '#30d158';
+        msgBox.textContent = '¡Conexión exitosa! Tu API Key de Google Gemini IA está activa y funcionando.';
+      }
+    } else {
+      const errDetail = data.error ? data.error.message : 'API Key no válida o respuesta no permitida por Google.';
+      if (msgBox) {
+        msgBox.style.color = '#ff453a';
+        msgBox.textContent = `❌ Error: ${errDetail}`;
+      }
+    }
+  } catch (err) {
+    if (msgBox) {
+      msgBox.style.color = '#ff453a';
+      msgBox.textContent = '❌ Error de red al conectar con Google Gemini.';
+    }
+  }
 }
 
 function saveGeminiKey(key) {
@@ -1802,8 +1908,17 @@ function renderUserSettings() {
   const settingLang = document.getElementById('settingLanguage');
   if (settingLang) settingLang.value = appState.language || 'es';
 
-  if (document.getElementById('geminiApiKeyInput')) {
-    document.getElementById('geminiApiKeyInput').value = appState.geminiApiKey || '';
+  const geminiInput = document.getElementById('geminiApiKeyInput');
+  const geminiBadge = document.getElementById('geminiStatusBadge');
+  if (geminiInput) geminiInput.value = appState.geminiApiKey || '';
+  if (geminiBadge) {
+    if (appState.geminiApiKey) {
+      geminiBadge.className = 'badge-subtle badge-green';
+      geminiBadge.textContent = 'Conectada ✓';
+    } else {
+      geminiBadge.className = 'badge-subtle badge-yellow';
+      geminiBadge.textContent = 'No configurada';
+    }
   }
 
   const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
