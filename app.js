@@ -132,7 +132,6 @@ function showLoginForm() {
   const formRegister = document.getElementById('formRegister');
   const authTitle = document.getElementById('authTitle');
   const authSubtitle = document.getElementById('authSubtitle');
-  const btnFaceId = document.getElementById('btnFaceIdLogin');
 
   if (formLogin) formLogin.style.display = 'block';
   if (formRegister) formRegister.style.display = 'none';
@@ -144,10 +143,6 @@ function showLoginForm() {
     if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña o PIN para desbloquear';
   } else {
     if (authSubtitle) authSubtitle.textContent = 'Ingresa tu contraseña para acceder';
-  }
-
-  if (btnFaceId) {
-    btnFaceId.style.display = (currentUser && currentUser.faceIdEnabled) ? 'inline-flex' : 'none';
   }
 }
 
@@ -357,84 +352,6 @@ function saveNewPin() {
   }
 }
 
-async function toggleFaceIdOption(enabled) {
-  const msgEl = document.getElementById('faceIdMessage');
-  if (msgEl) msgEl.style.display = 'none';
-
-  if (!currentUser) return;
-
-  if (enabled) {
-    try {
-      if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
-        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        currentUser.faceIdEnabled = true;
-        saveUser(currentUser);
-        if (msgEl) {
-          msgEl.style.color = '#30d158';
-          msgEl.textContent = available ? '¡Face ID / Biometría activado exitosamente!' : 'Face ID / Biometría activado para la app.';
-          msgEl.style.display = 'block';
-        }
-      } else {
-        currentUser.faceIdEnabled = true;
-        saveUser(currentUser);
-        if (msgEl) {
-          msgEl.style.color = '#30d158';
-          msgEl.textContent = 'Face ID / Biometría activado para la app.';
-          msgEl.style.display = 'block';
-        }
-      }
-    } catch (e) {
-      currentUser.faceIdEnabled = true;
-      saveUser(currentUser);
-      if (msgEl) {
-        msgEl.style.color = '#30d158';
-        msgEl.textContent = 'Face ID / Biometría activado.';
-        msgEl.style.display = 'block';
-      }
-    }
-  } else {
-    currentUser.faceIdEnabled = false;
-    saveUser(currentUser);
-    if (msgEl) {
-      msgEl.style.color = 'var(--text-secondary)';
-      msgEl.textContent = 'Face ID / Biometría desactivado.';
-      msgEl.style.display = 'block';
-    }
-  }
-  renderUserSettings();
-}
-
-async function handleBiometricLogin() {
-  const loginError = document.getElementById('loginError');
-  if (loginError) loginError.style.display = 'none';
-
-  if (!currentUser || !currentUser.faceIdEnabled) return;
-
-  if (window.PublicKeyCredential && window.isSecureContext) {
-    try {
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-      
-      const options = {
-        publicKey: {
-          challenge: challenge,
-          timeout: 60000,
-          userVerification: "preferred"
-        }
-      };
-      
-      await navigator.credentials.get({ publicKey: options.publicKey });
-    } catch (e) {
-      console.log('Biometrics auth completed/handled:', e);
-    }
-  }
-
-  isAuthenticated = true;
-  failedLoginAttempts = 0;
-  lockoutUntil = 0;
-  checkAuth();
-}
-
 function handleLogout() {
   isAuthenticated = false;
   checkAuth();
@@ -503,15 +420,9 @@ function switchTab(tabId, el) {
   const btnRem = document.getElementById('btnHeaderReminders');
   const btnSet = document.getElementById('btnHeaderSettings');
   if (btnRem) {
-    if (tabId === 'tabGarage') {
-      btnRem.style.display = 'flex';
-      btnRem.classList.remove('active');
-    } else if (tabId === 'tabReminders') {
-      btnRem.style.display = 'flex';
-      btnRem.classList.add('active');
-    } else {
-      btnRem.style.display = 'none';
-    }
+    btnRem.style.display = 'flex';
+    if (tabId === 'tabReminders') btnRem.classList.add('active');
+    else btnRem.classList.remove('active');
   }
   if (btnSet) {
     btnSet.style.display = 'flex';
@@ -839,20 +750,28 @@ function renderRemindersListHelper(remindersList, veh) {
     const cardClass = r.completed ? '' : isUrgent ? 'urgent' : isUpcoming ? 'upcoming' : '';
 
     return `
-      <div class="user-reminder-card ${cardClass}" onclick="openReminderModal('${r.id}')">
-        <div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(r.title)}</span>
-            ${statusBadge}
-          </div>
-          <div class="reminder-meta">${escapeHtml(detailsText.join(' • ')) || 'Configurado por usuario'}${repeatText}</div>
-          ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
-          <button class="btn btn-secondary btn-sm" onclick="toggleReminderComplete('${r.id}')" style="padding:4px 8px;" title="Marcar como completado">
-            ${r.completed ? 'Desmarcar' : '✓ Listo'}
+      <div class="swipe-container">
+        <div class="swipe-action-bg">
+          <button class="swipe-action-btn" onclick="deleteReminderDirect('${r.id}')">
+            ${SVG_ICONS.trash}
+            <span>Eliminar</span>
           </button>
-          <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:#ff453a; padding:4px 6px;" title="Eliminar recordatorio">✕</button>
+        </div>
+        <div class="swipe-content user-reminder-card ${cardClass}" onclick="openReminderModal('${r.id}')">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(r.title)}</span>
+              ${statusBadge}
+            </div>
+            <div class="reminder-meta">${escapeHtml(detailsText.join(' • ')) || 'Configurado por usuario'}${repeatText}</div>
+            ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
+            <button class="btn btn-secondary btn-sm" onclick="toggleReminderComplete('${r.id}')" style="padding:4px 8px;" title="Marcar como completado">
+              ${r.completed ? 'Desmarcar' : '✓ Listo'}
+            </button>
+            <button class="btn btn-tertiary btn-sm" onclick="deleteReminderDirect('${r.id}')" style="color:#ff453a; padding:4px 6px;" title="Eliminar recordatorio">✕</button>
+          </div>
         </div>
       </div>
     `;
@@ -1747,16 +1666,6 @@ function renderUserSettings() {
     if (pinContainer) {
       pinContainer.style.display = currentUser.pinEnabled ? 'block' : 'none';
     }
-
-    const toggleFaceId = document.getElementById('toggleFaceIdSetting');
-    const faceIdStatusText = document.getElementById('faceIdStatusText');
-
-    if (toggleFaceId) toggleFaceId.checked = !!currentUser.faceIdEnabled;
-    if (faceIdStatusText) {
-      faceIdStatusText.textContent = currentUser.faceIdEnabled
-        ? 'Face ID / Biometría activado'
-        : 'Desbloquea la app con rostro o huella dactilar';
-    }
   }
 
   const settingCurr = document.getElementById('settingCurrency');
@@ -1790,6 +1699,65 @@ function renderReports() {
   document.getElementById('totalFuelSpend').textContent = formatCurrency(totalFuelSpend);
 
   renderCategoryDonutChart(services);
+  renderMonthlyExpensesChart(services, fuels);
+}
+
+function renderMonthlyExpensesChart(services, fuels) {
+  const chartContainer = document.getElementById('monthlyExpensesChart');
+  if (!chartContainer) return;
+
+  if (services.length === 0 && fuels.length === 0) {
+    chartContainer.innerHTML = '<p class="subtitle">Registra mantenimientos o gasolina para ver desglose mensual.</p>';
+    return;
+  }
+
+  const monthlyTotals = {};
+
+  services.forEach(s => {
+    if (!s.date) return;
+    const monthKey = s.date.substring(0, 7); // "YYYY-MM"
+    monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + s.cost;
+  });
+
+  fuels.forEach(f => {
+    if (!f.date) return;
+    const monthKey = f.date.substring(0, 7); // "YYYY-MM"
+    monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + f.cost;
+  });
+
+  const sortedMonths = Object.keys(monthlyTotals).sort((a, b) => b.localeCompare(a));
+
+  if (sortedMonths.length === 0) {
+    chartContainer.innerHTML = '<p class="subtitle">Sin datos de fecha válidos para desglosar.</p>';
+    return;
+  }
+
+  const maxMonthSpend = Math.max(...Object.values(monthlyTotals));
+  const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  let html = `<div style="display:flex; flex-direction:column; gap:10px; width:100%;">`;
+
+  sortedMonths.forEach(mKey => {
+    const [year, monthNum] = mKey.split('-');
+    const monthName = monthNamesEs[parseInt(monthNum, 10) - 1] || mKey;
+    const total = monthlyTotals[mKey];
+    const percent = maxMonthSpend > 0 ? Math.round((total / maxMonthSpend) * 100) : 0;
+
+    html += `
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
+          <span><strong>${monthName} ${year}</strong></span>
+          <span style="font-weight:700; color:#30d158;">${formatCurrency(total)}</span>
+        </div>
+        <div style="width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+          <div style="width:${percent}%; height:100%; background:linear-gradient(90deg, #0a84ff, #30d158); border-radius:4px;"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  chartContainer.innerHTML = html;
 }
 
 function renderCategoryDonutChart(services) {

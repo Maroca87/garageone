@@ -3,6 +3,8 @@
    ========================================================================== */
 
 :root {
+  color-scheme: dark only;
+  forced-color-adjust: none;
   --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   
   --bg-primary: #000000;
@@ -36,7 +38,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Force icons and SVGs to preserve explicit colors across OS themes */
+svg, img, .log-icon-badge, .header-icon-btn, .nav-icon, .auth-symbol, .header-logo-img {
+  forced-color-adjust: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 html {
+  color-scheme: dark only;
   font-size: 16px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
