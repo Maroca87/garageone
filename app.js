@@ -78,13 +78,18 @@ let isAuthenticated = false;
 let failedLoginAttempts = 0;
 let lockoutUntil = 0;
 
-// Currency Formatter
 function formatCurrency(amount) {
+  const num = Number(amount || 0);
   const curr = appState.currency || 'CRC';
-  if (curr === 'CRC') return '₡' + Math.round(amount).toLocaleString('es-CR');
-  if (curr === 'USD') return '$' + amount.toFixed(2);
-  if (curr === 'EUR') return '€' + amount.toFixed(2);
-  return '₡' + Math.round(amount).toLocaleString('es-CR');
+  const hasDecimals = num % 1 !== 0;
+  const opts = hasDecimals
+    ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+    : { maximumFractionDigits: 2 };
+
+  if (curr === 'CRC') return '₡' + num.toLocaleString('es-CR', opts);
+  if (curr === 'USD') return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (curr === 'EUR') return '€' + num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '₡' + num.toLocaleString('es-CR', opts);
 }
 
 // App Initialization
