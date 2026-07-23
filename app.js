@@ -3,8 +3,8 @@
    ========================================================================== */
 
 const STORAGE_KEY = 'AUTOCARE_DATA_V14';
-const USER_KEY = 'AUTOCARE_USER_V17';
-const USERS_KEY = 'AUTOCARE_USERS_V17';
+const USER_KEY = 'AUTOCARE_USER_V19';
+const USERS_KEY = 'AUTOCARE_USERS_V19';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -167,30 +167,33 @@ async function saveUsersList(usersList) {
   }
 }
 
-// Centralized Cloud User Authentication Server
-const CLOUD_AUTH_KEY = 'garageone_central_auth_v18_prod';
+// Centralized Cloud User Authentication Server (CORS JSON REST Engine v19)
+const CLOUD_AUTH_BIN = 'https://api.jsonbin.io/v3/b/65c8a9a0dc74654018a45210';
 
 async function fetchCloudAuthUsers() {
+  const users = [];
   try {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 4500) : null;
-    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_AUTH_KEY}/users`, {
+    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/garageone_auth_v19/users`, {
       signal: controller ? controller.signal : undefined
     });
     if (timeoutId) clearTimeout(timeoutId);
-    if (!res.ok) return [];
-    const text = await res.text();
-    if (!text) return [];
-    let parsed = text;
-    try { parsed = JSON.parse(text); } catch (e) {}
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch (e) {}
+    if (res.ok) {
+      const text = await res.text();
+      let parsed = text;
+      try { parsed = JSON.parse(text); } catch (e) {}
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (e) {}
+      }
+      if (Array.isArray(parsed)) {
+        users.push(...parsed);
+      }
     }
-    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.warn('Central Auth Server fetch fallback:', e);
-    return [];
+    console.warn('Cloud Auth fetch fallback:', e);
   }
+  return users;
 }
 
 async function registerCloudAuthUser(userObj) {
@@ -217,13 +220,13 @@ async function registerCloudAuthUser(userObj) {
       createdAt: u.createdAt || new Date().toISOString()
     }));
 
-    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_AUTH_KEY}/users`, {
+    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/garageone_auth_v19/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'value=' + encodeURIComponent(JSON.stringify(cleanList))
     });
   } catch (e) {
-    console.warn('Central Auth Server register error:', e);
+    console.warn('Cloud Auth Register Error:', e);
   }
 }
 
@@ -608,7 +611,7 @@ async function handleRegister(e) {
   };
 
   await saveUser(newUser);
-  registerCloudAuthUser(newUser);
+  await registerCloudAuthUser(newUser);
 
   isAuthenticated = true;
   failedLoginAttempts = 0;
@@ -885,18 +888,12 @@ async function initAsyncStorage() {
   }
 
   try {
-    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16'].forEach(k => {
+    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16', 'AUTOCARE_USER_V17', 'AUTOCARE_USERS_V17', 'AUTOCARE_USER_V18', 'AUTOCARE_USERS_V18'].forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
     });
     await syncUsersDatabase();
   } catch (e) {
     console.warn('Error syncing users database on startup:', e);
-  }
-
-  const hasSyncToken = await checkUrlSyncToken();
-  if (hasSyncToken) {
-    checkAuth();
-    return;
   }
 
   currentUser = loadUser();
