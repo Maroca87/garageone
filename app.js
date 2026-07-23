@@ -1449,7 +1449,7 @@ function renderUserReminders() {
   const veh = getActiveVehicle();
   if (!veh) { container.innerHTML = ''; return; }
 
-  const reminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
+  const reminders = (appState.reminders || []).filter(r => (!r.vehicleId || r.vehicleId === veh.id) && !r.completed);
   container.innerHTML = renderRemindersListHelper(reminders, veh);
 }
 
@@ -1542,8 +1542,9 @@ function toggleReminderComplete(remId) {
   if (rem) {
     rem.completed = !rem.completed;
 
-    // Recurrence logic: if marked completed and repeat is set, spawn next reminder
-    if (rem.completed && rem.repeat && rem.repeat !== 'none') {
+    // Recurrence logic: if marked completed and repeat is set, spawn next reminder (only once per recurrence)
+    if (rem.completed && rem.repeat && rem.repeat !== 'none' && !rem.hasSpawnedNext) {
+      rem.hasSpawnedNext = true;
       const nextRem = {
         id: 'rem_' + Date.now(),
         vehicleId: rem.vehicleId,
@@ -1569,7 +1570,16 @@ function toggleReminderComplete(remId) {
         nextRem.targetDate = d.toISOString().split('T')[0];
       }
 
+      rem.spawnedNextId = nextRem.id;
       appState.reminders.push(nextRem);
+    } else if (!rem.completed && rem.spawnedNextId) {
+      // If user unchecks a completed reminder, remove the auto-spawned next reminder if it is still pending
+      const nextIdx = (appState.reminders || []).findIndex(r => r.id === rem.spawnedNextId && !r.completed);
+      if (nextIdx !== -1) {
+        appState.reminders.splice(nextIdx, 1);
+      }
+      delete rem.hasSpawnedNext;
+      delete rem.spawnedNextId;
     }
 
     saveState();
