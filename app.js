@@ -167,6 +167,57 @@ async function saveUsersList(usersList) {
   }
 }
 
+const CLOUD_SYNC_URL = 'https://keyvalue.immanuel.co/api/KeyVal/';
+const CLOUD_SYNC_KEY = 'garageone_app_users_v16_prod';
+
+async function fetchCloudUsers() {
+  try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
+    const res = await fetch(`${CLOUD_SYNC_URL}GetValue/${CLOUD_SYNC_KEY}/all_users`, { 
+      signal: controller ? controller.signal : undefined 
+    });
+    if (timeoutId) clearTimeout(timeoutId);
+    if (!res.ok) return [];
+    const text = await res.text();
+    if (!text) return [];
+    let parsed = text;
+    if (typeof text === 'string') {
+      try { parsed = JSON.parse(text); } catch (e) {}
+    }
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (e) {}
+    }
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Cloud fetch users error/timeout:', e);
+    return [];
+  }
+}
+
+async function pushCloudUsers(usersList) {
+  try {
+    if (!Array.isArray(usersList) || usersList.length === 0) return;
+    const cleanList = usersList.map(u => ({
+      id: u.id || ('usr_' + Date.now()),
+      username: u.username,
+      name: u.name || u.username,
+      email: u.email || '',
+      password: u.password,
+      pinEnabled: !!u.pinEnabled,
+      pin: u.pin || '',
+      createdAt: u.createdAt || new Date().toISOString()
+    }));
+    await fetch(`${CLOUD_SYNC_URL}UpdateValue/${CLOUD_SYNC_KEY}/all_users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'value=' + encodeURIComponent(JSON.stringify(cleanList))
+    });
+  } catch (e) {
+    console.warn('Cloud push users error:', e);
+  }
+}
+
 async function syncUsersDatabase() {
   try {
     const idbUsers = (await loadUsersListFromIDB()) || [];
@@ -179,8 +230,11 @@ async function syncUsersDatabase() {
 
     const activeUser = currentUser || loadUser();
 
+    // Fetch users from Cloud Database (for iOS Safari PWA Isolated Sandbox Sync)
+    const cloudUsers = await fetchCloudUsers();
+
     const map = new Map();
-    [...idbUsers, ...lsUsers, activeUser].forEach(u => {
+    [...idbUsers, ...lsUsers, ...cloudUsers, activeUser].forEach(u => {
       if (!u || (!u.username && !u.email)) return;
       const key = (u.username || u.email).trim().toLowerCase();
       if (!map.has(key)) {
@@ -208,6 +262,12 @@ async function syncUsersDatabase() {
         tx.objectStore(IDB_STORE).put(merged, 'usersList');
       }
     } catch (e) {}
+
+    // Push merged users list to cloud database
+    if (merged.length > 0) {
+      pushCloudUsers(merged);
+    }
+
     return merged;
   } catch (e) {
     console.warn('Error in syncUsersDatabase:', e);
