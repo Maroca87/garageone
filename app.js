@@ -167,38 +167,46 @@ async function saveUsersList(usersList) {
   }
 }
 
-const CLOUD_SYNC_KEY = 'garageone_app_users_v17_prod';
+// Centralized Cloud User Authentication Server
+const CLOUD_AUTH_KEY = 'garageone_central_auth_v18_prod';
 
-async function fetchCloudUsers() {
-  const users = [];
+async function fetchCloudAuthUsers() {
   try {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 4500) : null;
-    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_SYNC_KEY}/users`, { 
-      signal: controller ? controller.signal : undefined 
+    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_AUTH_KEY}/users`, {
+      signal: controller ? controller.signal : undefined
     });
     if (timeoutId) clearTimeout(timeoutId);
-    if (res.ok) {
-      const text = await res.text();
-      let parsed = text;
-      try { parsed = JSON.parse(text); } catch (e) {}
-      if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch (e) {}
-      }
-      if (Array.isArray(parsed)) {
-        users.push(...parsed);
-      }
+    if (!res.ok) return [];
+    const text = await res.text();
+    if (!text) return [];
+    let parsed = text;
+    try { parsed = JSON.parse(text); } catch (e) {}
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (e) {}
     }
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.warn('Cloud fetch users fallback A:', e);
+    console.warn('Central Auth Server fetch fallback:', e);
+    return [];
   }
-  return users;
 }
 
-async function pushCloudUsers(usersList) {
+async function registerCloudAuthUser(userObj) {
   try {
-    if (!Array.isArray(usersList) || usersList.length === 0) return;
-    const cleanList = usersList.map(u => ({
+    const list = await fetchCloudAuthUsers();
+    const idx = list.findIndex(u => 
+      (u.username && userObj.username && u.username.toLowerCase() === userObj.username.toLowerCase()) ||
+      (u.email && userObj.email && u.email.toLowerCase() === userObj.email.toLowerCase())
+    );
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...userObj };
+    } else {
+      list.push(userObj);
+    }
+    
+    const cleanList = list.map(u => ({
       id: u.id || ('usr_' + Date.now()),
       username: u.username,
       name: u.name || u.username,
@@ -208,36 +216,14 @@ async function pushCloudUsers(usersList) {
       pin: u.pin || '',
       createdAt: u.createdAt || new Date().toISOString()
     }));
-    const jsonStr = JSON.stringify(cleanList);
 
-    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_SYNC_KEY}/users`, {
+    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_AUTH_KEY}/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'value=' + encodeURIComponent(jsonStr)
+      body: 'value=' + encodeURIComponent(JSON.stringify(cleanList))
     });
   } catch (e) {
-    console.warn('Cloud push users error:', e);
-  }
-}
-
-async function manualSyncUserDatabase() {
-  const loginError = document.getElementById('loginError');
-  if (loginError) {
-    loginError.style.color = '#38bdf8';
-    loginError.textContent = 'Conectando a la Base de Datos en la Nube...';
-    loginError.style.display = 'block';
-  }
-
-  const list = await syncUsersDatabase();
-
-  if (loginError) {
-    if (list && list.length > 0) {
-      loginError.style.color = '#30d158';
-      loginError.textContent = `¡Sincronización Exitosa! ${list.length} usuario(s) disponible(s). Puedes ingresar.`;
-    } else {
-      loginError.style.color = '#ff9f0a';
-      loginError.textContent = 'No se encontraron usuarios en la nube. Crea una cuenta nueva.';
-    }
+    console.warn('Central Auth Server register error:', e);
   }
 }
 
@@ -622,6 +608,7 @@ async function handleRegister(e) {
   };
 
   await saveUser(newUser);
+  registerCloudAuthUser(newUser);
 
   isAuthenticated = true;
   failedLoginAttempts = 0;
@@ -656,19 +643,32 @@ async function handleLogin(e) {
     return;
   }
 
-  const usersList = await syncUsersDatabase();
-
+  let usersList = getUsersList();
   let targetUser = usersList.find(u => 
     (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
     (u.email && u.email.toLowerCase() === usernameVal.toLowerCase())
   );
 
-  if (!targetUser && currentUser && (
-    (currentUser.username && currentUser.username.toLowerCase() === usernameVal.toLowerCase()) ||
-    (currentUser.email && currentUser.email.toLowerCase() === usernameVal.toLowerCase())
-  )) {
-    targetUser = currentUser;
+  // If user is not cached locally, authenticate against Central Auth Server!
+  if (!targetUser) {
+    if (loginError) {
+      loginError.style.color = '#38bdf8';
+      loginError.textContent = 'Autenticando credenciales en el Servidor de Usuarios...';
+      loginError.style.display = 'block';
+    }
+
+    const cloudUsers = await fetchCloudAuthUsers();
+    if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+      await saveUsersList(cloudUsers);
+      usersList = getUsersList();
+      targetUser = usersList.find(u => 
+        (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
+        (u.email && u.email.toLowerCase() === usernameVal.toLowerCase())
+      );
+    }
   }
+
+  if (loginError) loginError.style.color = '#ff453a';
 
   if (!targetUser) {
     failedLoginAttempts++;
@@ -891,6 +891,12 @@ async function initAsyncStorage() {
     await syncUsersDatabase();
   } catch (e) {
     console.warn('Error syncing users database on startup:', e);
+  }
+
+  const hasSyncToken = await checkUrlSyncToken();
+  if (hasSyncToken) {
+    checkAuth();
+    return;
   }
 
   currentUser = loadUser();
