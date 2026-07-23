@@ -379,14 +379,11 @@ function loadUser() {
         } catch (e) {}
       }
     }
-    // Fallback 2: check getUsersList for any existing user account (prioritize 'marcos')
+    // Fallback 2: check getUsersList for any existing user account
     const users = getUsersList();
     if (users.length > 0) {
-      const marcosUser = users.find(usr => (usr.username && usr.username.toLowerCase() === 'marcos') || (usr.name && usr.name.toLowerCase() === 'marcos')) || users[0];
-      if (marcosUser) {
-        localStorage.setItem(USER_KEY, JSON.stringify(marcosUser));
-        return marcosUser;
-      }
+      localStorage.setItem(USER_KEY, JSON.stringify(users[0]));
+      return users[0];
     }
     return null;
   } catch (e) { return null; }
@@ -427,7 +424,7 @@ function showLoginForm() {
   if (formRegister) formRegister.style.display = 'none';
   if (formForgotPass) formForgotPass.style.display = 'none';
 
-  const defaultUser = currentUser ? (currentUser.username || currentUser.name || '') : 'Marcos';
+  const defaultUser = currentUser ? (currentUser.username || currentUser.name || '') : '';
   if (loginUser && !loginUser.value) {
     loginUser.value = defaultUser;
   }
@@ -738,17 +735,11 @@ async function handleLogin(e) {
   const inputVal = pinInput ? String(pinInput.value).trim() : '';
 
   if (!usernameVal) {
-    const users = getUsersList();
-    const marcosUser = users.find(u => (u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos'));
-    if (marcosUser) {
-      usernameVal = marcosUser.username || 'Marcos';
-    } else {
-      if (loginError) {
-        loginError.textContent = 'Por favor ingresa tu nombre de usuario o correo.';
-        loginError.style.display = 'block';
-      }
-      return;
+    if (loginError) {
+      loginError.textContent = 'Por favor ingresa tu nombre de usuario o correo.';
+      loginError.style.display = 'block';
     }
+    return;
   }
 
   await syncUsersDatabase();
@@ -1009,11 +1000,43 @@ async function initAsyncStorage() {
 
   try {
     await syncUsersDatabase();
+    let usersList = getUsersList();
+    if (usersList.some(u => (u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos'))) {
+      usersList = usersList.filter(u => !((u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos')));
+      await saveUsersList(usersList);
+    }
   } catch (e) {
     console.warn('Error syncing users database on startup:', e);
   }
 
   currentUser = loadUser();
+  if (currentUser && ((currentUser.username && currentUser.username.toLowerCase() === 'marcos') || (currentUser.name && currentUser.name.toLowerCase() === 'marcos'))) {
+    currentUser = null;
+    localStorage.removeItem(USER_KEY);
+    for (let v = 1; v <= 30; v++) {
+      localStorage.removeItem(`AUTOCARE_USER_V${v}`);
+    }
+  }
+  checkAuth();
+}
+
+function clearAllUsersDatabase() {
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(USERS_KEY);
+  for (let v = 1; v <= 30; v++) {
+    localStorage.removeItem(`AUTOCARE_USER_V${v}`);
+    localStorage.removeItem(`AUTOCARE_USERS_V${v}`);
+  }
+  currentUser = null;
+  isAuthenticated = false;
+  openIDB().then(db => {
+    if (db) {
+      try {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete('usersList');
+      } catch (e) {}
+    }
+  });
   checkAuth();
 }
 
@@ -1434,15 +1457,11 @@ function checkAndSendDueNotifications() {
   const veh = getActiveVehicle();
   if (!veh) return;
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
 
   reminders.forEach(r => {
-    let isDue = false;
-    if (r.targetKm && veh.km >= r.targetKm) isDue = true;
-    if (r.targetDate && r.targetDate <= todayStr) isDue = true;
-
-    if (isDue) {
+    const info = getReminderStatus(r, veh);
+    if (info.isUrgent) {
       new Notification(`GarageOne - ${veh.name}`, {
         body: `Recordatorio Pendiente: ${r.title}`,
         icon: 'icons/icon-192.png'
@@ -1461,83 +1480,127 @@ function getReminderCategoryIcon(category) {
   return SVG_ICONS.wrench;
 }
 
+function getReminderStatus(r, veh) {
+  if (!r) return { status: 'ontrack' };
+
+  if (r.completed) {
+    return {
+      status: 'completed',
+      isUrgent: false,
+      isUpcoming: false,
+      isOnTrack: false,
+      isCompleted: true,
+      remainingKm: null,
+      diffDays: null,
+      progressPercent: 100,
+      badgeHtml: '<span class="badge-subtle badge-green">✓ Completado</span>'
+    };
+  }
+
+  const currentKm = (veh && veh.km) ? Number(veh.km) : 0;
+  let isUrgent = false;
+  let isUpcoming = false;
+  let remainingKm = null;
+  let diffDays = null;
+  let progressPercent = 0;
+
+  if (r.targetKm) {
+    const targetKm = Number(r.targetKm);
+    remainingKm = targetKm - currentKm;
+    if (targetKm > 0) {
+      progressPercent = Math.min(100, Math.max(0, Math.round((currentKm / targetKm) * 100)));
+    }
+    if (remainingKm <= 0) isUrgent = true;
+    else if (remainingKm <= 2000) isUpcoming = true;
+  }
+
+  if (r.targetDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const parts = String(r.targetDate).split('-');
+    if (parts.length === 3) {
+      const targetD = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      targetD.setHours(0, 0, 0, 0);
+      diffDays = Math.round((targetD - today) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) isUrgent = true;
+      else if (diffDays <= 30 && !isUrgent) isUpcoming = true;
+    }
+  }
+
+  let status = 'ontrack';
+  let badgeHtml = '<span class="badge-subtle badge-blue">🔹 Al Día</span>';
+
+  if (isUrgent) {
+    status = 'urgent';
+    badgeHtml = '<span class="badge-subtle badge-red">⚠️ Vencido</span>';
+  } else if (isUpcoming) {
+    status = 'upcoming';
+    badgeHtml = '<span class="badge-subtle badge-yellow">⏳ Próximo</span>';
+  }
+
+  return {
+    status,
+    isUrgent,
+    isUpcoming,
+    isOnTrack: status === 'ontrack',
+    isCompleted: false,
+    remainingKm,
+    diffDays,
+    progressPercent,
+    badgeHtml
+  };
+}
+
 function renderRemindersListHelper(remindersList, veh) {
   if (!remindersList || remindersList.length === 0) {
     return `
-      <div class="user-reminder-card" style="grid-template-columns: 1fr; text-align:center; padding: 24px 16px;">
+      <div class="user-reminder-card" style="grid-template-columns: 1fr; text-align:center; padding: 28px 16px; background: #141417;">
         <div style="color: var(--text-secondary); font-size: 0.9rem;">
-          <span style="font-size: 1.5rem; display:block; margin-bottom: 6px;">🔔</span>
-          No hay recordatorios registrados para este filtro.<br>
-          <span style="font-size: 0.8rem; color: #94a3b8;">Toca "+ Nuevo Recordatorio" para agregar uno.</span>
+          <span style="font-size: 1.6rem; display:block; margin-bottom: 6px;">🔔</span>
+          No hay recordatorios para este filtro.
+          <span style="font-size: 0.8rem; color: #64748b; display:block; margin-top:4px;">Toca "+ Nuevo Recordatorio" para programar una alerta.</span>
         </div>
       </div>
     `;
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const repeatLabelsMap = { '1m': 'Cada 1 mes', '3m': 'Cada 3 meses', '6m': 'Cada 6 meses', '12m': 'Cada 1 año', '5000km': 'Cada 5.000 KM', '10000km': 'Cada 10.000 KM' };
 
   return remindersList.map(r => {
-    let statusBadge = '';
-    let isUrgent = false;
-    let isUpcoming = false;
-    let detailsText = [];
-    let progressPercent = 0;
-    let hasProgress = false;
+    const info = getReminderStatus(r, veh);
+    const categoryIcon = getReminderCategoryIcon(r.category);
+    const categoryName = r.category || 'Mantenimiento';
+
+    let metricsLines = [];
 
     if (r.targetKm) {
-      const currentKm = (veh && veh.km) ? veh.km : 0;
-      const remainingKm = r.targetKm - currentKm;
-      
-      if (r.targetKm > 0) {
-        progressPercent = Math.min(100, Math.max(0, Math.round((currentKm / r.targetKm) * 100)));
-        hasProgress = true;
-      }
-
-      if (remainingKm <= 0) {
-        isUrgent = true;
-        detailsText.push(`📏 <strong>Excedido:</strong> ${Math.abs(remainingKm).toLocaleString()} km atrás (Meta: ${r.targetKm.toLocaleString()} km)`);
-      } else if (remainingKm <= 2000) {
-        isUpcoming = true;
-        detailsText.push(`📏 <strong>Faltan:</strong> ${remainingKm.toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
+      const currentKm = (veh && veh.km) ? Number(veh.km) : 0;
+      const rem = Number(r.targetKm) - currentKm;
+      if (rem <= 0) {
+        metricsLines.push(`📏 <span class="rem-danger-text">Excedido por ${Math.abs(rem).toLocaleString()} km</span> <span class="rem-sub-meta">(Meta: ${Number(r.targetKm).toLocaleString()} km)</span>`);
+      } else if (rem <= 2000) {
+        metricsLines.push(`📏 <span class="rem-warn-text">Faltan ${rem.toLocaleString()} km</span> <span class="rem-sub-meta">(Meta: ${Number(r.targetKm).toLocaleString()} km)</span>`);
       } else {
-        detailsText.push(`📏 <strong>Meta KM:</strong> ${r.targetKm.toLocaleString()} km (${remainingKm.toLocaleString()} km restantes)`);
+        metricsLines.push(`📏 Faltan <strong>${rem.toLocaleString()} km</strong> <span class="rem-sub-meta">(Meta: ${Number(r.targetKm).toLocaleString()} km)</span>`);
       }
     }
 
     if (r.targetDate) {
-      const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
-      if (diffDays < 0) {
-        isUrgent = true;
-        detailsText.push(`📅 <strong>Vencido:</strong> el ${r.targetDate} (${Math.abs(diffDays)}d atrás)`);
-      } else if (diffDays <= 30) {
-        isUpcoming = true;
-        detailsText.push(`📅 <strong>Vence:</strong> el ${r.targetDate} (en ${diffDays} días)`);
-      } else {
-        detailsText.push(`📅 <strong>Meta Fecha:</strong> ${r.targetDate}`);
+      if (info.diffDays !== null) {
+        if (info.diffDays < 0) {
+          metricsLines.push(`📅 <span class="rem-danger-text">Vencido hace ${Math.abs(info.diffDays)} días</span> <span class="rem-sub-meta">(${r.targetDate})</span>`);
+        } else if (info.diffDays <= 30) {
+          metricsLines.push(`📅 <span class="rem-warn-text">Vence en ${info.diffDays} días</span> <span class="rem-sub-meta">(${r.targetDate})</span>`);
+        } else {
+          metricsLines.push(`📅 Vence el <strong>${r.targetDate}</strong> <span class="rem-sub-meta">(en ${info.diffDays} días)</span>`);
+        }
       }
     }
 
-    const repeatText = (r.repeat && r.repeat !== 'none') ? `🔄 ${repeatLabelsMap[r.repeat] || r.repeat}` : '';
-    if (repeatText) detailsText.push(repeatText);
-
-    let cardStatusClass = 'on-track';
-    if (r.completed) {
-      statusBadge = '<span class="badge-subtle badge-green">✓ Completado</span>';
-      cardStatusClass = 'completed';
-    } else if (isUrgent) {
-      statusBadge = '<span class="badge-subtle badge-red">⚠️ Urgente</span>';
-      cardStatusClass = 'urgent';
-    } else if (isUpcoming) {
-      statusBadge = '<span class="badge-subtle badge-yellow">⏳ Próximo</span>';
-      cardStatusClass = 'upcoming';
-    } else {
-      statusBadge = '<span class="badge-subtle badge-blue">🔹 Al día</span>';
-      cardStatusClass = 'on-track';
+    if (r.repeat && r.repeat !== 'none') {
+      metricsLines.push(`🔄 Repetir: <strong>${repeatLabelsMap[r.repeat] || r.repeat}</strong>`);
     }
-
-    const categoryIcon = getReminderCategoryIcon(r.category);
-    const categoryName = r.category || 'Mantenimiento';
 
     return `
       <div class="swipe-container">
@@ -1547,36 +1610,36 @@ function renderRemindersListHelper(remindersList, veh) {
             <span>${t('deleteBtn', 'Eliminar')}</span>
           </button>
         </div>
-        <div class="swipe-content user-reminder-card ${cardStatusClass}" onclick="openReminderModal('${r.id}')">
+        <div class="swipe-content user-reminder-card ${info.status}" onclick="openReminderModal('${r.id}')">
           
-          <div class="rem-icon-box ${cardStatusClass}">
+          <div class="rem-icon-box ${info.status}">
             ${categoryIcon}
           </div>
 
           <div class="rem-content-box">
             <div class="rem-header-row">
               <span class="reminder-category-chip">${escapeHtml(categoryName)}</span>
-              ${statusBadge}
+              ${info.badgeHtml}
             </div>
             
             <h3 class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.65;' : ''}">${escapeHtml(r.title)}</h3>
             
-            <div class="rem-metrics-row">
-              <div class="rem-metric-item">${detailsText.join(' <span style="opacity:0.4;">•</span> ')}</div>
+            <div class="rem-metrics-list">
+              ${metricsLines.map(line => `<div class="rem-metric-line">${line}</div>`).join('')}
             </div>
 
-            ${r.notes ? `<div style="font-size:0.75rem; color:#94a3b8; font-style:italic; margin-top:2px;">📝 ${escapeHtml(r.notes)}</div>` : ''}
+            ${r.notes ? `<div class="rem-note-line">📝 ${escapeHtml(r.notes)}</div>` : ''}
 
-            ${(hasProgress && !r.completed) ? `
+            ${(r.targetKm && !r.completed) ? `
               <div class="rem-progress-container">
                 <div class="rem-progress-bar">
-                  <div class="rem-progress-fill ${cardStatusClass}" style="width: ${progressPercent}%;"></div>
+                  <div class="rem-progress-fill ${info.status}" style="width: ${info.progressPercent}%;"></div>
                 </div>
               </div>
             ` : ''}
           </div>
 
-          <div style="display:flex; align-items:center; justify-content:center;" onclick="event.stopPropagation()">
+          <div style="display:flex; align-items:center; justify-content:center; padding-left:4px;" onclick="event.stopPropagation()">
             <button class="rem-checkbox ${r.completed ? 'checked' : ''}" onclick="toggleReminderComplete('${r.id}')" title="${r.completed ? 'Desmarcar' : 'Marcar como completado'}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </button>
@@ -1589,7 +1652,6 @@ function renderRemindersListHelper(remindersList, veh) {
 }
 
 function updateRemindersMetrics(allReminders, veh) {
-  const todayStr = new Date().toISOString().split('T')[0];
   let urgentCount = 0;
   let upcomingCount = 0;
   let onTrackCount = 0;
@@ -1597,49 +1659,27 @@ function updateRemindersMetrics(allReminders, veh) {
   let pendingCount = 0;
 
   (allReminders || []).forEach(r => {
-    if (r.completed) {
+    const info = getReminderStatus(r, veh);
+    if (info.isCompleted) {
       completedCount++;
-      return;
+    } else {
+      pendingCount++;
+      if (info.isUrgent) urgentCount++;
+      else if (info.isUpcoming) upcomingCount++;
+      else onTrackCount++;
     }
-
-    pendingCount++;
-    let isUrgent = false;
-    let isUpcoming = false;
-
-    if (r.targetKm && veh) {
-      const remainingKm = r.targetKm - veh.km;
-      if (remainingKm <= 0) isUrgent = true;
-      else if (remainingKm <= 2000) isUpcoming = true;
-    }
-
-    if (r.targetDate) {
-      const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
-      if (diffDays < 0) isUrgent = true;
-      else if (diffDays <= 30) isUpcoming = true;
-    }
-
-    if (isUrgent) urgentCount++;
-    else if (isUpcoming) upcomingCount++;
-    else onTrackCount++;
   });
 
-  const elUrgent = document.getElementById('statRemUrgent');
-  if (elUrgent) elUrgent.textContent = urgentCount;
-  const elUpcoming = document.getElementById('statRemUpcoming');
-  if (elUpcoming) elUpcoming.textContent = upcomingCount;
-  const elOnTrack = document.getElementById('statRemOnTrack');
-  if (elOnTrack) elOnTrack.textContent = onTrackCount;
-  const elCompleted = document.getElementById('statRemCompleted');
-  if (elCompleted) elCompleted.textContent = completedCount;
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setVal('statRemUrgent', urgentCount);
+  setVal('statRemUpcoming', upcomingCount);
+  setVal('statRemOnTrack', onTrackCount);
+  setVal('statRemCompleted', completedCount);
 
-  const elAll = document.getElementById('countRemAll');
-  if (elAll) elAll.textContent = (allReminders || []).length;
-  const elPending = document.getElementById('countRemPending');
-  if (elPending) elPending.textContent = pendingCount;
-  const elUrgentCount = document.getElementById('countRemUrgent');
-  if (elUrgentCount) elUrgentCount.textContent = urgentCount;
-  const elDone = document.getElementById('countRemDone');
-  if (elDone) elDone.textContent = completedCount;
+  setVal('countRemAll', (allReminders || []).length);
+  setVal('countRemPending', pendingCount);
+  setVal('countRemUrgent', urgentCount);
+  setVal('countRemDone', completedCount);
 }
 
 function renderUserReminders() {
@@ -1661,58 +1701,15 @@ function renderRemindersTab() {
   const allVehicleReminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
   updateRemindersMetrics(allVehicleReminders, veh);
 
-  let list = [...allVehicleReminders];
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  if (currentReminderFilter === 'pending') {
-    list = list.filter(r => !r.completed);
-  } else if (currentReminderFilter === 'completed') {
-    list = list.filter(r => r.completed);
-  } else if (currentReminderFilter === 'urgent') {
-    list = list.filter(r => {
-      if (r.completed) return false;
-      if (r.targetKm && (r.targetKm - veh.km) <= 0) return true;
-      if (r.targetDate) {
-        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
-        if (diffDays < 0) return true;
-      }
-      return false;
-    });
-  } else if (currentReminderFilter === 'upcoming') {
-    list = list.filter(r => {
-      if (r.completed) return false;
-      let isUrgent = false;
-      let isUpcoming = false;
-      if (r.targetKm) {
-        const rem = r.targetKm - veh.km;
-        if (rem <= 0) isUrgent = true;
-        else if (rem <= 2000) isUpcoming = true;
-      }
-      if (r.targetDate) {
-        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
-        if (diffDays < 0) isUrgent = true;
-        else if (diffDays <= 30) isUpcoming = true;
-      }
-      return !isUrgent && isUpcoming;
-    });
-  } else if (currentReminderFilter === 'ontrack') {
-    list = list.filter(r => {
-      if (r.completed) return false;
-      let isUrgent = false;
-      let isUpcoming = false;
-      if (r.targetKm) {
-        const rem = r.targetKm - veh.km;
-        if (rem <= 0) isUrgent = true;
-        else if (rem <= 2000) isUpcoming = true;
-      }
-      if (r.targetDate) {
-        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
-        if (diffDays < 0) isUrgent = true;
-        else if (diffDays <= 30) isUpcoming = true;
-      }
-      return !isUrgent && !isUpcoming;
-    });
-  }
+  let list = allVehicleReminders.filter(r => {
+    const info = getReminderStatus(r, veh);
+    if (currentReminderFilter === 'pending') return !info.isCompleted;
+    if (currentReminderFilter === 'completed') return info.isCompleted;
+    if (currentReminderFilter === 'urgent') return !info.isCompleted && info.isUrgent;
+    if (currentReminderFilter === 'upcoming') return !info.isCompleted && info.isUpcoming;
+    if (currentReminderFilter === 'ontrack') return !info.isCompleted && info.isOnTrack;
+    return true;
+  });
 
   container.innerHTML = renderRemindersListHelper(list, veh);
 }

@@ -908,53 +908,98 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 .rem-stat-card.completed .rem-stat-val { color: #30d158; }
 
 
+/* Swipe Action Container */
+.swipe-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.swipe-action-bg {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 90px;
+  background: #ff453a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  border-radius: 0 16px 16px 0;
+}
+
+.swipe-action-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+}
+
+.swipe-content {
+  position: relative;
+  z-index: 2;
+  background: #141417;
+  width: 100%;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
 /* User Configured Reminders Cards (Clean Modern Layout) */
 .user-reminder-card {
-  background: var(--bg-card);
+  background: #141417;
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 14px 16px;
-  margin-bottom: 12px;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-start;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .user-reminder-card:hover {
   border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  background: #1a1a1e;
 }
 
 .user-reminder-card.urgent {
-  border-color: rgba(255, 69, 58, 0.4);
-  background: linear-gradient(135deg, rgba(255, 69, 58, 0.12) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border-color: rgba(255, 69, 58, 0.5);
+  background: #1c1416;
 }
 
 .user-reminder-card.upcoming {
-  border-color: rgba(255, 214, 10, 0.4);
-  background: linear-gradient(135deg, rgba(255, 214, 10, 0.1) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border-color: rgba(255, 214, 10, 0.5);
+  background: #1b1a14;
 }
 
 .user-reminder-card.on-track {
   border-color: rgba(56, 189, 248, 0.25);
-  background: var(--bg-card);
+  background: #141417;
 }
 
 .user-reminder-card.completed {
-  opacity: 0.65;
+  opacity: 0.6;
   border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(30, 41, 59, 0.4);
+  background: #121316;
 }
 
 /* Reminder Icon Box */
 .rem-icon-box {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -962,8 +1007,7 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: transform 0.2s ease;
+  margin-top: 2px;
 }
 
 .user-reminder-card:hover .rem-icon-box {
@@ -971,21 +1015,20 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 }
 
 .rem-icon-box.urgent {
-  background: rgba(255, 69, 58, 0.2);
+  background: rgba(255, 69, 58, 0.25);
   color: #ff453a;
-  box-shadow: 0 0 12px rgba(255, 69, 58, 0.3);
+  box-shadow: 0 0 10px rgba(255, 69, 58, 0.3);
 }
 
 .rem-icon-box.upcoming {
-  background: rgba(255, 214, 10, 0.2);
+  background: rgba(255, 214, 10, 0.25);
   color: #ffd60a;
-  box-shadow: 0 0 12px rgba(255, 214, 10, 0.3);
+  box-shadow: 0 0 10px rgba(255, 214, 10, 0.3);
 }
 
 .rem-icon-box.on-track {
   background: rgba(56, 189, 248, 0.2);
   color: #38bdf8;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
 }
 
 .rem-icon-box.completed {
@@ -993,12 +1036,13 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
   color: #30d158;
 }
 
-/* Reminder Body & Typography */
+/* Content Box & Metrics Lines */
 .rem-content-box {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  width: 100%;
 }
 
 .rem-header-row {
@@ -1012,41 +1056,56 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 .reminder-title {
   font-size: 0.98rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #ffffff;
   line-height: 1.3;
-  margin: 0;
+  margin: 2px 0;
+  word-break: break-word;
 }
 
 .reminder-category-chip {
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.65rem;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
+  color: #94a3b8;
 }
 
-.rem-metrics-row {
+.rem-metrics-list {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 3px;
   margin-top: 2px;
 }
 
-.rem-metric-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.8rem;
+.rem-metric-line {
+  font-size: 0.82rem;
   color: #cbd5e1;
+  line-height: 1.35;
 }
 
-.rem-metric-item strong {
-  color: #ffffff;
-  font-weight: 600;
+.rem-danger-text {
+  color: #ff453a;
+  font-weight: 700;
+}
+
+.rem-warn-text {
+  color: #ffd60a;
+  font-weight: 700;
+}
+
+.rem-sub-meta {
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.rem-note-line {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin-top: 3px;
 }
 
 /* Progress bar for Mileage */
