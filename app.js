@@ -1058,7 +1058,7 @@ function saveState() {
     console.warn('LocalStorage limit reached, saving to IndexedDB high-capacity store...', e);
   }
   saveStateToIDB(appState);
-  renderStorageStats();
+  setTimeout(autoOptimizeStorageImagesSilent, 500);
 }
 
 function getStorageUsage() {
@@ -1106,9 +1106,7 @@ function renderStorageStats() {
   `;
 }
 
-function optimizeStorageImages() {
-  let count = 0;
-
+function autoOptimizeStorageImagesSilent() {
   const compressDataUrl = (dataUrl, maxDim = 500, quality = 0.5, callback) => {
     if (!dataUrl || !dataUrl.startsWith('data:image')) return callback(dataUrl);
     const img = new Image();
@@ -1129,7 +1127,6 @@ function optimizeStorageImages() {
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      count++;
       callback(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = () => callback(dataUrl);
@@ -1155,20 +1152,17 @@ function optimizeStorageImages() {
     }
   });
 
-  if (tasks.length === 0) {
-    alert('¡Tus datos e imágenes ya están 100% optimizados!');
-    renderStorageStats();
-    return;
-  }
+  if (tasks.length === 0) return;
 
   let completed = 0;
   tasks.forEach(fn => {
     fn(() => {
       completed++;
       if (completed === tasks.length) {
-        saveState();
-        renderStorageStats();
-        alert(`¡Optimización finalizada! Se comprimieron ${count} imagen(es) liberando memoria para uso en producción.`);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+        } catch (e) {}
+        saveStateToIDB(appState);
       }
     });
   });
