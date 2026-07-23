@@ -185,12 +185,17 @@
 
       <!-- TAB: Módulo de Recordatorios -->
       <section id="tabReminders" class="tab-content">
-        <div class="section-header">
+        <div class="section-header" style="flex-wrap:wrap; gap:10px;">
           <div class="section-header-title">
             <h1>Recordatorios</h1>
             <p class="subtitle">Alertas personalizadas y mantenimientos programados</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Nuevo Recordatorio</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="requestNotificationPermission()" title="Activar Notificaciones de Sistema">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Notificaciones
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Nuevo Recordatorio</button>
+          </div>
         </div>
 
         <div id="fullRemindersList" class="log-list" style="margin-top:14px;">
@@ -490,10 +495,10 @@
         <div class="settings-card">
           <h3>Respaldo y Seguridad</h3>
           <div class="btn-group" style="flex-direction:column;">
-            <button class="btn btn-outline btn-block" onclick="exportDataJSON()">Exportar Datos (JSON)</button>
-            <label class="btn btn-outline btn-block" style="text-align:center;">
-              Importar Datos (JSON)
-              <input type="file" id="importJsonInput" accept=".json" onchange="importDataJSON(event)" style="display:none;">
+            <button class="btn btn-outline btn-block" onclick="exportDataXML()">Exportar Copia de Seguridad (XML)</button>
+            <label class="btn btn-outline btn-block" style="text-align:center; cursor:pointer;">
+              Importar Copia de Seguridad (XML)
+              <input type="file" id="importXmlInput" accept=".xml,.json" onchange="importDataXML(event)" style="display:none;">
             </label>
             <button class="btn btn-tertiary btn-block" onclick="handleLogout()" style="color:#ff453a; margin-top:8px;">Bloquear / Cerrar Sesión</button>
           </div>

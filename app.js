@@ -1457,13 +1457,27 @@ function checkAndSendDueNotifications() {
   const veh = getActiveVehicle();
   if (!veh) return;
 
-  const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
+  const currentKm = Number(veh.km || 0);
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const reminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
 
   reminders.forEach(r => {
-    const info = getReminderStatus(r, veh);
-    if (info.isUrgent) {
+    let shouldNotify = false;
+    let detail = '';
+
+    if (r.targetDate && r.targetDate <= todayStr) {
+      shouldNotify = true;
+      detail = `Fecha meta: ${r.targetDate}`;
+    }
+    if (r.targetKm && Number(r.targetKm) <= currentKm) {
+      shouldNotify = true;
+      detail = `Odómetro alcanzado: ${Number(r.targetKm).toLocaleString()} km`;
+    }
+
+    if (shouldNotify) {
       new Notification(`GarageOne - ${veh.name}`, {
-        body: `Recordatorio Pendiente: ${r.title}`,
+        body: `Recordatorio Pendiente: ${r.title}${detail ? ' (' + detail + ')' : ''}`,
         icon: 'icons/icon-192.png'
       });
     }
@@ -3143,38 +3157,132 @@ function readAndCompressImage(file, callback) {
   reader.readAsDataURL(file);
 }
 
-function exportDataJSON() {
-  const usersList = getUsersList();
-  const exportPayload = {
-    appState: appState,
-    currentUser: currentUser,
-    usersList: usersList,
-    version: 'V14',
-    exportDate: new Date().toISOString()
-  };
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `garageone_respaldo_${new Date().toISOString().split('T')[0]}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
+// XML Backup Serialization & Deserialization Engine
+function objectToXML(obj, rootName = 'GarageOneBackup') {
+  function serialize(val, name) {
+    if (val === null || val === undefined) {
+      return `<${name} type="null"/>`;
+    }
+    const type = typeof val;
+    if (type === 'boolean' || type === 'number') {
+      return `<${name} type="${type}">${val}</${name}>`;
+    }
+    if (type === 'string') {
+      const escaped = val
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+      return `<${name} type="string">${escaped}</${name}>`;
+    }
+    if (Array.isArray(val)) {
+      let children = val.map(item => serialize(item, 'item')).join('');
+      return `<${name} type="array">${children}</${name}>`;
+    }
+    if (type === 'object') {
+      let children = Object.keys(val).map(key => {
+        const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '_');
+        return serialize(val[key], safeKey);
+      }).join('');
+      return `<${name} type="object">${children}</${name}>`;
+    }
+    return `<${name}/>`;
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${serialize(obj, rootName)}`;
 }
 
-function importDataJSON(e) {
+function xmlToObject(xmlStr) {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlStr, 'text/xml');
+  if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+    throw new Error('Formato XML inválido o corrupto.');
+  }
+
+  function parseNode(node) {
+    const type = node.getAttribute('type');
+    if (type === 'null') return null;
+    if (type === 'boolean') return node.textContent === 'true';
+    if (type === 'number') return Number(node.textContent);
+    if (type === 'string') return node.textContent;
+    if (type === 'array') {
+      const result = [];
+      for (let child of node.children) {
+        if (child.tagName === 'item') {
+          result.push(parseNode(child));
+        }
+      }
+      return result;
+    }
+    if (type === 'object') {
+      const result = {};
+      for (let child of node.children) {
+        result[child.tagName] = parseNode(child);
+      }
+      return result;
+    }
+    if (node.children.length === 0) {
+      return node.textContent;
+    }
+    const obj = {};
+    for (let child of node.children) {
+      obj[child.tagName] = parseNode(child);
+    }
+    return obj;
+  }
+
+  return parseNode(xmlDoc.documentElement);
+}
+
+function exportDataXML() {
+  try {
+    const usersList = getUsersList();
+    const exportPayload = {
+      appState: appState,
+      currentUser: currentUser,
+      usersList: usersList,
+      version: 'V15',
+      exportDate: new Date().toISOString()
+    };
+
+    const xmlString = objectToXML(exportPayload, 'GarageOneBackup');
+    const blob = new Blob([xmlString], { type: 'application/xml;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = url;
+    downloadAnchor.download = `garageone_respaldo_${new Date().toISOString().split('T')[0]}.xml`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    alert('Error al exportar la copia de seguridad XML: ' + err.message);
+  }
+}
+
+function importDataXML(e) {
   const file = e.target.files[0];
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = function(evt) {
     try {
-      const imported = JSON.parse(evt.target.result);
-      let targetState = imported;
+      const content = evt.target.result;
+      let imported = null;
 
+      if (file.name.endsWith('.json') || content.trim().startsWith('{')) {
+        imported = JSON.parse(content);
+      } else {
+        imported = xmlToObject(content);
+      }
+
+      let targetState = imported;
       if (imported.appState && imported.vehicles === undefined) {
         targetState = imported.appState;
       }
 
-      if (targetState.vehicles && Array.isArray(targetState.vehicles)) {
+      if (targetState && targetState.vehicles && Array.isArray(targetState.vehicles)) {
         appState = sanitizeState(targetState);
         
         if (imported.usersList && Array.isArray(imported.usersList)) {
@@ -3190,12 +3298,12 @@ function importDataJSON(e) {
         saveState();
         renderApp();
         checkAuth();
-        alert('¡Copia de seguridad (JSON) restaurada con éxito! Todos tus vehículos, registros, facturas e información fueron recuperados.');
+        alert('¡Copia de seguridad (XML) restaurada con éxito! Todos tus vehículos, registros e información fueron recuperados.');
       } else {
-        alert('El archivo JSON no tiene un formato válido de GarageOne.');
+        alert('El archivo no contiene un formato de respaldo válido de GarageOne.');
       }
     } catch (err) {
-      alert('Error al leer el archivo JSON: ' + err.message);
+      alert('Error al leer el archivo de respaldo: ' + err.message);
     }
   };
   reader.readAsText(file);
