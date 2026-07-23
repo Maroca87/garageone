@@ -804,9 +804,9 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
 }
 
 .btn-call-direct {
-  background: #30d158;
-  color: #000000;
-  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   padding: 6px 12px;
   font-size: 0.8rem;
@@ -818,9 +818,11 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.btn-call-direct:active {
+.btn-call-direct:hover, .btn-call-direct:active {
   transform: scale(0.95);
-  background: #28b84c;
+  background: #38bdf8;
+  color: #000000;
+  border-color: #38bdf8;
 }
 
 .log-item-card {
