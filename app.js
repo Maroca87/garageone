@@ -1403,7 +1403,13 @@ let currentReminderFilter = 'all';
 function filterReminders(filterType, el) {
   currentReminderFilter = filterType;
   document.querySelectorAll('#reminderFilterPills .pill').forEach(p => p.classList.remove('active'));
-  if (el) el.classList.add('active');
+  if (el && el.classList.contains('pill')) {
+    el.classList.add('active');
+  } else {
+    // If clicked from summary stats card, highlight matching pill
+    const matchingPill = document.querySelector(`#reminderFilterPills .pill[onclick*="'${filterType}'"]`);
+    if (matchingPill) matchingPill.classList.add('active');
+  }
   renderRemindersTab();
 }
 
@@ -1445,11 +1451,25 @@ function checkAndSendDueNotifications() {
   });
 }
 
+function getReminderCategoryIcon(category) {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('aceite')) return SVG_ICONS.oil || SVG_ICONS.wrench;
+  if (cat.includes('freno') || cat.includes('llanta')) return SVG_ICONS.brakes || SVG_ICONS.wrench;
+  if (cat.includes('documento') || cat.includes('marchamo') || cat.includes('rtv') || cat.includes('seguro')) return SVG_ICONS.document || SVG_ICONS.wrench;
+  if (cat.includes('filtro')) return SVG_ICONS.filters || SVG_ICONS.wrench;
+  if (cat.includes('bater') || cat.includes('buj')) return SVG_ICONS.spark || SVG_ICONS.battery;
+  return SVG_ICONS.wrench;
+}
+
 function renderRemindersListHelper(remindersList, veh) {
   if (!remindersList || remindersList.length === 0) {
     return `
-      <div class="user-reminder-card" style="justify-content:center; text-align:center;">
-        <span class="subtitle">No hay recordatorios registrados.<br>Toca "+ Recordatorio" para agregar uno.</span>
+      <div class="user-reminder-card" style="grid-template-columns: 1fr; text-align:center; padding: 24px 16px;">
+        <div style="color: var(--text-secondary); font-size: 0.9rem;">
+          <span style="font-size: 1.5rem; display:block; margin-bottom: 6px;">🔔</span>
+          No hay recordatorios registrados para este filtro.<br>
+          <span style="font-size: 0.8rem; color: #94a3b8;">Toca "+ Nuevo Recordatorio" para agregar uno.</span>
+        </div>
       </div>
     `;
   }
@@ -1462,17 +1482,26 @@ function renderRemindersListHelper(remindersList, veh) {
     let isUrgent = false;
     let isUpcoming = false;
     let detailsText = [];
+    let progressPercent = 0;
+    let hasProgress = false;
 
     if (r.targetKm) {
-      const remainingKm = r.targetKm - veh.km;
+      const currentKm = (veh && veh.km) ? veh.km : 0;
+      const remainingKm = r.targetKm - currentKm;
+      
+      if (r.targetKm > 0) {
+        progressPercent = Math.min(100, Math.max(0, Math.round((currentKm / r.targetKm) * 100)));
+        hasProgress = true;
+      }
+
       if (remainingKm <= 0) {
         isUrgent = true;
-        detailsText.push(`Excedido por ${Math.abs(remainingKm).toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
+        detailsText.push(`📏 <strong>Excedido:</strong> ${Math.abs(remainingKm).toLocaleString()} km atrás (Meta: ${r.targetKm.toLocaleString()} km)`);
       } else if (remainingKm <= 2000) {
         isUpcoming = true;
-        detailsText.push(`Próximo: faltan ${remainingKm.toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
+        detailsText.push(`📏 <strong>Faltan:</strong> ${remainingKm.toLocaleString()} km (Meta: ${r.targetKm.toLocaleString()} km)`);
       } else {
-        detailsText.push(`Meta KM: ${r.targetKm.toLocaleString()} km (${remainingKm.toLocaleString()} km restantes)`);
+        detailsText.push(`📏 <strong>Meta KM:</strong> ${r.targetKm.toLocaleString()} km (${remainingKm.toLocaleString()} km restantes)`);
       }
     }
 
@@ -1480,28 +1509,35 @@ function renderRemindersListHelper(remindersList, veh) {
       const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
       if (diffDays < 0) {
         isUrgent = true;
-        detailsText.push(`Vencido el ${r.targetDate} (${Math.abs(diffDays)}d atrás)`);
+        detailsText.push(`📅 <strong>Vencido:</strong> el ${r.targetDate} (${Math.abs(diffDays)}d atrás)`);
       } else if (diffDays <= 30) {
         isUpcoming = true;
-        detailsText.push(`Vence el ${r.targetDate} (en ${diffDays}d)`);
+        detailsText.push(`📅 <strong>Vence:</strong> el ${r.targetDate} (en ${diffDays} días)`);
       } else {
-        detailsText.push(`Meta Fecha: ${r.targetDate}`);
+        detailsText.push(`📅 <strong>Meta Fecha:</strong> ${r.targetDate}`);
       }
     }
 
-    const repeatText = (r.repeat && r.repeat !== 'none') ? ` • 🔄 ${repeatLabelsMap[r.repeat] || r.repeat}` : '';
+    const repeatText = (r.repeat && r.repeat !== 'none') ? `🔄 ${repeatLabelsMap[r.repeat] || r.repeat}` : '';
+    if (repeatText) detailsText.push(repeatText);
 
+    let cardStatusClass = 'on-track';
     if (r.completed) {
-      statusBadge = '<span class="badge-subtle badge-green">Completado ✓</span>';
+      statusBadge = '<span class="badge-subtle badge-green">✓ Completado</span>';
+      cardStatusClass = 'completed';
     } else if (isUrgent) {
-      statusBadge = '<span class="badge-subtle badge-red">Atención Pendiente</span>';
+      statusBadge = '<span class="badge-subtle badge-red">⚠️ Urgente</span>';
+      cardStatusClass = 'urgent';
     } else if (isUpcoming) {
-      statusBadge = '<span class="badge-subtle badge-yellow">Próximo</span>';
+      statusBadge = '<span class="badge-subtle badge-yellow">⏳ Próximo</span>';
+      cardStatusClass = 'upcoming';
     } else {
-      statusBadge = '<span class="badge-subtle badge-blue">Al día</span>';
+      statusBadge = '<span class="badge-subtle badge-blue">🔹 Al día</span>';
+      cardStatusClass = 'on-track';
     }
 
-    const cardClass = r.completed ? '' : isUrgent ? 'urgent' : isUpcoming ? 'upcoming' : '';
+    const categoryIcon = getReminderCategoryIcon(r.category);
+    const categoryName = r.category || 'Mantenimiento';
 
     return `
       <div class="swipe-container">
@@ -1511,24 +1547,99 @@ function renderRemindersListHelper(remindersList, veh) {
             <span>${t('deleteBtn', 'Eliminar')}</span>
           </button>
         </div>
-        <div class="swipe-content user-reminder-card ${cardClass}" onclick="openReminderModal('${r.id}')">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(r.title)}</span>
+        <div class="swipe-content user-reminder-card ${cardStatusClass}" onclick="openReminderModal('${r.id}')">
+          
+          <div class="rem-icon-box ${cardStatusClass}">
+            ${categoryIcon}
+          </div>
+
+          <div class="rem-content-box">
+            <div class="rem-header-row">
+              <span class="reminder-category-chip">${escapeHtml(categoryName)}</span>
               ${statusBadge}
             </div>
-            <div class="reminder-meta">${escapeHtml(detailsText.join(' • ')) || 'Configurado por usuario'}${repeatText}</div>
-            ${r.notes ? `<div class="reminder-meta" style="font-style:italic;">${escapeHtml(r.notes)}</div>` : ''}
+            
+            <h3 class="reminder-title" style="${r.completed ? 'text-decoration:line-through; opacity:0.65;' : ''}">${escapeHtml(r.title)}</h3>
+            
+            <div class="rem-metrics-row">
+              <div class="rem-metric-item">${detailsText.join(' <span style="opacity:0.4;">•</span> ')}</div>
+            </div>
+
+            ${r.notes ? `<div style="font-size:0.75rem; color:#94a3b8; font-style:italic; margin-top:2px;">📝 ${escapeHtml(r.notes)}</div>` : ''}
+
+            ${(hasProgress && !r.completed) ? `
+              <div class="rem-progress-container">
+                <div class="rem-progress-bar">
+                  <div class="rem-progress-fill ${cardStatusClass}" style="width: ${progressPercent}%;"></div>
+                </div>
+              </div>
+            ` : ''}
           </div>
-          <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation()">
-            <button class="btn btn-secondary btn-sm" onclick="toggleReminderComplete('${r.id}')" style="padding:4px 8px;" title="Marcar como completado">
-              ${r.completed ? 'Desmarcar' : '✓ Listo'}
+
+          <div style="display:flex; align-items:center; justify-content:center;" onclick="event.stopPropagation()">
+            <button class="rem-checkbox ${r.completed ? 'checked' : ''}" onclick="toggleReminderComplete('${r.id}')" title="${r.completed ? 'Desmarcar' : 'Marcar como completado'}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </button>
           </div>
+
         </div>
       </div>
     `;
   }).join('');
+}
+
+function updateRemindersMetrics(allReminders, veh) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  let urgentCount = 0;
+  let upcomingCount = 0;
+  let onTrackCount = 0;
+  let completedCount = 0;
+  let pendingCount = 0;
+
+  (allReminders || []).forEach(r => {
+    if (r.completed) {
+      completedCount++;
+      return;
+    }
+
+    pendingCount++;
+    let isUrgent = false;
+    let isUpcoming = false;
+
+    if (r.targetKm && veh) {
+      const remainingKm = r.targetKm - veh.km;
+      if (remainingKm <= 0) isUrgent = true;
+      else if (remainingKm <= 2000) isUpcoming = true;
+    }
+
+    if (r.targetDate) {
+      const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) isUrgent = true;
+      else if (diffDays <= 30) isUpcoming = true;
+    }
+
+    if (isUrgent) urgentCount++;
+    else if (isUpcoming) upcomingCount++;
+    else onTrackCount++;
+  });
+
+  const elUrgent = document.getElementById('statRemUrgent');
+  if (elUrgent) elUrgent.textContent = urgentCount;
+  const elUpcoming = document.getElementById('statRemUpcoming');
+  if (elUpcoming) elUpcoming.textContent = upcomingCount;
+  const elOnTrack = document.getElementById('statRemOnTrack');
+  if (elOnTrack) elOnTrack.textContent = onTrackCount;
+  const elCompleted = document.getElementById('statRemCompleted');
+  if (elCompleted) elCompleted.textContent = completedCount;
+
+  const elAll = document.getElementById('countRemAll');
+  if (elAll) elAll.textContent = (allReminders || []).length;
+  const elPending = document.getElementById('countRemPending');
+  if (elPending) elPending.textContent = pendingCount;
+  const elUrgentCount = document.getElementById('countRemUrgent');
+  if (elUrgentCount) elUrgentCount.textContent = urgentCount;
+  const elDone = document.getElementById('countRemDone');
+  if (elDone) elDone.textContent = completedCount;
 }
 
 function renderUserReminders() {
@@ -1547,12 +1658,60 @@ function renderRemindersTab() {
   const veh = getActiveVehicle();
   if (!veh) { container.innerHTML = '<p class="subtitle" style="text-align:center; padding:20px;">No hay vehículo activo.</p>'; return; }
 
-  let list = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
+  const allVehicleReminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id);
+  updateRemindersMetrics(allVehicleReminders, veh);
+
+  let list = [...allVehicleReminders];
+  const todayStr = new Date().toISOString().split('T')[0];
 
   if (currentReminderFilter === 'pending') {
     list = list.filter(r => !r.completed);
   } else if (currentReminderFilter === 'completed') {
     list = list.filter(r => r.completed);
+  } else if (currentReminderFilter === 'urgent') {
+    list = list.filter(r => {
+      if (r.completed) return false;
+      if (r.targetKm && (r.targetKm - veh.km) <= 0) return true;
+      if (r.targetDate) {
+        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) return true;
+      }
+      return false;
+    });
+  } else if (currentReminderFilter === 'upcoming') {
+    list = list.filter(r => {
+      if (r.completed) return false;
+      let isUrgent = false;
+      let isUpcoming = false;
+      if (r.targetKm) {
+        const rem = r.targetKm - veh.km;
+        if (rem <= 0) isUrgent = true;
+        else if (rem <= 2000) isUpcoming = true;
+      }
+      if (r.targetDate) {
+        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) isUrgent = true;
+        else if (diffDays <= 30) isUpcoming = true;
+      }
+      return !isUrgent && isUpcoming;
+    });
+  } else if (currentReminderFilter === 'ontrack') {
+    list = list.filter(r => {
+      if (r.completed) return false;
+      let isUrgent = false;
+      let isUpcoming = false;
+      if (r.targetKm) {
+        const rem = r.targetKm - veh.km;
+        if (rem <= 0) isUrgent = true;
+        else if (rem <= 2000) isUpcoming = true;
+      }
+      if (r.targetDate) {
+        const diffDays = Math.ceil((new Date(r.targetDate) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) isUrgent = true;
+        else if (diffDays <= 30) isUpcoming = true;
+      }
+      return !isUrgent && !isUpcoming;
+    });
   }
 
   container.innerHTML = renderRemindersListHelper(list, veh);

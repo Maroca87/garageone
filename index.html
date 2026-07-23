@@ -188,7 +188,7 @@
         <div class="section-header" style="flex-direction:column; align-items:flex-start; gap:10px;">
           <div class="section-header-title">
             <h1>Recordatorios</h1>
-            <p class="subtitle">Alertas personalizadas, tareas y repeticiones</p>
+            <p class="subtitle">Alertas personalizadas, mantenimiento y vencimientos</p>
           </div>
           <div style="display:flex; gap:8px; width:100%; justify-content:flex-start; flex-wrap:wrap; margin-top:2px;">
             <button class="btn btn-primary btn-sm" onclick="openReminderModal()">+ Nuevo Recordatorio</button>
@@ -198,13 +198,34 @@
           </div>
         </div>
 
-        <div class="filter-pills" id="reminderFilterPills">
-          <button class="pill active" onclick="filterReminders('all', this)">Todos</button>
-          <button class="pill" onclick="filterReminders('pending', this)">Pendientes</button>
-          <button class="pill" onclick="filterReminders('completed', this)">Completados</button>
+        <!-- Summary Metrics Dashboard -->
+        <div class="reminders-summary-grid" id="remindersSummaryGrid">
+          <div class="rem-stat-card urgent" onclick="filterReminders('urgent', this)">
+            <span class="rem-stat-val" id="statRemUrgent">0</span>
+            <span class="rem-stat-label">⚠️ Vencidos</span>
+          </div>
+          <div class="rem-stat-card upcoming" onclick="filterReminders('upcoming', this)">
+            <span class="rem-stat-val" id="statRemUpcoming">0</span>
+            <span class="rem-stat-label">⏳ Próximos</span>
+          </div>
+          <div class="rem-stat-card on-track" onclick="filterReminders('ontrack', this)">
+            <span class="rem-stat-val" id="statRemOnTrack">0</span>
+            <span class="rem-stat-label">🔹 Al Día</span>
+          </div>
+          <div class="rem-stat-card completed" onclick="filterReminders('completed', this)">
+            <span class="rem-stat-val" id="statRemCompleted">0</span>
+            <span class="rem-stat-label">✓ Listos</span>
+          </div>
         </div>
 
-        <div id="fullRemindersList" class="predictive-alerts-wrapper">
+        <div class="filter-pills" id="reminderFilterPills" style="margin-top:14px;">
+          <button class="pill active" onclick="filterReminders('all', this)">Todos (<span id="countRemAll">0</span>)</button>
+          <button class="pill" onclick="filterReminders('pending', this)">Pendientes (<span id="countRemPending">0</span>)</button>
+          <button class="pill" onclick="filterReminders('urgent', this)">Vencidos (<span id="countRemUrgent">0</span>)</button>
+          <button class="pill" onclick="filterReminders('completed', this)">Completados (<span id="countRemDone">0</span>)</button>
+        </div>
+
+        <div id="fullRemindersList" class="predictive-alerts-wrapper" style="margin-top:14px;">
           <!-- Dynamic list of user reminders -->
         </div>
       </section>
