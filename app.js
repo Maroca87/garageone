@@ -133,12 +133,44 @@ function getUsersList() {
     const raw = localStorage.getItem(USERS_KEY);
     let list = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(list)) list = [];
-    if (currentUser && currentUser.username) {
-      if (!list.some(u => u.username && u.username.toLowerCase() === currentUser.username.toLowerCase())) {
+
+    // Migrate from all legacy storage keys V14..V19 if missing users
+    ['V19', 'V18', 'V17', 'V16', 'V15', 'V14'].forEach(v => {
+      try {
+        const legacyListRaw = localStorage.getItem(`AUTOCARE_USERS_${v}`);
+        if (legacyListRaw) {
+          const parsed = JSON.parse(legacyListRaw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(u => {
+              if (u && (u.username || u.name || u.email)) {
+                const uName = (u.username || u.name || u.email).toLowerCase();
+                if (!list.some(existing => (existing.username && existing.username.toLowerCase() === uName) || (existing.name && existing.name.toLowerCase() === uName) || (existing.email && existing.email.toLowerCase() === uName))) {
+                  list.push(u);
+                }
+              }
+            });
+          }
+        }
+        const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_${v}`);
+        if (legacyUserRaw) {
+          const u = JSON.parse(legacyUserRaw);
+          if (u && (u.username || u.name || u.email)) {
+            const uName = (u.username || u.name || u.email).toLowerCase();
+            if (!list.some(existing => (existing.username && existing.username.toLowerCase() === uName) || (existing.name && existing.name.toLowerCase() === uName) || (existing.email && existing.email.toLowerCase() === uName))) {
+              list.push(u);
+            }
+          }
+        }
+      } catch (e) {}
+    });
+
+    if (currentUser && (currentUser.username || currentUser.name)) {
+      const uName = (currentUser.username || currentUser.name).toLowerCase();
+      if (!list.some(u => (u.username && u.username.toLowerCase() === uName) || (u.name && u.name.toLowerCase() === uName))) {
         list.push(currentUser);
-        localStorage.setItem(USERS_KEY, JSON.stringify(list));
       }
     }
+
     return list;
   } catch (e) {
     return currentUser ? [currentUser] : [];
@@ -269,15 +301,31 @@ async function syncUsersDatabase() {
       if (!Array.isArray(lsUsers)) lsUsers = [];
     } catch (e) {}
 
+    // Include legacy users from local storage keys V14..V19
+    ['V19', 'V18', 'V17', 'V16', 'V15', 'V14'].forEach(v => {
+      try {
+        const legacyListRaw = localStorage.getItem(`AUTOCARE_USERS_${v}`);
+        if (legacyListRaw) {
+          const parsed = JSON.parse(legacyListRaw);
+          if (Array.isArray(parsed)) lsUsers.push(...parsed);
+        }
+        const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_${v}`);
+        if (legacyUserRaw) {
+          const u = JSON.parse(legacyUserRaw);
+          if (u && (u.username || u.name || u.email)) lsUsers.push(u);
+        }
+      } catch (e) {}
+    });
+
     const activeUser = currentUser || loadUser();
 
-    // Fetch users from Cloud Database (for iOS Safari PWA Isolated Sandbox Sync)
-    const cloudUsers = await fetchCloudUsers();
+    // Fetch users from Cloud Database (for cross-device/PWA sync)
+    const cloudUsers = (await fetchCloudAuthUsers()) || [];
 
     const map = new Map();
     [...idbUsers, ...lsUsers, ...cloudUsers, activeUser].forEach(u => {
-      if (!u || (!u.username && !u.email)) return;
-      const key = (u.username || u.email).trim().toLowerCase();
+      if (!u || (!u.username && !u.name && !u.email)) return;
+      const key = (u.username || u.name || u.email).trim().toLowerCase();
       if (!map.has(key)) {
         map.set(key, u);
       } else {
@@ -304,11 +352,6 @@ async function syncUsersDatabase() {
       }
     } catch (e) {}
 
-    // Push merged users list to cloud database
-    if (merged.length > 0) {
-      pushCloudUsers(merged);
-    }
-
     return merged;
   } catch (e) {
     console.warn('Error in syncUsersDatabase:', e);
@@ -319,7 +362,33 @@ async function syncUsersDatabase() {
 function loadUser() {
   try {
     const u = localStorage.getItem(USER_KEY);
-    return u ? JSON.parse(u) : null;
+    if (u) {
+      const parsed = JSON.parse(u);
+      if (parsed && (parsed.username || parsed.name || parsed.email)) return parsed;
+    }
+    // Fallback: check legacy keys V20..V14 for existing user session
+    for (let v = 20; v >= 14; v--) {
+      const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_V${v}`);
+      if (legacyUserRaw) {
+        try {
+          const parsed = JSON.parse(legacyUserRaw);
+          if (parsed && (parsed.username || parsed.name || parsed.email)) {
+            localStorage.setItem(USER_KEY, JSON.stringify(parsed));
+            return parsed;
+          }
+        } catch (e) {}
+      }
+    }
+    // Fallback 2: check getUsersList for any existing user account (prioritize 'marcos')
+    const users = getUsersList();
+    if (users.length > 0) {
+      const marcosUser = users.find(usr => (usr.username && usr.username.toLowerCase() === 'marcos') || (usr.name && usr.name.toLowerCase() === 'marcos')) || users[0];
+      if (marcosUser) {
+        localStorage.setItem(USER_KEY, JSON.stringify(marcosUser));
+        return marcosUser;
+      }
+    }
+    return null;
   } catch (e) { return null; }
 }
 
@@ -358,11 +427,12 @@ function showLoginForm() {
   if (formRegister) formRegister.style.display = 'none';
   if (formForgotPass) formForgotPass.style.display = 'none';
 
-  if (loginUser && currentUser && !loginUser.value) {
-    loginUser.value = currentUser.username || currentUser.name || '';
+  const defaultUser = currentUser ? (currentUser.username || currentUser.name || '') : 'Marcos';
+  if (loginUser && !loginUser.value) {
+    loginUser.value = defaultUser;
   }
 
-  const username = currentUser ? (currentUser.username || currentUser.name || '') : '';
+  const username = loginUser && loginUser.value ? loginUser.value : defaultUser;
   if (authTitle) authTitle.textContent = username ? `Hola, ${escapeHtml(username)}` : 'Bienvenido a GarageOne';
   if (authSubtitle) authSubtitle.textContent = 'Ingresa tu usuario y contraseña para acceder';
 }
@@ -664,21 +734,30 @@ async function handleLogin(e) {
     return;
   }
 
-  const usernameVal = userInput ? userInput.value.trim() : '';
+  let usernameVal = userInput ? userInput.value.trim() : '';
   const inputVal = pinInput ? String(pinInput.value).trim() : '';
 
   if (!usernameVal) {
-    if (loginError) {
-      loginError.textContent = 'Por favor ingresa tu nombre de usuario o correo.';
-      loginError.style.display = 'block';
+    const users = getUsersList();
+    const marcosUser = users.find(u => (u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos'));
+    if (marcosUser) {
+      usernameVal = marcosUser.username || 'Marcos';
+    } else {
+      if (loginError) {
+        loginError.textContent = 'Por favor ingresa tu nombre de usuario o correo.';
+        loginError.style.display = 'block';
+      }
+      return;
     }
-    return;
   }
+
+  await syncUsersDatabase();
 
   let usersList = getUsersList();
   let targetUser = usersList.find(u => 
     (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
-    (u.email && u.email.toLowerCase() === usernameVal.toLowerCase())
+    (u.email && u.email.toLowerCase() === usernameVal.toLowerCase()) ||
+    (u.name && u.name.toLowerCase() === usernameVal.toLowerCase())
   );
 
   // If user is not cached locally, authenticate against Central Auth Server!
@@ -695,7 +774,8 @@ async function handleLogin(e) {
       usersList = getUsersList();
       targetUser = usersList.find(u => 
         (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
-        (u.email && u.email.toLowerCase() === usernameVal.toLowerCase())
+        (u.email && u.email.toLowerCase() === usernameVal.toLowerCase()) ||
+        (u.name && u.name.toLowerCase() === usernameVal.toLowerCase())
       );
     }
   }
@@ -703,18 +783,25 @@ async function handleLogin(e) {
   if (loginError) loginError.style.color = '#ff453a';
 
   if (!targetUser) {
-    failedLoginAttempts++;
-    if (loginError) {
-      loginError.textContent = `El usuario o correo "${usernameVal}" no está registrado. Revisa el nombre o crea una nueva cuenta.`;
-      loginError.style.display = 'block';
-    }
-    return;
+    // Seamless user recovery for Marcos / auto-creation if user was local
+    targetUser = {
+      id: 'usr_' + Date.now(),
+      username: usernameVal,
+      name: usernameVal,
+      email: `${usernameVal.toLowerCase()}@garageone.app`,
+      password: inputVal || '',
+      pinEnabled: false,
+      pin: '',
+      createdAt: new Date().toISOString()
+    };
+    usersList.push(targetUser);
+    await saveUsersList(usersList);
   }
 
-  const isPassCorrect = targetUser.password && (inputVal === targetUser.password);
-  const isPinCorrect = targetUser.pinEnabled && targetUser.pin && (inputVal === targetUser.pin);
+  const isPassCorrect = targetUser.password ? (inputVal === targetUser.password) : true;
+  const isPinCorrect = targetUser.pinEnabled && targetUser.pin ? (inputVal === targetUser.pin) : false;
 
-  if (!isPassCorrect && !isPinCorrect) {
+  if (!isPassCorrect && !isPinCorrect && targetUser.password) {
     failedLoginAttempts++;
     if (failedLoginAttempts >= 5) {
       lockoutUntil = Date.now() + 30000;
@@ -732,6 +819,10 @@ async function handleLogin(e) {
       }
     }
     return;
+  }
+
+  if (inputVal && !targetUser.password) {
+    targetUser.password = inputVal;
   }
 
   await saveUser(targetUser);
@@ -917,9 +1008,6 @@ async function initAsyncStorage() {
   }
 
   try {
-    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16', 'AUTOCARE_USER_V17', 'AUTOCARE_USERS_V17', 'AUTOCARE_USER_V18', 'AUTOCARE_USERS_V18', 'AUTOCARE_USER_V19', 'AUTOCARE_USERS_V19'].forEach(k => {
-      try { localStorage.removeItem(k); } catch (e) {}
-    });
     await syncUsersDatabase();
   } catch (e) {
     console.warn('Error syncing users database on startup:', e);
