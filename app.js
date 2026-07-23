@@ -3,8 +3,8 @@
    ========================================================================== */
 
 const STORAGE_KEY = 'AUTOCARE_DATA_V14';
-const USER_KEY = 'AUTOCARE_USER_V16';
-const USERS_KEY = 'AUTOCARE_USERS_V16';
+const USER_KEY = 'AUTOCARE_USER_V17';
+const USERS_KEY = 'AUTOCARE_USERS_V17';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -167,32 +167,32 @@ async function saveUsersList(usersList) {
   }
 }
 
-const CLOUD_SYNC_URL = 'https://keyvalue.immanuel.co/api/KeyVal/';
-const CLOUD_SYNC_KEY = 'garageone_app_users_v16_prod';
+const CLOUD_SYNC_KEY = 'garageone_app_users_v17_prod';
 
 async function fetchCloudUsers() {
+  const users = [];
   try {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
-    const res = await fetch(`${CLOUD_SYNC_URL}GetValue/${CLOUD_SYNC_KEY}/all_users`, { 
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 4500) : null;
+    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_SYNC_KEY}/users`, { 
       signal: controller ? controller.signal : undefined 
     });
     if (timeoutId) clearTimeout(timeoutId);
-    if (!res.ok) return [];
-    const text = await res.text();
-    if (!text) return [];
-    let parsed = text;
-    if (typeof text === 'string') {
+    if (res.ok) {
+      const text = await res.text();
+      let parsed = text;
       try { parsed = JSON.parse(text); } catch (e) {}
+      if (typeof parsed === 'string') {
+        try { parsed = JSON.parse(parsed); } catch (e) {}
+      }
+      if (Array.isArray(parsed)) {
+        users.push(...parsed);
+      }
     }
-    if (typeof parsed === 'string') {
-      try { parsed = JSON.parse(parsed); } catch (e) {}
-    }
-    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.warn('Cloud fetch users error/timeout:', e);
-    return [];
+    console.warn('Cloud fetch users fallback A:', e);
   }
+  return users;
 }
 
 async function pushCloudUsers(usersList) {
@@ -208,13 +208,36 @@ async function pushCloudUsers(usersList) {
       pin: u.pin || '',
       createdAt: u.createdAt || new Date().toISOString()
     }));
-    await fetch(`${CLOUD_SYNC_URL}UpdateValue/${CLOUD_SYNC_KEY}/all_users`, {
+    const jsonStr = JSON.stringify(cleanList);
+
+    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_SYNC_KEY}/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'value=' + encodeURIComponent(JSON.stringify(cleanList))
+      body: 'value=' + encodeURIComponent(jsonStr)
     });
   } catch (e) {
     console.warn('Cloud push users error:', e);
+  }
+}
+
+async function manualSyncUserDatabase() {
+  const loginError = document.getElementById('loginError');
+  if (loginError) {
+    loginError.style.color = '#38bdf8';
+    loginError.textContent = 'Conectando a la Base de Datos en la Nube...';
+    loginError.style.display = 'block';
+  }
+
+  const list = await syncUsersDatabase();
+
+  if (loginError) {
+    if (list && list.length > 0) {
+      loginError.style.color = '#30d158';
+      loginError.textContent = `¡Sincronización Exitosa! ${list.length} usuario(s) disponible(s). Puedes ingresar.`;
+    } else {
+      loginError.style.color = '#ff9f0a';
+      loginError.textContent = 'No se encontraron usuarios en la nube. Crea una cuenta nueva.';
+    }
   }
 }
 
@@ -862,6 +885,9 @@ async function initAsyncStorage() {
   }
 
   try {
+    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16'].forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
     await syncUsersDatabase();
   } catch (e) {
     console.warn('Error syncing users database on startup:', e);
