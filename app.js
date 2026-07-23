@@ -3,8 +3,8 @@
    ========================================================================== */
 
 const STORAGE_KEY = 'AUTOCARE_DATA_V14';
-const USER_KEY = 'AUTOCARE_USER_V19';
-const USERS_KEY = 'AUTOCARE_USERS_V19';
+const USER_KEY = 'AUTOCARE_USER_V20';
+const USERS_KEY = 'AUTOCARE_USERS_V20';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -167,32 +167,46 @@ async function saveUsersList(usersList) {
   }
 }
 
-// Centralized Cloud User Authentication Server (CORS JSON REST Engine v19)
-const CLOUD_AUTH_BIN = 'https://api.jsonbin.io/v3/b/65c8a9a0dc74654018a45210';
+// Multi-Provider Cloud User Authentication Server (v20 Clean Engine)
+const CLOUD_AUTH_KEY = 'garageone_auth_v20_clean';
 
 async function fetchCloudAuthUsers() {
   const users = [];
+
+  // Provider 1: KVDB CORS REST API
   try {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 4500) : null;
-    const res = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/garageone_auth_v19/users`, {
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
+    const res = await fetch(`https://kvdb.io/4y9n1k8p3q7w5t2z/users`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
       signal: controller ? controller.signal : undefined
     });
     if (timeoutId) clearTimeout(timeoutId);
     if (res.ok) {
-      const text = await res.text();
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('Cloud Auth Provider 1 fetch fallback:', e);
+  }
+
+  // Provider 2: KeyVal REST API
+  try {
+    const res2 = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_AUTH_KEY}/users`);
+    if (res2.ok) {
+      const text = await res2.text();
       let parsed = text;
       try { parsed = JSON.parse(text); } catch (e) {}
       if (typeof parsed === 'string') {
         try { parsed = JSON.parse(parsed); } catch (e) {}
       }
-      if (Array.isArray(parsed)) {
-        users.push(...parsed);
-      }
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
-    console.warn('Cloud Auth fetch fallback:', e);
+    console.warn('Cloud Auth Provider 2 fetch fallback:', e);
   }
+
   return users;
 }
 
@@ -220,11 +234,26 @@ async function registerCloudAuthUser(userObj) {
       createdAt: u.createdAt || new Date().toISOString()
     }));
 
-    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/garageone_auth_v19/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'value=' + encodeURIComponent(JSON.stringify(cleanList))
-    });
+    const jsonStr = JSON.stringify(cleanList);
+
+    // Push Provider 1 (KVDB CORS JSON)
+    try {
+      await fetch(`https://kvdb.io/4y9n1k8p3q7w5t2z/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonStr
+      });
+    } catch (e) {}
+
+    // Push Provider 2 (KeyVal)
+    try {
+      await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_AUTH_KEY}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'value=' + encodeURIComponent(jsonStr)
+      });
+    } catch (e) {}
+
   } catch (e) {
     console.warn('Cloud Auth Register Error:', e);
   }
@@ -888,7 +917,7 @@ async function initAsyncStorage() {
   }
 
   try {
-    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16', 'AUTOCARE_USER_V17', 'AUTOCARE_USERS_V17', 'AUTOCARE_USER_V18', 'AUTOCARE_USERS_V18'].forEach(k => {
+    ['AUTOCARE_USER_V14', 'AUTOCARE_USERS_V14', 'AUTOCARE_USER_V15', 'AUTOCARE_USERS_V15', 'AUTOCARE_USER_V16', 'AUTOCARE_USERS_V16', 'AUTOCARE_USER_V17', 'AUTOCARE_USERS_V17', 'AUTOCARE_USER_V18', 'AUTOCARE_USERS_V18', 'AUTOCARE_USER_V19', 'AUTOCARE_USERS_V19'].forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
     });
     await syncUsersDatabase();
