@@ -2,9 +2,9 @@
    AutoCare - Core Logic (v14: Bi-Directional Seamless iOS Swipe Physics)
    ========================================================================== */
 
-const STORAGE_KEY = 'AUTOCARE_DATA_V14';
-const USER_KEY = 'AUTOCARE_USER_V20';
-const USERS_KEY = 'AUTOCARE_USERS_V20';
+const STORAGE_KEY = 'AUTOCARE_DATA_V25';
+const USER_KEY = 'AUTOCARE_USER_V25';
+const USERS_KEY = 'AUTOCARE_USERS_V25';
 
 // Security: Helper to escape user HTML inputs
 function escapeHtml(str) {
@@ -133,47 +133,9 @@ function getUsersList() {
     const raw = localStorage.getItem(USERS_KEY);
     let list = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(list)) list = [];
-
-    // Migrate from all legacy storage keys V14..V19 if missing users
-    ['V19', 'V18', 'V17', 'V16', 'V15', 'V14'].forEach(v => {
-      try {
-        const legacyListRaw = localStorage.getItem(`AUTOCARE_USERS_${v}`);
-        if (legacyListRaw) {
-          const parsed = JSON.parse(legacyListRaw);
-          if (Array.isArray(parsed)) {
-            parsed.forEach(u => {
-              if (u && (u.username || u.name || u.email)) {
-                const uName = (u.username || u.name || u.email).toLowerCase();
-                if (!list.some(existing => (existing.username && existing.username.toLowerCase() === uName) || (existing.name && existing.name.toLowerCase() === uName) || (existing.email && existing.email.toLowerCase() === uName))) {
-                  list.push(u);
-                }
-              }
-            });
-          }
-        }
-        const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_${v}`);
-        if (legacyUserRaw) {
-          const u = JSON.parse(legacyUserRaw);
-          if (u && (u.username || u.name || u.email)) {
-            const uName = (u.username || u.name || u.email).toLowerCase();
-            if (!list.some(existing => (existing.username && existing.username.toLowerCase() === uName) || (existing.name && existing.name.toLowerCase() === uName) || (existing.email && existing.email.toLowerCase() === uName))) {
-              list.push(u);
-            }
-          }
-        }
-      } catch (e) {}
-    });
-
-    if (currentUser && (currentUser.username || currentUser.name)) {
-      const uName = (currentUser.username || currentUser.name).toLowerCase();
-      if (!list.some(u => (u.username && u.username.toLowerCase() === uName) || (u.name && u.name.toLowerCase() === uName))) {
-        list.push(currentUser);
-      }
-    }
-
     return list;
   } catch (e) {
-    return currentUser ? [currentUser] : [];
+    return [];
   }
 }
 
@@ -189,9 +151,7 @@ async function saveUsersList(usersList) {
       const tx = db.transaction(IDB_STORE, 'readwrite');
       tx.objectStore(IDB_STORE).put(usersList, 'usersList');
     }
-  } catch (e) {
-    console.warn('Error saving users to IndexedDB:', e);
-  }
+  } catch (e) {}
   if (userSyncChannel) {
     try {
       userSyncChannel.postMessage({ type: 'USER_DATABASE_UPDATED' });
@@ -199,144 +159,16 @@ async function saveUsersList(usersList) {
   }
 }
 
-// Multi-Provider Cloud User Authentication Server (v20 Clean Engine)
-const CLOUD_AUTH_KEY = 'garageone_auth_v20_clean';
-
-async function fetchCloudAuthUsers() {
-  const users = [];
-
-  // Provider 1: KVDB CORS REST API
-  try {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 3500) : null;
-    const res = await fetch(`https://kvdb.io/4y9n1k8p3q7w5t2z/users`, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: controller ? controller.signal : undefined
-    });
-    if (timeoutId) clearTimeout(timeoutId);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) return data;
-    }
-  } catch (e) {
-    console.warn('Cloud Auth Provider 1 fetch fallback:', e);
-  }
-
-  // Provider 2: KeyVal REST API
-  try {
-    const res2 = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${CLOUD_AUTH_KEY}/users`);
-    if (res2.ok) {
-      const text = await res2.text();
-      let parsed = text;
-      try { parsed = JSON.parse(text); } catch (e) {}
-      if (typeof parsed === 'string') {
-        try { parsed = JSON.parse(parsed); } catch (e) {}
-      }
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.warn('Cloud Auth Provider 2 fetch fallback:', e);
-  }
-
-  return users;
-}
-
-async function registerCloudAuthUser(userObj) {
-  try {
-    const list = await fetchCloudAuthUsers();
-    const idx = list.findIndex(u => 
-      (u.username && userObj.username && u.username.toLowerCase() === userObj.username.toLowerCase()) ||
-      (u.email && userObj.email && u.email.toLowerCase() === userObj.email.toLowerCase())
-    );
-    if (idx >= 0) {
-      list[idx] = { ...list[idx], ...userObj };
-    } else {
-      list.push(userObj);
-    }
-    
-    const cleanList = list.map(u => ({
-      id: u.id || ('usr_' + Date.now()),
-      username: u.username,
-      name: u.name || u.username,
-      email: u.email || '',
-      password: u.password,
-      pinEnabled: !!u.pinEnabled,
-      pin: u.pin || '',
-      createdAt: u.createdAt || new Date().toISOString()
-    }));
-
-    const jsonStr = JSON.stringify(cleanList);
-
-    // Push Provider 1 (KVDB CORS JSON)
-    try {
-      await fetch(`https://kvdb.io/4y9n1k8p3q7w5t2z/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jsonStr
-      });
-    } catch (e) {}
-
-    // Push Provider 2 (KeyVal)
-    try {
-      await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${CLOUD_AUTH_KEY}/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'value=' + encodeURIComponent(jsonStr)
-      });
-    } catch (e) {}
-
-  } catch (e) {
-    console.warn('Cloud Auth Register Error:', e);
-  }
-}
-
 async function syncUsersDatabase() {
   try {
     const idbUsers = (await loadUsersListFromIDB()) || [];
-    let lsUsers = [];
-    try {
-      const raw = localStorage.getItem(USERS_KEY);
-      lsUsers = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(lsUsers)) lsUsers = [];
-    } catch (e) {}
-
-    // Include legacy users from local storage keys V14..V19
-    ['V19', 'V18', 'V17', 'V16', 'V15', 'V14'].forEach(v => {
-      try {
-        const legacyListRaw = localStorage.getItem(`AUTOCARE_USERS_${v}`);
-        if (legacyListRaw) {
-          const parsed = JSON.parse(legacyListRaw);
-          if (Array.isArray(parsed)) lsUsers.push(...parsed);
-        }
-        const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_${v}`);
-        if (legacyUserRaw) {
-          const u = JSON.parse(legacyUserRaw);
-          if (u && (u.username || u.name || u.email)) lsUsers.push(u);
-        }
-      } catch (e) {}
-    });
-
-    const activeUser = currentUser || loadUser();
-
-    // Fetch users from Cloud Database (for cross-device/PWA sync)
-    const cloudUsers = (await fetchCloudAuthUsers()) || [];
-
+    let lsUsers = getUsersList();
     const map = new Map();
-    [...idbUsers, ...lsUsers, ...cloudUsers, activeUser].forEach(u => {
+    [...idbUsers, ...lsUsers].forEach(u => {
       if (!u || (!u.username && !u.name && !u.email)) return;
       const key = (u.username || u.name || u.email).trim().toLowerCase();
       if (!map.has(key)) {
         map.set(key, u);
-      } else {
-        const prev = map.get(key);
-        map.set(key, {
-          ...prev,
-          ...u,
-          password: u.password || prev.password,
-          pin: u.pin || prev.pin,
-          email: u.email || prev.email
-        });
       }
     });
 
@@ -344,17 +176,8 @@ async function syncUsersDatabase() {
     try {
       localStorage.setItem(USERS_KEY, JSON.stringify(merged));
     } catch (e) {}
-    try {
-      const db = await openIDB();
-      if (db) {
-        const tx = db.transaction(IDB_STORE, 'readwrite');
-        tx.objectStore(IDB_STORE).put(merged, 'usersList');
-      }
-    } catch (e) {}
-
     return merged;
   } catch (e) {
-    console.warn('Error in syncUsersDatabase:', e);
     return getUsersList();
   }
 }
@@ -366,47 +189,32 @@ function loadUser() {
       const parsed = JSON.parse(u);
       if (parsed && (parsed.username || parsed.name || parsed.email)) return parsed;
     }
-    // Fallback: check legacy keys V20..V14 for existing user session
-    for (let v = 20; v >= 14; v--) {
-      const legacyUserRaw = localStorage.getItem(`AUTOCARE_USER_V${v}`);
-      if (legacyUserRaw) {
-        try {
-          const parsed = JSON.parse(legacyUserRaw);
-          if (parsed && (parsed.username || parsed.name || parsed.email)) {
-            localStorage.setItem(USER_KEY, JSON.stringify(parsed));
-            return parsed;
-          }
-        } catch (e) {}
-      }
-    }
-    // Fallback 2: check getUsersList for any existing user account
-    const users = getUsersList();
-    if (users.length > 0) {
-      localStorage.setItem(USER_KEY, JSON.stringify(users[0]));
-      return users[0];
-    }
     return null;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }
 
 async function saveUser(user) {
   currentUser = user;
-  try {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch (e) {
-    console.warn('Error saving currentUser:', e);
-  }
-  const list = await syncUsersDatabase();
-  const idx = list.findIndex(u => 
-    (u.username && user.username && u.username.toLowerCase() === user.username.toLowerCase()) ||
-    (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase())
-  );
-  if (idx >= 0) {
-    list[idx] = { ...list[idx], ...user };
+  if (user) {
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch (e) {}
+    let list = getUsersList();
+    const idx = list.findIndex(u => 
+      (u.id && user.id && u.id === user.id) || 
+      (u.username && user.username && u.username.toLowerCase() === user.username.toLowerCase())
+    );
+    if (idx !== -1) {
+      list[idx] = user;
+    } else {
+      list.push(user);
+    }
+    await saveUsersList(list);
   } else {
-    list.push(user);
+    localStorage.removeItem(USER_KEY);
   }
-  await saveUsersList(list);
 }
 
 let currentRecoveryOTP = null;
@@ -598,13 +406,13 @@ function checkAuth() {
 
   if (!currentUser) {
     isAuthenticated = false;
-    showRegisterForm();
   }
 
   if (isAuthenticated) {
     if (authScreen) authScreen.style.display = 'none';
     if (appShell) appShell.style.display = 'block';
     try {
+      switchTab('tabGarage');
       renderApp();
       renderUserSettings();
     } catch (err) {
@@ -707,7 +515,6 @@ async function handleRegister(e) {
   };
 
   await saveUser(newUser);
-  await registerCloudAuthUser(newUser);
 
   isAuthenticated = true;
   failedLoginAttempts = 0;
@@ -742,8 +549,6 @@ async function handleLogin(e) {
     return;
   }
 
-  await syncUsersDatabase();
-
   let usersList = getUsersList();
   let targetUser = usersList.find(u => 
     (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
@@ -751,42 +556,14 @@ async function handleLogin(e) {
     (u.name && u.name.toLowerCase() === usernameVal.toLowerCase())
   );
 
-  // If user is not cached locally, authenticate against Central Auth Server!
-  if (!targetUser) {
-    if (loginError) {
-      loginError.style.color = '#38bdf8';
-      loginError.textContent = 'Autenticando credenciales en el Servidor de Usuarios...';
-      loginError.style.display = 'block';
-    }
-
-    const cloudUsers = await fetchCloudAuthUsers();
-    if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
-      await saveUsersList(cloudUsers);
-      usersList = getUsersList();
-      targetUser = usersList.find(u => 
-        (u.username && u.username.toLowerCase() === usernameVal.toLowerCase()) ||
-        (u.email && u.email.toLowerCase() === usernameVal.toLowerCase()) ||
-        (u.name && u.name.toLowerCase() === usernameVal.toLowerCase())
-      );
-    }
-  }
-
   if (loginError) loginError.style.color = '#ff453a';
 
   if (!targetUser) {
-    // Seamless user recovery for Marcos / auto-creation if user was local
-    targetUser = {
-      id: 'usr_' + Date.now(),
-      username: usernameVal,
-      name: usernameVal,
-      email: `${usernameVal.toLowerCase()}@garageone.app`,
-      password: inputVal || '',
-      pinEnabled: false,
-      pin: '',
-      createdAt: new Date().toISOString()
-    };
-    usersList.push(targetUser);
-    await saveUsersList(usersList);
+    if (loginError) {
+      loginError.textContent = `El usuario "${usernameVal}" no existe. Regístrate para iniciar sesión.`;
+      loginError.style.display = 'block';
+    }
+    return;
   }
 
   const isPassCorrect = targetUser.password ? (inputVal === targetUser.password) : true;
@@ -812,10 +589,6 @@ async function handleLogin(e) {
     return;
   }
 
-  if (inputVal && !targetUser.password) {
-    targetUser.password = inputVal;
-  }
-
   await saveUser(targetUser);
   isAuthenticated = true;
   failedLoginAttempts = 0;
@@ -827,9 +600,7 @@ async function handleLogin(e) {
 function resetUserPin(e) {
   if (e) e.preventDefault();
   if (confirm('¿Deseas cerrar sesión para ingresar con otro usuario o registrar una cuenta nueva?')) {
-    currentUser = null;
-    isAuthenticated = false;
-    showRegisterForm();
+    handleLogout();
   }
 }
 
@@ -881,10 +652,28 @@ function saveNewPin() {
 
 function handleLogout() {
   isAuthenticated = false;
-  const loginUser = document.getElementById('loginUser');
-  if (loginUser && currentUser) {
-    loginUser.value = currentUser.username || '';
+  currentUser = null;
+  localStorage.removeItem(USER_KEY);
+  for (let v = 1; v <= 30; v++) {
+    localStorage.removeItem(`AUTOCARE_USER_V${v}`);
   }
+
+  const loginUser = document.getElementById('loginUser');
+  if (loginUser) loginUser.value = '';
+  const loginPin = document.getElementById('loginPin');
+  if (loginPin) loginPin.value = '';
+  const loginError = document.getElementById('loginError');
+  if (loginError) loginError.style.display = 'none';
+
+  const regUser = document.getElementById('regUser');
+  if (regUser) regUser.value = '';
+  const regEmail = document.getElementById('regEmail');
+  if (regEmail) regEmail.value = '';
+  const regPassword = document.getElementById('regPassword');
+  if (regPassword) regPassword.value = '';
+  const regConfirmPassword = document.getElementById('regConfirmPassword');
+  if (regConfirmPassword) regConfirmPassword.value = '';
+
   checkAuth();
 }
 
@@ -991,32 +780,19 @@ async function initAsyncStorage() {
       if (idbRaw.length >= localRaw.length && idbState.vehicles) {
         appState = sanitizeState(idbState);
         renderApp();
-        renderStorageStats();
       }
     }
   } catch (e) {
     console.warn('Error loading IndexedDB state on startup:', e);
   }
 
-  try {
-    await syncUsersDatabase();
-    let usersList = getUsersList();
-    if (usersList.some(u => (u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos'))) {
-      usersList = usersList.filter(u => !((u.username && u.username.toLowerCase() === 'marcos') || (u.name && u.name.toLowerCase() === 'marcos')));
-      await saveUsersList(usersList);
-    }
-  } catch (e) {
-    console.warn('Error syncing users database on startup:', e);
+  // Purge legacy users V1..V24 from cache
+  for (let v = 1; v <= 24; v++) {
+    localStorage.removeItem(`AUTOCARE_USER_V${v}`);
+    localStorage.removeItem(`AUTOCARE_USERS_V${v}`);
   }
 
   currentUser = loadUser();
-  if (currentUser && ((currentUser.username && currentUser.username.toLowerCase() === 'marcos') || (currentUser.name && currentUser.name.toLowerCase() === 'marcos'))) {
-    currentUser = null;
-    localStorage.removeItem(USER_KEY);
-    for (let v = 1; v <= 30; v++) {
-      localStorage.removeItem(`AUTOCARE_USER_V${v}`);
-    }
-  }
   checkAuth();
 }
 
