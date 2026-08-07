@@ -1960,34 +1960,52 @@ function renderCustomCategoriesList() {
   if (!container) return;
 
   const cats = SERVICE_CATEGORIES || [];
-  container.innerHTML = cats.map(cat => `
-    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.08);">
-      <span style="color:#ffffff; font-weight:600;">${escapeHtml(cat)}</span>
-      <div style="display:flex; gap:4px;">
-        <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.7rem; padding:2px 6px;" onclick="editCategoryName('${escapeHtml(cat)}')">Editar</button>
-        <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.7rem; padding:2px 6px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(cat)}')">Eliminar</button>
+  const healthCats = appState.serviceCategories || [];
+
+  container.innerHTML = cats.map(cat => {
+    const hInfo = healthCats.find(c => c.name && c.name.toLowerCase() === cat.toLowerCase());
+    const isHealth = hInfo && hInfo.affectsHealth === true;
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="color:#ffffff; font-weight:600;">${escapeHtml(cat)}</span>
+          ${isHealth ? '<span style="font-size:0.7rem; color:#34d399; background:rgba(52,211,153,0.1); padding:1px 6px; border-radius:4px; font-weight:600;">💚 Salud</span>' : ''}
+        </div>
+        <div style="display:flex; gap:4px;">
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.7rem; padding:2px 6px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
+          <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.7rem; padding:2px 6px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(cat)}')">Eliminar</button>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
+}
+
+function loadCategoryForEdit(catName) {
+  document.getElementById('editCatOldName').value = catName;
+  document.getElementById('newCatName').value = catName;
+  document.getElementById('modalNewCategoryTitle').textContent = 'Editar Servicio';
+
+  const healthCats = appState.serviceCategories || [];
+  const hInfo = healthCats.find(c => c.name && c.name.toLowerCase() === catName.toLowerCase());
+
+  const affectsCheck = document.getElementById('newCatAffectsHealth');
+  const container = document.getElementById('newCatHealthFieldsContainer');
+
+  if (hInfo && hInfo.affectsHealth === true) {
+    if (affectsCheck) affectsCheck.checked = true;
+    if (container) container.style.display = 'block';
+    if (document.getElementById('newCatIntervalKm')) document.getElementById('newCatIntervalKm').value = hInfo.recommendedIntervalKm || '';
+    if (document.getElementById('newCatIntervalMonths')) document.getElementById('newCatIntervalMonths').value = hInfo.recommendedIntervalMonths || '';
+  } else {
+    if (affectsCheck) affectsCheck.checked = false;
+    if (container) container.style.display = 'none';
+    if (document.getElementById('newCatIntervalKm')) document.getElementById('newCatIntervalKm').value = '';
+    if (document.getElementById('newCatIntervalMonths')) document.getElementById('newCatIntervalMonths').value = '';
+  }
 }
 
 function editCategoryName(oldName) {
-  const newName = prompt('Ingresa el nuevo nombre para este servicio:', oldName);
-  if (!newName || !newName.trim() || newName.trim() === oldName) return;
-
-  const idx = SERVICE_CATEGORIES.indexOf(oldName);
-  if (idx !== -1) {
-    SERVICE_CATEGORIES[idx] = newName.trim();
-  }
-
-  (appState.services || []).forEach(s => {
-    if (s.category === oldName) s.category = newName.trim();
-  });
-
-  saveState();
-  populateServCategorySelect();
-  renderMaintenanceFilterPills();
-  renderCustomCategoriesList();
+  loadCategoryForEdit(oldName);
 }
 
 function deleteCategory(catName) {
@@ -2014,17 +2032,55 @@ function saveNewCategory(e) {
   const name = document.getElementById('newCatName').value.trim();
   if (!name) return;
 
-  if (!SERVICE_CATEGORIES.includes(name)) {
+  const oldName = document.getElementById('editCatOldName')?.value || '';
+
+  if (oldName && oldName !== name) {
+    const idx = SERVICE_CATEGORIES.indexOf(oldName);
+    if (idx !== -1) SERVICE_CATEGORIES[idx] = name;
+    (appState.services || []).forEach(s => {
+      if (s.category === oldName) s.category = name;
+    });
+  } else if (!SERVICE_CATEGORIES.includes(name)) {
     SERVICE_CATEGORIES.push(name);
+  }
+
+  const affectsHealth = document.getElementById('newCatAffectsHealth')?.checked || false;
+  const intervalKm = Number(document.getElementById('newCatIntervalKm')?.value) || 0;
+  const intervalMonths = Number(document.getElementById('newCatIntervalMonths')?.value) || 0;
+
+  if (!appState.serviceCategories) appState.serviceCategories = [];
+  const existingIdx = appState.serviceCategories.findIndex(c => c.name && c.name.toLowerCase() === (oldName || name).toLowerCase());
+
+  if (existingIdx !== -1) {
+    appState.serviceCategories[existingIdx] = {
+      ...appState.serviceCategories[existingIdx],
+      name,
+      affectsHealth,
+      recommendedIntervalKm: intervalKm,
+      recommendedIntervalMonths: intervalMonths
+    };
+  } else {
+    appState.serviceCategories.push({
+      id: 'cat_' + Date.now(),
+      name,
+      affectsHealth,
+      recommendedIntervalKm: intervalKm,
+      recommendedIntervalMonths: intervalMonths
+    });
   }
 
   saveState();
   closeModal('modalNewCategory');
   document.getElementById('formNewCategory').reset();
+  if (document.getElementById('editCatOldName')) document.getElementById('editCatOldName').value = '';
+  if (document.getElementById('modalNewCategoryTitle')) document.getElementById('modalNewCategoryTitle').textContent = 'Crear Nuevo Servicio';
+  if (document.getElementById('newCatHealthFieldsContainer')) document.getElementById('newCatHealthFieldsContainer').style.display = 'none';
 
   populateServCategorySelect();
   renderMaintenanceFilterPills();
   renderCustomCategoriesList();
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
+
   const select = document.getElementById('servCategory');
   if (select) select.value = name;
 }
@@ -5603,12 +5659,9 @@ function renderVehicleHealth() {
     </div>
 
     <!-- SECCIÓN 2: COMPONENTES ADICIONALES / MANTENIMIENTOS ESPECÍFICOS -->
-    <div style="margin-top:24px; margin-bottom:12px; border-top:1px solid var(--border-color); padding-top:18px; display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <h3 style="font-size:0.95rem; font-weight:800; color:#38bdf8; margin:0;">⚙️ Componentes Adicionales / Mantenimientos Específicos</h3>
-        <p class="subtitle" style="font-size:0.8rem; margin:2px 0 0 0;">Servicios personalizados que participan en el análisis de salud.</p>
-      </div>
-      <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()" style="font-size:0.78rem;">+ Nuevo Servicio</button>
+    <div style="margin-top:24px; margin-bottom:12px; border-top:1px solid var(--border-color); padding-top:18px;">
+      <h3 style="font-size:0.95rem; font-weight:800; color:#38bdf8; margin:0 0 2px 0;">⚙️ Componentes Adicionales / Mantenimientos Específicos</h3>
+      <p class="subtitle" style="font-size:0.8rem; margin:0;">Servicios personalizados configurados para participar en el análisis de salud.</p>
     </div>
 
     ${h.customComponentsData && h.customComponentsData.length > 0 ? `
@@ -5643,9 +5696,8 @@ function renderVehicleHealth() {
         `).join('')}
       </div>
     ` : `
-      <div style="background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.1); border-radius:12px; padding:20px; text-align:center;">
-        <p class="subtitle" style="margin:0 0 10px 0; font-size:0.83rem;">No hay mantenimientos específicos configurados para participar en Salud.</p>
-        <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()">+ Configurar un servicio personalizado</button>
+      <div style="background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.1); border-radius:12px; padding:18px; text-align:center;">
+        <p class="subtitle" style="margin:0; font-size:0.83rem;">No hay mantenimientos específicos configurados para participar en Salud. Puedes activarlos al crear o editar un servicio en la pestaña Mantenimiento (+ Crear servicio).</p>
       </div>
     `}
   `;
