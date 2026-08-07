@@ -975,17 +975,12 @@ function renderStorageStats() {
   container.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
       <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
-      <span style="font-weight:700; color:${barColor};">Estado del Respaldo: ${usage.percent <= 100 ? 'Normal' : 'Elevado'}</span>
     </div>
     <div style="width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
       <div style="width:${Math.max(1, Math.min(100, usage.percent))}%; height:100%; background:${barColor}; border-radius:5px; transition:width 0.3s ease; box-shadow:0 0 10px ${barColor}66;"></div>
     </div>
-    <div style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#30d158; margin-bottom:6px;">
-      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#30d158; box-shadow:0 0 8px #30d158;"></span>
-      <strong>Servicio de Respaldo: Activo y Sincronizado</strong>
-    </div>
     <div style="font-size:0.78rem; color:#cbd5e1; line-height:1.4;">
-      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s) respaldado(s).
+      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s) almacenados.
     </div>
   `;
 }
@@ -1458,8 +1453,8 @@ function checkAndSendDueNotifications() {
   if (!veh || !appState.reminders) return;
 
   const currentKm = Number(veh.km || 0);
-  const todayStr = new Date().toISOString().split('T')[0];
   const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
   const currentHoursMin = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 
   let notifiedSet = new Set();
@@ -1479,6 +1474,19 @@ function checkAndSendDueNotifications() {
       if (r.targetDate < todayStr || (r.targetDate === todayStr && (!r.time || currentHoursMin >= r.time))) {
         shouldNotify = true;
         detail = `Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''}`;
+      } else if (r.targetDate === todayStr && r.time && r.time > currentHoursMin) {
+        // Schedule precise timeout for today's upcoming reminder time
+        const [targetHour, targetMin] = r.time.split(':').map(Number);
+        const targetTimeObj = new Date();
+        targetTimeObj.setHours(targetHour, targetMin, 0, 0);
+        const delayMs = targetTimeObj.getTime() - now.getTime();
+        if (delayMs > 0 && delayMs <= 86400000 && !r._timerScheduled) {
+          r._timerScheduled = true;
+          setTimeout(() => {
+            r._timerScheduled = false;
+            checkAndSendDueNotifications();
+          }, delayMs);
+        }
       }
     }
     if (r.targetKm && Number(r.targetKm) > 0 && currentKm >= Number(r.targetKm)) {
@@ -1493,20 +1501,29 @@ function checkAndSendDueNotifications() {
         updatedNotified = true;
 
         const notifTitle = `GarageOne - ${r.title}`;
-        const notifBody = `${veh.name}: ${detail} (${r.category || 'Recordatorio'})`;
+        const notifBody = `${veh.name || 'Vehículo'}: ${detail} (${r.category || 'Recordatorio'})`;
 
-        // 1. Browser Native Notification
+        // Trigger native phone system notification via ServiceWorker or Notification API
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
-            new Notification(notifTitle, {
-              body: notifBody,
-              icon: 'icons/icon-192.png'
-            });
-          } catch (e) {}
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(notifTitle, {
+                  body: notifBody,
+                  icon: 'icons/icon-192.png',
+                  badge: 'icons/icon-192.png',
+                  vibrate: [200, 100, 200]
+                });
+              }).catch(() => {
+                new Notification(notifTitle, { body: notifBody, icon: 'icons/icon-192.png' });
+              });
+            } else {
+              new Notification(notifTitle, { body: notifBody, icon: 'icons/icon-192.png' });
+            }
+          } catch (e) {
+            console.error('Error al emitir notificación nativa:', e);
+          }
         }
-
-        // 2. In-App Notification Banner
-        showInAppNotificationBanner(notifTitle, notifBody);
       }
     }
   });
@@ -1516,51 +1533,6 @@ function checkAndSendDueNotifications() {
       localStorage.setItem('GARAGEONE_NOTIFIED_REMINDERS', JSON.stringify(Array.from(notifiedSet)));
     } catch (e) {}
   }
-}
-
-function showInAppNotificationBanner(title, body) {
-  let banner = document.getElementById('globalInAppNotification');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'globalInAppNotification';
-    banner.style.cssText = `
-      position: fixed;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 99999;
-      background: rgba(28, 28, 30, 0.95);
-      border: 1px solid rgba(56, 189, 248, 0.5);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(12px);
-      color: #ffffff;
-      padding: 12px 16px;
-      border-radius: 14px;
-      max-width: 92%;
-      width: 380px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    `;
-    document.body.appendChild(banner);
-  }
-
-  banner.innerHTML = `
-    <div style="background:rgba(56,189,248,0.2); border-radius:10px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-    </div>
-    <div style="flex:1;">
-      <strong style="font-size:0.88rem; color:#38bdf8; display:block; margin-bottom:2px;">${escapeHtml(title)}</strong>
-      <span style="font-size:0.78rem; color:#e2e8f0; line-height:1.3; display:block;">${escapeHtml(body)}</span>
-    </div>
-    <button type="button" style="background:none; border:none; color:#94a3b8; font-size:1.2rem; cursor:pointer; padding:0 4px;" onclick="this.parentElement.remove()">&times;</button>
-  `;
-
-  setTimeout(() => {
-    if (banner && banner.parentElement) {
-      banner.remove();
-    }
-  }, 8000);
 }
 
 function getReminderCategoryIcon(category) {
@@ -1622,7 +1594,7 @@ function getReminderStatus(r, veh) {
   }
 
   let status = 'ontrack';
-  let badgeHtml = '<span class="badge-subtle badge-blue">📋 Al Día</span>';
+  let badgeHtml = '<span class="badge-subtle badge-blue">Al Día</span>';
 
   if (isUrgent) {
     status = 'urgent';
@@ -2405,7 +2377,7 @@ async function loadAiChat(chatId) {
 
   (chat.messages || []).forEach(m => {
     if (m.role === 'user') {
-      html += `<div style="margin-top:10px; font-weight:700; color:#38bdf8;">👤 Tú: ${escapeHtml(m.content)}</div>`;
+      html += `<div style="margin-top:10px; font-weight:700; color:#38bdf8;">Tú: ${escapeHtml(m.content)}</div>`;
     } else {
       html += `<div style="margin-top:6px; background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">${formatText(m.content)}</div>`;
     }
@@ -2556,7 +2528,7 @@ Consulta: "${question}"`;
     }
 
     if (!isLive) {
-      const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">💡 Asistente Mecánico Offline (Conocimiento Local)</div><br>`;
+      const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">Asistente Mecánico Offline (Conocimiento Local)</div><br>`;
       responseText = getSmartOfflineResponse(question, veh, vehContext, recentServicesText, pendingRemindersText);
       responseBox.innerHTML = offlineBadge + formatText(responseText);
       if (input) input.value = '';
@@ -2583,7 +2555,7 @@ Consulta: "${question}"`;
     }
   } catch (err) {
     console.error('Error en IA:', err);
-    const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">💡 Asistente Mecánico Offline</div><br>`;
+    const offlineBadge = `<div style="display:inline-flex; align-items:center; gap:6px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:4px 10px; border-radius:12px; font-size:0.78rem; font-weight:700; margin-bottom:12px;">Asistente Mecánico Offline</div><br>`;
     const responseText = getSmartOfflineResponse(question, getActiveVehicle(), '', '', '');
     responseBox.innerHTML = offlineBadge + (responseText ? responseText.replace(/\n/g, '<br>') : 'Asistencia procesada.');
     if (input) input.value = '';
@@ -3360,7 +3332,7 @@ function openVehicleModal(vehId = null) {
   const form = document.getElementById('formVehicle');
   if (form) form.reset();
   if (document.getElementById('vehId')) document.getElementById('vehId').value = '';
-  if (document.getElementById('vehPhoto')) document.getElementById('vehPhoto').value = '';
+  if (document.getElementById('vehPhotoFile')) document.getElementById('vehPhotoFile').value = '';
   if (document.getElementById('modalVehicleTitle')) document.getElementById('modalVehicleTitle').textContent = 'Nuevo Vehículo';
 
   if (vehId) {
@@ -3368,29 +3340,18 @@ function openVehicleModal(vehId = null) {
     if (v) {
       if (document.getElementById('modalVehicleTitle')) document.getElementById('modalVehicleTitle').textContent = 'Editar Vehículo';
       if (document.getElementById('vehId')) document.getElementById('vehId').value = v.id;
-      if (document.getElementById('vehType')) document.getElementById('vehType').value = v.type || 'Automóvil';
+      if (document.getElementById('vehType')) document.getElementById('vehType').value = v.type || 'Sedán';
 
-      const elName = document.getElementById('vehName');
-      const elBrand = document.getElementById('vehBrand');
+      const elMake = document.getElementById('vehMake');
       const elModel = document.getElementById('vehModel');
 
-      if (elName) {
-        elName.value = v.name || '';
-      }
-      if (elBrand || elModel) {
-        if (v.brand || v.model) {
-          if (elBrand) elBrand.value = v.brand || '';
-          if (elModel) elModel.value = v.model || '';
-        } else {
-          const parts = (v.name || '').split(' ');
-          if (elBrand) elBrand.value = parts[0] || '';
-          if (elModel) elModel.value = parts.slice(1).join(' ') || '';
-        }
-      }
+      if (elMake) elMake.value = v.brand || v.make || '';
+      if (elModel) elModel.value = v.model || '';
 
       if (document.getElementById('vehYear')) document.getElementById('vehYear').value = v.year || '';
       if (document.getElementById('vehPlate')) document.getElementById('vehPlate').value = v.plate || '';
       if (document.getElementById('vehKm')) document.getElementById('vehKm').value = v.km || 0;
+      if (document.getElementById('vehVin')) document.getElementById('vehVin').value = v.vin || '';
     }
   }
 
@@ -3407,22 +3368,17 @@ function saveVehicle(e) {
   const vehId = vehIdEl ? vehIdEl.value : '';
 
   const typeEl = document.getElementById('vehType');
-  const type = typeEl ? typeEl.value : 'Automóvil';
+  const type = typeEl ? typeEl.value : 'Sedán';
 
-  const nameEl = document.getElementById('vehName');
-  const brandEl = document.getElementById('vehBrand');
+  const makeEl = document.getElementById('vehMake');
   const modelEl = document.getElementById('vehModel');
 
-  let brand = brandEl ? brandEl.value.trim() : '';
+  let brand = makeEl ? makeEl.value.trim() : '';
   let model = modelEl ? modelEl.value.trim() : '';
-  let name = nameEl ? nameEl.value.trim() : '';
+  let name = `${brand} ${model}`.trim() || type;
 
-  if (!name && (brand || model)) {
-    name = `${brand} ${model}`.trim();
-  }
-
-  if (!name) {
-    alert('Por favor ingresa la Marca y Modelo (o Nombre) de tu vehículo.');
+  if (!brand || !model) {
+    alert('Por favor ingresa la Marca y Modelo de tu vehículo.');
     return;
   }
 
@@ -3431,7 +3387,8 @@ function saveVehicle(e) {
   const plate = document.getElementById('vehPlate') ? document.getElementById('vehPlate').value.trim() : '';
   const kmInputVal = document.getElementById('vehKm') ? document.getElementById('vehKm').value : '0';
   const km = parseInt(kmInputVal, 10);
-  const photoInput = document.getElementById('vehPhoto');
+  const vin = document.getElementById('vehVin') ? document.getElementById('vehVin').value.trim() : '';
+  const photoInput = document.getElementById('vehPhotoFile');
 
   const currentYear = new Date().getFullYear();
   if (isNaN(year) || year < 1900 || year > currentYear + 2) {
@@ -3445,7 +3402,7 @@ function saveVehicle(e) {
   const processAndSave = async (photoBase64) => {
     const vehData = {
       id: vehId || undefined,
-      type, brand, model, name, year, plate, km: safeKm,
+      type, brand, make: brand, model, name, year, plate, km: safeKm, vin,
       photo: photoBase64 || (targetVeh ? targetVeh.photo : '')
     };
 
@@ -3533,7 +3490,7 @@ function openServiceModal(servId = null) {
   const form = document.getElementById('formService');
   if (form) form.reset();
   document.getElementById('servId').value = '';
-  if (document.getElementById('servReceipt')) document.getElementById('servReceipt').value = '';
+  if (document.getElementById('servReceiptFile')) document.getElementById('servReceiptFile').value = '';
   document.getElementById('modalServiceTitle').textContent = 'Registrar Mantenimiento';
   populateServCategorySelect();
   setTodayDates();
@@ -3544,10 +3501,10 @@ function openServiceModal(servId = null) {
       document.getElementById('modalServiceTitle').textContent = 'Editar Mantenimiento';
       document.getElementById('servId').value = s.id;
       document.getElementById('servCategory').value = s.category;
-      document.getElementById('servTitle').value = s.title;
       document.getElementById('servCost').value = s.cost;
       document.getElementById('servDate').value = s.date;
       document.getElementById('servKm').value = s.km;
+      if (document.getElementById('servNextKm')) document.getElementById('servNextKm').value = s.nextKm || '';
       document.getElementById('servShop').value = s.shop || '';
       if (document.getElementById('servNotes')) document.getElementById('servNotes').value = s.notes || '';
     }
@@ -3614,6 +3571,7 @@ function renderFuelList(vehId) {
             <div class="log-title">${f.volume || f.liters || 0} Litros</div>
             <div class="log-meta">${f.date} • Odómetro: ${(Number(f.km)||0).toLocaleString()} km</div>
             ${f.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(f.notes)}</div>` : ''}
+            ${f.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewFuelReceipt('${f.id}')">${SVG_ICONS.document} Ver Adjunto</span>` : ''}
           </div>
         </div>
         <div class="log-item-side">
@@ -3628,6 +3586,7 @@ function openFuelModal(fuelId = null) {
   const form = document.getElementById('formFuel');
   if (form) form.reset();
   document.getElementById('fuelId').value = '';
+  if (document.getElementById('fuelReceiptFile')) document.getElementById('fuelReceiptFile').value = '';
   document.getElementById('modalFuelTitle').textContent = 'Registrar Gasolina';
   setTodayDates();
 
@@ -3637,7 +3596,8 @@ function openFuelModal(fuelId = null) {
       document.getElementById('modalFuelTitle').textContent = 'Editar Gasolina';
       document.getElementById('fuelId').value = f.id;
       document.getElementById('fuelCost').value = f.cost;
-      document.getElementById('fuelVolume').value = f.volume;
+      const volEl = document.getElementById('fuelLiters') || document.getElementById('fuelVolume');
+      if (volEl) volEl.value = f.volume || f.liters || '';
       document.getElementById('fuelKm').value = f.km;
       document.getElementById('fuelDate').value = f.date;
       if (document.getElementById('fuelNotes')) document.getElementById('fuelNotes').value = f.notes || '';
@@ -3923,18 +3883,15 @@ function saveService(e) {
   if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
   const servId = document.getElementById('servId').value;
   const category = document.getElementById('servCategory').value;
-  const title = document.getElementById('servTitle').value.trim();
+  const title = category || 'Servicio Mecánico';
   const cost = parseFloat(document.getElementById('servCost').value);
   const date = document.getElementById('servDate').value;
   const km = parseInt(document.getElementById('servKm').value);
+  const nextKmVal = document.getElementById('servNextKm') ? document.getElementById('servNextKm').value : '';
+  const nextKm = nextKmVal ? parseInt(nextKmVal) : null;
   const shop = document.getElementById('servShop').value.trim();
   const notes = document.getElementById('servNotes') ? document.getElementById('servNotes').value.trim() : '';
-  const receiptInput = document.getElementById('servReceipt');
-
-  if (!title) {
-    alert('Por favor ingresa la descripción del servicio o mantenimiento.');
-    return;
-  }
+  const receiptInput = document.getElementById('servReceiptFile');
 
   const safeCost = isNaN(cost) || cost < 0 ? 0 : cost;
   const safeKm = isNaN(km) || km < 0 ? veh.km : km;
@@ -3945,7 +3902,7 @@ function saveService(e) {
     const servData = {
       id: servId || undefined,
       vehicleId: veh.id,
-      category, title, cost: safeCost, date, km: safeKm, shop, notes,
+      category, title, cost: safeCost, date, km: safeKm, nextKm, shop, notes,
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
     };
 
@@ -3976,10 +3933,12 @@ async function saveFuel(e) {
   if (!veh) { alert('Primero debes registrar un vehículo.'); return; }
   const fuelId = document.getElementById('fuelId').value;
   const cost = parseFloat(document.getElementById('fuelCost').value);
-  const volume = parseFloat(document.getElementById('fuelVolume').value);
+  const volumeInput = document.getElementById('fuelLiters') || document.getElementById('fuelVolume');
+  const volume = volumeInput ? parseFloat(volumeInput.value) : NaN;
   const km = parseInt(document.getElementById('fuelKm').value);
   const date = document.getElementById('fuelDate').value;
   const notes = document.getElementById('fuelNotes') ? document.getElementById('fuelNotes').value.trim() : '';
+  const receiptInput = document.getElementById('fuelReceiptFile');
 
   const safeCost = isNaN(cost) || cost < 0 ? 0 : cost;
   const safeVolume = isNaN(volume) || volume <= 0 ? 1 : volume;
@@ -3987,32 +3946,57 @@ async function saveFuel(e) {
 
   let targetFuel = fuelId ? appState.fuels.find(f => f.id === fuelId) : null;
 
-  const fuelData = {
-    id: fuelId || undefined,
-    vehicleId: veh.id,
-    cost: safeCost, volume: safeVolume, km: safeKm, date, notes
+  const processAndSave = async (receiptBase64) => {
+    const fuelData = {
+      id: fuelId || undefined,
+      vehicleId: veh.id,
+      cost: safeCost, volume: safeVolume, liters: safeVolume, km: safeKm, date, notes,
+      receipt: receiptBase64 || (targetFuel ? targetFuel.receipt : '')
+    };
+
+    await SyncService.executeCrud(targetFuel ? 'UPDATE' : 'CREATE', STORES.FUELS, fuelData);
+
+    if (safeKm > veh.km) {
+      veh.km = safeKm;
+      await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
+    }
+
+    await loadAppStateFromDB();
+    closeModal('modalFuel');
+    document.getElementById('formFuel').reset();
+    setTodayDates();
+    renderApp();
   };
 
-  await SyncService.executeCrud(targetFuel ? 'UPDATE' : 'CREATE', STORES.FUELS, fuelData);
-
-  if (safeKm > veh.km) {
-    veh.km = safeKm;
-    await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
+  if (receiptInput && receiptInput.files && receiptInput.files[0]) {
+    readAndCompressImage(receiptInput.files[0], processAndSave);
+  } else {
+    processAndSave('');
   }
-
-  await loadAppStateFromDB();
-  closeModal('modalFuel');
-  document.getElementById('formFuel').reset();
-  setTodayDates();
-  renderApp();
 }
 
 function viewReceipt(serviceId) {
   const serv = appState.services.find(s => s.id === serviceId);
   if (serv && serv.receipt) {
-    document.getElementById('receiptContainer').innerHTML = `
-      <img src="${serv.receipt}" alt="Factura de ${escapeHtml(serv.title)}">
-    `;
+    const container = document.getElementById('receiptContainer');
+    if (serv.receipt.startsWith('data:application/pdf')) {
+      container.innerHTML = `<iframe src="${serv.receipt}" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>`;
+    } else {
+      container.innerHTML = `<img src="${serv.receipt}" alt="Factura de ${escapeHtml(serv.title)}">`;
+    }
+    openModal('modalReceiptViewer');
+  }
+}
+
+function viewFuelReceipt(fuelId) {
+  const f = appState.fuels.find(item => item.id === fuelId);
+  if (f && f.receipt) {
+    const container = document.getElementById('receiptContainer');
+    if (f.receipt.startsWith('data:application/pdf')) {
+      container.innerHTML = `<iframe src="${f.receipt}" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>`;
+    } else {
+      container.innerHTML = `<img src="${f.receipt}" alt="Comprobante de Recarga de Gasolina">`;
+    }
     openModal('modalReceiptViewer');
   }
 }
@@ -5822,14 +5806,49 @@ function downloadReportPDFDirect() {
 
 function createManualBackup() {
   try {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+    const xmlStr = objectToXML(appState);
+    const blob = new Blob([xmlStr], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `GarageOne_Backup_${new Date().toISOString().substring(0,10)}.json`);
+    dlAnchorElem.setAttribute("href", url);
+    dlAnchorElem.setAttribute("download", `GarageOne_Backup_${new Date().toISOString().substring(0,10)}.xml`);
     document.body.appendChild(dlAnchorElem);
     dlAnchorElem.click();
     dlAnchorElem.remove();
+    URL.revokeObjectURL(url);
+    const status = document.getElementById('backupStatus');
+    if (status) status.textContent = 'Respaldo XML generado exitosamente.';
   } catch (e) {
     alert('Error al generar respaldo manual: ' + e.message);
   }
+}
+
+function importBackupXml(e) {
+  const file = e.target && e.target.files ? e.target.files[0] : null;
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    try {
+      const xmlStr = evt.target.result;
+      const parsedData = xmlToObject(xmlStr);
+      if (!parsedData || typeof parsedData !== 'object') {
+        throw new Error('Archivo XML no válido');
+      }
+      if (confirm('¿Deseas restaurar los datos desde este archivo XML? Se actualizará la información del sistema.')) {
+        if (parsedData.vehicles && Array.isArray(parsedData.vehicles)) appState.vehicles = parsedData.vehicles;
+        if (parsedData.services && Array.isArray(parsedData.services)) appState.services = parsedData.services;
+        if (parsedData.fuels && Array.isArray(parsedData.fuels)) appState.fuels = parsedData.fuels;
+        if (parsedData.documents && Array.isArray(parsedData.documents)) appState.documents = parsedData.documents;
+        if (parsedData.reminders && Array.isArray(parsedData.reminders)) appState.reminders = parsedData.reminders;
+        if (parsedData.activeVehicleId) appState.activeVehicleId = parsedData.activeVehicleId;
+        saveState();
+        await loadAppStateFromDB();
+        renderApp();
+        alert('Respaldo XML restaurado con éxito.');
+      }
+    } catch (err) {
+      alert('Error al importar el respaldo XML: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
