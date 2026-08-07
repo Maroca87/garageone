@@ -5144,8 +5144,8 @@ function renderVehicleHealth() {
   if (!veh) {
     container.innerHTML = `
       <div class="health-hero-card" style="text-align:center; padding:30px 18px;">
-        <h2 style="font-size:1.2rem; color:var(--text-primary); margin-bottom:8px;">No hay vehículo activo</h2>
-        <p class="subtitle">Registra o selecciona un vehículo en la pestaña Garaje para visualizar la Salud del Vehículo.</p>
+        <h2 style="font-size:1.2rem; color:var(--text-primary); margin-bottom:8px;">🚗 No hay vehiculo activo</h2>
+        <p class="subtitle">Registra o selecciona un vehiculo en la pestaña Garaje para visualizar la Salud del Vehiculo.</p>
         <button class="btn btn-primary" onclick="switchTab('tabGarage')" style="margin-top:14px;">Ir al Garaje</button>
       </div>
     `;
@@ -5166,8 +5166,8 @@ function renderVehicleHealth() {
   if (h.allSmartAlerts.length > 0) {
     alertsHtml = `
       <div class="health-alerts-container">
-        <h3 style="font-size:0.92rem; font-weight:700; margin-bottom:8px; color:var(--text-primary);">
-          Alertas Inteligentes (${h.allSmartAlerts.length})
+        <h3 style="font-size:0.92rem; font-weight:700; margin-bottom:8px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+          ${SVG_ICONS.alertTriangle} Alertas Inteligentes (${h.allSmartAlerts.length})
         </h3>
         ${h.allSmartAlerts.map(a => `
           <div class="health-alert-item health-alert-${a.type}">
@@ -5181,7 +5181,8 @@ function renderVehicleHealth() {
     alertsHtml = `
       <div class="health-alerts-container">
         <div class="health-alert-item health-alert-success">
-          <span><strong>Sin observaciones críticas.</strong> Todos los componentes evaluados operan dentro de parámetros normales.</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span><strong>Sin problemas criticos.</strong> Todo funciona correctamente en tu automovil.</span>
         </div>
       </div>
     `;
@@ -5192,10 +5193,10 @@ function renderVehicleHealth() {
   if (h.missingItems.length > 0) {
     confidenceTipsHtml = `
       <div class="health-confidence-tips">
-        <strong>Para aumentar la confiabilidad del análisis registra:</strong>
-        <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+        <strong>Para mejorar la precision del analisis registre:</strong>
+        <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">
           ${h.missingItems.map(item => `
-            <button type="button" class="btn btn-secondary btn-sm btn-quick-add" onclick="quickAddHealthService('${item.key}')" style="font-size:0.75rem; padding:4px 10px;">
+            <button type="button" class="btn btn-secondary btn-sm btn-quick-add" onclick="quickAddHealthService('${item.key}')" style="font-size:0.75rem; padding:3px 8px;">
               + ${escapeHtml(item.name)}
             </button>
           `).join('')}
@@ -5209,7 +5210,7 @@ function renderVehicleHealth() {
     <div class="health-hero-card">
       <div class="health-hero-header">
         <div class="health-hero-title">
-          ${escapeHtml(veh.name || 'Vehículo')} (${veh.year || ''})
+          <span>🚗</span> ${escapeHtml(veh.name || 'Vehiculo')} (${veh.year || ''})
         </div>
         <span style="font-size:0.8rem; color:#94a3b8; font-weight:600;">${(veh.km || 0).toLocaleString()} km</span>
       </div>
@@ -5235,15 +5236,15 @@ function renderVehicleHealth() {
           </div>
 
           <div class="health-hero-text">
-            ${h.overallHealthPct === null ? 'No hay suficientes datos registrados para calcular un porcentaje de salud verídico.' : (h.allSmartAlerts.length === 0 ? 'Sin observaciones críticas detectadas.' : `Se han detectado ${h.allSmartAlerts.length} observación(es) de mantenimiento.`)}
+            ${h.overallHealthPct === null ? 'No hay suficientes datos registrados para calcular un porcentaje de salud veridico.' : (h.allSmartAlerts.length === 0 ? 'Sin observaciones criticas detectadas.' : `Se han detectado ${h.allSmartAlerts.length} observacion(es) de mantenimiento.`)}
           </div>
 
           <div class="health-next-service">
-            <strong>Próximo servicio:</strong> ${escapeHtml(h.nextServiceText)}
+            <strong>Proximo servicio:</strong> ${escapeHtml(h.nextServiceText)}
           </div>
 
           <div style="font-size:0.74rem; color:#94a3b8; margin-top:8px; font-weight:600;">
-            Última evaluación: ${escapeHtml(h.lastEvaluationText)}
+            ⏱️ Ultima evaluacion: ${escapeHtml(h.lastEvaluationText)}
           </div>
         </div>
       </div>
@@ -5273,7 +5274,8 @@ function renderVehicleHealth() {
     <div class="health-confidence-banner">
       <div class="health-confidence-header">
         <div class="health-confidence-title">
-          Confiabilidad del Análisis
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${h.confidenceColor}" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Confiabilidad del Analisis
         </div>
         <strong style="color:${h.confidenceColor}; font-size:0.95rem;">${h.confidencePct}%</strong>
       </div>
@@ -5288,12 +5290,12 @@ function renderVehicleHealth() {
 
     <!-- SMART MAINTENANCE ASSISTANT PANEL -->
     <div class="health-assistant-card">
-      <h3 style="font-size:0.9rem; font-weight:800; color:var(--text-primary);">
-        Diagnóstico y Recomendaciones Rápidas
+      <h3 style="font-size:0.9rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+        💡 Diagnostico y Recomendaciones Rapidas
       </h3>
       <div class="health-assistant-grid">
         <div class="health-assistant-item">
-          <div class="health-assistant-q">¿Qué revisar primero?</div>
+          <div class="health-assistant-q">¿Que revisar primero?</div>
           <div class="health-assistant-a">${escapeHtml(h.firstAction)}</div>
         </div>
         <div class="health-assistant-item">
@@ -5301,7 +5303,7 @@ function renderVehicleHealth() {
           <div class="health-assistant-a">${escapeHtml(h.worstWearText)}</div>
         </div>
         <div class="health-assistant-item">
-          <div class="health-assistant-q">Documentación</div>
+          <div class="health-assistant-q">Documentacion</div>
           <div class="health-assistant-a">${escapeHtml(h.docStatusSummary)}</div>
         </div>
       </div>
@@ -5311,7 +5313,7 @@ function renderVehicleHealth() {
     ${alertsHtml}
 
     <!-- COMPONENT EVALUATION CARDS GRID -->
-    <h3 style="font-size:0.95rem; font-weight:800; margin-bottom:12px; color:var(--text-primary);">Evaluación de Componentes</h3>
+    <h3 style="font-size:0.95rem; font-weight:800; margin-bottom:12px; color:var(--text-primary);">Evaluacion de Componentes</h3>
 
     <div class="health-grid">
       <!-- 1. Aceite -->
@@ -5319,7 +5321,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.oilData.hasData ? 'health-icon-nodata' : ''}">
-              Aceite
+              ${SVG_ICONS.oil} Aceite
             </div>
             <div class="health-card-score" style="color:${!h.oilData.hasData ? '#64748b' : (h.oilData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.oilData.hasData ? h.oilData.score + '%' : 'Sin historial'}
@@ -5346,7 +5348,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.tireData.hasData ? 'health-icon-nodata' : ''}">
-              Llantas
+              ${SVG_ICONS.tires} Llantas
             </div>
             <div class="health-card-score" style="color:${!h.tireData.hasData ? '#64748b' : (h.tireData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.tireData.hasData ? h.tireData.score + '%' : 'Sin historial'}
@@ -5373,7 +5375,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.brakeData.hasData ? 'health-icon-nodata' : ''}">
-              Frenos
+              ${SVG_ICONS.brakes} Frenos
             </div>
             <div class="health-card-score" style="color:${!h.brakeData.hasData ? '#64748b' : (h.brakeData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.brakeData.hasData ? h.brakeData.score + '%' : 'Sin historial'}
@@ -5395,12 +5397,12 @@ function renderVehicleHealth() {
         </div>
       </div>
 
-      <!-- 4. Batería -->
+      <!-- 4. Bateria -->
       <div class="health-card ${!h.batteryData.hasData ? 'health-card-nodata' : ''}">
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.batteryData.hasData ? 'health-icon-nodata' : ''}">
-              Batería
+              ${SVG_ICONS.battery} Bateria
             </div>
             <div class="health-card-score" style="color:${!h.batteryData.hasData ? '#64748b' : (h.batteryData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.batteryData.hasData ? h.batteryData.score + '%' : 'Sin historial'}
@@ -5427,7 +5429,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.filterData.hasData ? 'health-icon-nodata' : ''}">
-              Filtros
+              ${SVG_ICONS.filters} Filtros
             </div>
             <div class="health-card-score" style="color:${!h.filterData.hasData ? '#64748b' : (h.filterData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.filterData.hasData ? h.filterData.score + '%' : 'Sin historial'}
@@ -5454,7 +5456,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.beltData.hasData ? 'health-icon-nodata' : ''}">
-              Correas
+              ${SVG_ICONS.belt} Correas
             </div>
             <div class="health-card-score" style="color:${!h.beltData.hasData ? '#64748b' : (h.beltData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.beltData.hasData ? h.beltData.score + '%' : 'Sin historial'}
@@ -5476,12 +5478,12 @@ function renderVehicleHealth() {
         </div>
       </div>
 
-      <!-- 7. Documentación -->
+      <!-- 7. Documentacion -->
       <div class="health-card ${!h.docData.hasData ? 'health-card-nodata' : ''}">
         <div>
           <div class="health-card-header">
             <div class="health-card-title ${!h.docData.hasData ? 'health-icon-nodata' : ''}">
-              Documentación
+              ${SVG_ICONS.document} Documentacion
             </div>
             <div class="health-card-score" style="color:${!h.docData.hasData ? '#64748b' : (h.docData.score >= 50 ? '#34d399' : '#f87171')};">
               ${h.docData.hasData ? h.docData.score + '%' : 'Sin documentos'}
@@ -5505,14 +5507,14 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title">
-              Recordatorios
+              ⏰ Recordatorios
             </div>
             <div class="health-card-score" style="color:#38bdf8;">
-              ${h.remindersSummary.dueRem > 0 ? `<span style="color:#f87171;">${h.remindersSummary.dueRem} vencido(s)</span>` : 'Al día'}
+              ${h.remindersSummary.dueRem > 0 ? `<span style="color:#f87171;">${h.remindersSummary.dueRem} vencido(s)</span>` : 'Al dia'}
             </div>
           </div>
           <div class="health-card-details" style="margin-top:6px;">
-            ${h.remindersSummary.pendingRem} pendiente(s) • ${h.remindersSummary.upcomingRem} próximo(s)
+            ${h.remindersSummary.pendingRem} pendiente(s) • ${h.remindersSummary.upcomingRem} proximo(s)
           </div>
         </div>
         <div class="health-card-footer">
@@ -5526,7 +5528,7 @@ function renderVehicleHealth() {
         <div>
           <div class="health-card-header">
             <div class="health-card-title">
-              Gastos e Inversión
+              💰 Gastos e Inversion
             </div>
             <div class="health-card-score" style="color:#38bdf8; font-size:0.9rem;">
               ${formatCurrency(h.expensesSummary.yearTotal)}
@@ -5535,7 +5537,7 @@ function renderVehicleHealth() {
           <div class="health-card-details">
             Invertido este año: ${formatCurrency(h.expensesSummary.yearTotal)}<br>
             Promedio mensual: ${formatCurrency(h.expensesSummary.monthlyAvg)}<br>
-            Total histórico: ${formatCurrency(h.expensesSummary.totalHistoric)}
+            Total historico: ${formatCurrency(h.expensesSummary.totalHistoric)}
           </div>
         </div>
         <div class="health-card-footer">
