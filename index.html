@@ -363,7 +363,7 @@
           <h3 data-i18n="reportTitle">Expediente Formal de Mantenimientos</h3>
           <p class="subtitle" data-i18n="reportSubtitle">Genera un documento formal en PDF con la bitácora completa de servicios mecánicos, talleres, fechas y repuestos registrada para este vehículo.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;" data-i18n="btnViewReport">Ver / Exportar PDF</button>
+            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;">Ver Expediente</button>
             <button class="btn btn-secondary btn-block" onclick="downloadReportPDFDirect()" style="flex:1; min-width:160px; color:#38bdf8; border-color:rgba(56,189,248,0.3);">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Descargar PDF</span>
@@ -371,10 +371,6 @@
             <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
               <span>Compartir</span>
-            </button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:120px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <span data-i18n="btnShareEmail">Correo</span>
             </button>
           </div>
         </div>
@@ -517,6 +513,15 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </span>
         <span class="nav-label" data-i18n="navHealth">Salud</span>
+      </button>
+
+      <button class="nav-item" onclick="switchTab('tabReports', this)">
+        <span class="nav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        <span class="nav-label" data-i18n="navReports">Reportes</span>
+      </button>
+    </nav>
   </div>
 
   <!-- MODALS CONTAINER -->
