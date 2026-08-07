@@ -1007,14 +1007,10 @@ function renderStorageStats() {
   container.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
       <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
-      <span style="font-weight:700; color:${barColor};">${usage.percent}% de 50MB Ampliado</span>
+      <span style="font-weight:700; color:${barColor};">${usage.percent}% Utilizado</span>
     </div>
     <div style="width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
       <div style="width:${Math.max(1, usage.percent)}%; height:100%; background:${barColor}; border-radius:5px; transition:width 0.3s ease; box-shadow:0 0 10px ${barColor}66;"></div>
-    </div>
-    <div style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#30d158; margin-bottom:6px;">
-      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#30d158; box-shadow:0 0 8px #30d158;"></span>
-      <strong>Almacenamiento IndexedDB (50MB+ Ampliado): Activo y Sincronizado</strong>
     </div>
     <div style="font-size:0.78rem; color:#cbd5e1; line-height:1.4;">
       • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s)/foto(s) respaldados.
