@@ -4264,214 +4264,33 @@ function xmlToObject(xmlStr) {
 
 
 
-// ================================================================
-// Modulo: Ficha Técnica & Banner de Venta (Zero WhatsApp Icons)
-// ================================================================
-
-const DEFAULT_EQUIPMENT_OPTIONS = [
-  'Aire Acondicionado',
-  'Asientos de Cuero',
-  'Sunroof / Techo Panorámico',
-  'Cámara y Sensores',
-  'Control de Crucero',
-  'Aros de Lujo',
-  'Alarma y Cierre Central',
-  'RTV y Marchamo Al Día'
-];
-
-function openVehicleShareBannerModal(initialMode = 'share') {
-  const veh = getActiveVehicle();
-  if (!veh) {
-    alert('Por favor selecciona o registra un vehículo primero.');
-    return;
-  }
-
-  // Pre-fill inputs with vehicle properties or saved specs
-  const specs = veh.shareSpecs || {};
-  
-  const priceInput = document.getElementById('sharePriceInput');
-  const engineInput = document.getElementById('shareEngineInput');
-  const transSelect = document.getElementById('shareTransSelect');
-  const doorsSelect = document.getElementById('shareDoorsSelect');
-  const radioInput = document.getElementById('shareRadioInput');
-  const absCheck = document.getElementById('shareAbsCheck');
-  const notesInput = document.getElementById('shareNotesInput');
-
-  if (priceInput) priceInput.value = specs.price || '';
-  if (engineInput) engineInput.value = specs.engine || veh.engine || '2.0L';
-  if (transSelect) transSelect.value = specs.transmission || veh.transmission || 'Automático';
-  if (doorsSelect) doorsSelect.value = specs.doors || veh.doors || '4 Puertas';
-  if (radioInput) radioInput.value = specs.radio || 'Pantalla Táctil con CarPlay';
-  if (absCheck) absCheck.checked = specs.abs !== false;
-  if (notesInput) notesInput.value = specs.notes || 'Excelente estado mecánico y de carrocería. Mantenimiento al día.';
-
-  // Render equipment checkboxes
-  const equipContainer = document.getElementById('shareEquipCheckboxesContainer');
-  if (equipContainer) {
-    const selectedEquip = specs.equipment || DEFAULT_EQUIPMENT_OPTIONS.slice(0, 5);
-    equipContainer.innerHTML = DEFAULT_EQUIPMENT_OPTIONS.map((item) => {
-      const isChecked = selectedEquip.includes(item);
-      return `
-        <label class="equip-checkbox-label">
-          <input type="checkbox" class="share-equip-cb" value="${escapeHtml(item)}" ${isChecked ? 'checked' : ''} onchange="updateShareBannerPreview()">
-          <span>${escapeHtml(item)}</span>
-        </label>
-      `;
-    }).join('');
-  }
-
-  updateShareBannerPreview();
-  openModal('modalVehicleShareBanner');
-}
-
-function getSelectedShareEquip() {
-  const checkboxes = document.querySelectorAll('.share-equip-cb:checked');
-  const list = [];
-  checkboxes.forEach(cb => list.push(cb.value));
-  return list;
-}
-
-function updateShareBannerPreview() {
+// Report Sharing (Text & Email)
+function shareReportText() {
   const veh = getActiveVehicle();
   if (!veh) return;
-
-  const price = (document.getElementById('sharePriceInput')?.value || '').trim();
-  const engine = (document.getElementById('shareEngineInput')?.value || '').trim() || '2.0L';
-  const trans = document.getElementById('shareTransSelect')?.value || 'Automático';
-  const doors = document.getElementById('shareDoorsSelect')?.value || '4 Puertas';
-  const radio = (document.getElementById('shareRadioInput')?.value || '').trim() || 'Pantalla Apple CarPlay';
-  const abs = document.getElementById('shareAbsCheck')?.checked !== false;
-  const notes = (document.getElementById('shareNotesInput')?.value || '').trim();
-  const equip = getSelectedShareEquip();
-
-  // Save choices into vehicle object for memory
-  veh.shareSpecs = { price, engine, transmission: trans, doors, radio, abs, notes, equipment: equip };
-  saveState();
-
-  // Calculate health & maintenance stats for the banner
-  const healthData = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
-  const healthScore = healthData && healthData.overallHealthPct !== null ? `${healthData.overallHealthPct}%` : 'N/A';
   const services = appState.services.filter(s => s.vehicleId === veh.id);
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
 
-  const previewContainer = document.getElementById('shareBannerPreviewCard');
-  if (!previewContainer) return;
-
-  previewContainer.innerHTML = `
-    <div class="share-banner-header">
-      <div>
-        <div class="share-banner-title">🚗 ${escapeHtml(veh.name)} (${veh.year || 'N/A'})</div>
-        <div class="share-banner-subtitle">
-          <span>Placa: <strong>${escapeHtml(veh.plate || 'N/A')}</strong></span> • 
-          <span>Odómetro: <strong>${(Number(veh.km)||0).toLocaleString()} KM</strong></span>
-        </div>
-      </div>
-      ${price ? `<div class="share-banner-price-badge">${escapeHtml(price)}</div>` : `<div style="font-weight:700; color:#38bdf8; font-size:0.85rem; padding:6px 12px; background:rgba(56,189,248,0.12); border-radius:10px;">Ficha de Vehículo</div>`}
-    </div>
-
-    <div class="share-banner-specs-grid">
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Motor / Cilindrada</span>
-        <span class="spec-val">⚡ ${escapeHtml(engine)}</span>
-      </div>
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Transmisión</span>
-        <span class="spec-val">⚙️ ${escapeHtml(trans)}</span>
-      </div>
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Carrocería</span>
-        <span class="spec-val">🚗 ${escapeHtml(doors)}</span>
-      </div>
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Frenos ABS</span>
-        <span class="spec-val">${abs ? '🛑 Con ABS' : '⚪ Sin ABS'}</span>
-      </div>
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Sistema de Audio</span>
-        <span class="spec-val">📻 ${escapeHtml(radio)}</span>
-      </div>
-      <div class="share-spec-pill">
-        <span class="spec-lbl">Salud General</span>
-        <span class="spec-val" style="color:#30d158;">💚 ${healthScore} (${services.length} Serv.)</span>
-      </div>
-    </div>
-
-    ${equip.length > 0 ? `
-      <div class="share-equip-tags">
-        ${equip.map(item => `<span class="share-equip-tag">✓ ${escapeHtml(item)}</span>`).join('')}
-      </div>
-    ` : ''}
-
-    ${notes ? `
-      <div style="background:rgba(255,255,255,0.04); border-left:3px solid #38bdf8; padding:8px 12px; border-radius:0 8px 8px 0; font-size:0.83rem; color:var(--text-secondary); font-style:italic;">
-        "${escapeHtml(notes)}"
-      </div>
-    ` : ''}
-  `;
-}
-
-function buildShareBannerTextCard() {
-  const veh = getActiveVehicle();
-  if (!veh) return '';
-
-  const specs = veh.shareSpecs || {};
-  const services = appState.services.filter(s => s.vehicleId === veh.id);
-  const healthData = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
-  const healthScore = healthData && healthData.overallHealthPct !== null ? `${healthData.overallHealthPct}%` : 'Excelente';
-
-  let text = `==============================\n`;
-  text += `🚗 FICHA DE VEHÍCULO - ${veh.name.toUpperCase()} (${veh.year || ''})\n`;
-  text += `==============================\n\n`;
-  
-  if (specs.price) text += `💰 PRECIO: ${specs.price}\n\n`;
-  
-  text += `📌 ESPECIFICACIONES TÉCNICAS:\n`;
-  text += `• Marca / Modelo: ${veh.name} ${veh.year || ''}\n`;
-  text += `• Placa: ${veh.plate || 'N/A'}\n`;
-  text += `• Kilometraje: ${(Number(veh.km)||0).toLocaleString()} KM\n`;
-  text += `• Cilindrada Motor: ${specs.engine || '2.0L'}\n`;
-  text += `• Transmisión: ${specs.transmission || 'Automático'}\n`;
-  text += `• Carrocería: ${specs.doors || '4 Puertas'}\n`;
-  text += `• Sistema Frenos ABS: ${specs.abs !== false ? 'Sí' : 'No'}\n`;
-  text += `• Sistema de Radio: ${specs.radio || 'Original'}\n`;
-  text += `• Estado de Salud: ${healthScore} (${services.length} mantenimientos registrados en historial)\n\n`;
-
-  if (specs.equipment && specs.equipment.length > 0) {
-    text += `✨ EQUIPAMIENTO Y EXTRAS:\n`;
-    specs.equipment.forEach(item => {
-      text += ` [✓] ${item}\n`;
-    });
-    text += `\n`;
-  }
-
-  if (specs.notes) {
-    text += `📝 NOTAS ADICIONALES:\n${specs.notes}\n\n`;
-  }
-
-  text += `Generado con GarageOne.`;
-  return text;
-}
-
-function shareBannerViaEmail() {
-  const veh = getActiveVehicle();
-  if (!veh) return;
-  const text = buildShareBannerTextCard();
-  const subject = `[FICHA DE VEHÍCULO] ${veh.name} (${veh.year || ''}) - Placa ${veh.plate || 'GarageOne'}`;
-  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-}
-
-function shareBannerViaSystemShare() {
-  const veh = getActiveVehicle();
-  if (!veh) return;
-  const text = buildShareBannerTextCard();
+  const text = `Expediente de Vehículo - GarageOne\n\n` +
+    `• Vehículo: ${veh.name} (${veh.year})\n` +
+    `• Placa: ${veh.plate || 'N/A'}\n` +
+    `• Odómetro: ${veh.km.toLocaleString()} KM\n\n` +
+    `Resumen de Inversión:\n` +
+    `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
+    `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
+    `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+    `Generado con GarageOne.`;
 
   if (navigator.share) {
     navigator.share({
-      title: `Ficha Técnica ${veh.name}`,
+      title: `Expediente ${veh.name}`,
       text: text
     }).catch(() => {});
   } else if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => {
-      alert('Ficha de vehículo copiada al portapapeles.');
+      alert('Resumen copiado al portapapeles.');
     }).catch(() => {
       alert(text);
     });
@@ -4480,36 +4299,26 @@ function shareBannerViaSystemShare() {
   }
 }
 
-function copyShareBannerText() {
-  const text = buildShareBannerTextCard();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('¡Ficha y especificaciones copiadas al portapapeles!');
-    }).catch(() => {
-      alert(text);
-    });
-  } else {
-    alert(text);
-  }
-}
-
-function downloadShareBannerPDF() {
-  const element = document.getElementById('shareBannerPreviewCard');
+function shareReportEmail() {
   const veh = getActiveVehicle();
-  if (!element || !veh) return;
+  if (!veh) return;
+  const services = appState.services.filter(s => s.vehicleId === veh.id);
+  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
 
-  if (typeof html2pdf !== 'undefined') {
-    const opt = {
-      margin:       [10, 10, 10, 10],
-      filename:     `Ficha_${veh.name.replace(/\s+/g, '_')}_${veh.plate || 'GarageOne'}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0d0d12' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
-  } else {
-    window.print();
-  }
+  const subject = `Expediente de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`;
+  const body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
+    `Vehículo: ${veh.name} (${veh.year})\n` +
+    `Placa: ${veh.plate || 'N/A'}\n` +
+    `Odómetro Actual: ${veh.km.toLocaleString()} KM\n\n` +
+    `RESUMEN FINANCIERO:\n` +
+    `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
+    `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
+    `- Inversión Total: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+    `Generado por GarageOne.`;
+
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 // Internationalization (i18n) Engine
@@ -4721,190 +4530,120 @@ function handleAdminRolePresetChange() { /* module removed */ }
 
 
 /* ==========================================================================
-   Modulo: Motor de Salud Dinámico & Gestión de Categorías de Servicio
+   Modulo: Salud del Vehiculo (Motor de Analisis y Asistente Inteligente)
    ========================================================================== */
 
-const DEFAULT_SERVICE_CATEGORIES = [
-  { id: 'cat_oil', name: 'Aceite de Motor', icon: 'oil', affectsHealth: true, calculationMethod: 'km', recommendedIntervalKm: 5000, recommendedIntervalMonths: 6, weightPercentage: 20, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_trans', name: 'Aceite de Transmisión', icon: 'transmission', affectsHealth: true, calculationMethod: 'both', recommendedIntervalKm: 40000, recommendedIntervalMonths: 24, weightPercentage: 15, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_diff', name: 'Aceite de Diferencial / Transfer', icon: 'wrench', affectsHealth: true, calculationMethod: 'both', recommendedIntervalKm: 40000, recommendedIntervalMonths: 24, weightPercentage: 10, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_brakes', name: 'Frenos y Pastillas', icon: 'brakes', affectsHealth: true, calculationMethod: 'km', recommendedIntervalKm: 30000, recommendedIntervalMonths: 12, weightPercentage: 15, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_tires', name: 'Llantas y Neumáticos', icon: 'tires', affectsHealth: true, calculationMethod: 'km', recommendedIntervalKm: 50000, recommendedIntervalMonths: 36, weightPercentage: 15, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_battery', name: 'Batería y Sistema Eléctrico', icon: 'battery', affectsHealth: true, calculationMethod: 'time', recommendedIntervalKm: 0, recommendedIntervalMonths: 36, weightPercentage: 10, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_filters', name: 'Filtros (Aire/Gasolina/Cabina)', icon: 'filters', affectsHealth: true, calculationMethod: 'km', recommendedIntervalKm: 15000, recommendedIntervalMonths: 12, weightPercentage: 8, warningThresholdPct: 80, criticalThresholdPct: 100 },
-  { id: 'cat_belts', name: 'Correas y Distribución', icon: 'belt', affectsHealth: true, calculationMethod: 'both', recommendedIntervalKm: 60000, recommendedIntervalMonths: 48, weightPercentage: 7, warningThresholdPct: 80, criticalThresholdPct: 100 }
-];
-
-function getHealthServiceCategories() {
-  if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories) || appState.serviceCategories.length === 0) {
-    appState.serviceCategories = JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATEGORIES));
-    saveState();
+const DEFAULT_HEALTH_SETTINGS = {
+  oilKm: 5000,
+  tiresKm: 50000,
+  brakePadsKm: 30000,
+  brakeDiscsKm: 80000,
+  batteryMonths: 36,
+  filtersKm: 15000,
+  beltKm: 60000,
+  beltMonths: 48,
+  weights: {
+    oil: 20,
+    tires: 20,
+    brakes: 20,
+    battery: 15,
+    filters: 10,
+    belts: 10,
+    docs: 5
   }
-  return appState.serviceCategories;
-}
+};
 
-function openServiceCategoryModal(catId = null) {
-  const form = document.getElementById('formServiceCategory');
-  if (form) form.reset();
-
-  document.getElementById('catId').value = '';
-  document.getElementById('modalCategoryTitle').textContent = 'Nuevo Tipo de Servicio';
-  
-  const affectsCheck = document.getElementById('catAffectsHealth');
-  if (affectsCheck) affectsCheck.checked = true;
-  toggleHealthCategoryInputs(true);
-
-  if (catId) {
-    const categories = getHealthServiceCategories();
-    const cat = categories.find(c => c.id === catId);
-    if (cat) {
-      document.getElementById('modalCategoryTitle').textContent = 'Editar Tipo de Servicio';
-      document.getElementById('catId').value = cat.id;
-      document.getElementById('catName').value = cat.name || '';
-      
-      const affects = cat.affectsHealth !== false;
-      if (affectsCheck) affectsCheck.checked = affects;
-      toggleHealthCategoryInputs(affects);
-
-      const calcSel = document.getElementById('catCalcMethod');
-      if (calcSel) calcSel.value = cat.calculationMethod || 'both';
-      toggleCalcMethodFields(cat.calculationMethod || 'both');
-
-      if (document.getElementById('catIntervalKm')) document.getElementById('catIntervalKm').value = cat.recommendedIntervalKm || 10000;
-      if (document.getElementById('catIntervalMonths')) document.getElementById('catIntervalMonths').value = cat.recommendedIntervalMonths || 12;
-      if (document.getElementById('catWeightPct')) document.getElementById('catWeightPct').value = cat.weightPercentage || 10;
-      if (document.getElementById('catWarnPct')) document.getElementById('catWarnPct').value = cat.warningThresholdPct || 80;
-      if (document.getElementById('catCritPct')) document.getElementById('catCritPct').value = cat.criticalThresholdPct || 100;
-    }
+function getHealthSettings() {
+  if (appState.healthSettings && typeof appState.healthSettings === 'object') {
+    return {
+      ...DEFAULT_HEALTH_SETTINGS,
+      ...appState.healthSettings,
+      weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(appState.healthSettings.weights || {}) }
+    };
   }
-
-  openModal('modalServiceCategory');
-}
-
-function toggleHealthCategoryInputs(checked) {
-  const container = document.getElementById('catHealthFieldsContainer');
-  if (container) container.style.display = checked ? 'block' : 'none';
-}
-
-function toggleCalcMethodFields(val) {
-  const groupKm = document.getElementById('groupCatIntervalKm');
-  const groupMonths = document.getElementById('groupCatIntervalMonths');
-  if (groupKm) groupKm.style.display = (val === 'km' || val === 'both') ? 'block' : 'none';
-  if (groupMonths) groupMonths.style.display = (val === 'time' || val === 'both') ? 'block' : 'none';
-}
-
-function saveServiceCategory(e) {
-  if (e) e.preventDefault();
-  const catId = document.getElementById('catId').value;
-  const name = (document.getElementById('catName').value || '').trim();
-  if (!name) return;
-
-  const affectsHealth = document.getElementById('catAffectsHealth').checked;
-  const method = document.getElementById('catCalcMethod').value || 'both';
-  const intervalKm = Number(document.getElementById('catIntervalKm').value) || 10000;
-  const intervalMonths = Number(document.getElementById('catIntervalMonths').value) || 12;
-  const weightPct = Number(document.getElementById('catWeightPct').value) || 10;
-  const warnPct = Number(document.getElementById('catWarnPct').value) || 80;
-  const critPct = Number(document.getElementById('catCritPct').value) || 100;
-
-  const categories = getHealthServiceCategories();
-
-  if (catId) {
-    const idx = categories.findIndex(c => c.id === catId);
-    if (idx !== -1) {
-      categories[idx] = {
-        ...categories[idx],
-        name,
-        affectsHealth,
-        calculationMethod: method,
-        recommendedIntervalKm: intervalKm,
-        recommendedIntervalMonths: intervalMonths,
-        weightPercentage: weightPct,
-        warningThresholdPct: warnPct,
-        criticalThresholdPct: critPct
+  try {
+    const stored = localStorage.getItem('GARAGEONE_HEALTH_SETTINGS');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      appState.healthSettings = parsed;
+      return {
+        ...DEFAULT_HEALTH_SETTINGS,
+        ...parsed,
+        weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(parsed.weights || {}) }
       };
     }
-  } else {
-    const newCat = {
-      id: 'cat_' + Date.now(),
-      name,
-      icon: 'wrench',
-      affectsHealth,
-      calculationMethod: method,
-      recommendedIntervalKm: intervalKm,
-      recommendedIntervalMonths: intervalMonths,
-      weightPercentage: weightPct,
-      warningThresholdPct: warnPct,
-      criticalThresholdPct: critPct
-    };
-    categories.push(newCat);
-  }
-
-  appState.serviceCategories = categories;
-  saveState();
-  closeModal('modalServiceCategory');
-  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
+  } catch (e) {}
+  appState.healthSettings = DEFAULT_HEALTH_SETTINGS;
+  return DEFAULT_HEALTH_SETTINGS;
 }
 
 function openHealthSettingsModal() {
-  const container = document.getElementById('healthSettingsCategoriesList');
-  if (!container) return;
+  const cfg = getHealthSettings();
 
-  const categories = getHealthServiceCategories().filter(c => c.affectsHealth !== false);
+  const elOil = document.getElementById('hsOilKm');
+  const elTires = document.getElementById('hsTiresKm');
+  const elPads = document.getElementById('hsBrakePadsKm');
+  const elDiscs = document.getElementById('hsBrakeDiscsKm');
+  const elBat = document.getElementById('hsBatteryMonths');
+  const elFilt = document.getElementById('hsFiltersKm');
+  const elBeltKm = document.getElementById('hsBeltKm');
+  const elBeltM = document.getElementById('hsBeltMonths');
 
-  container.innerHTML = categories.map(cat => `
-    <div class="health-cat-setting-card">
-      <div class="health-cat-setting-header">
-        <div class="health-cat-setting-title">
-          <span>⚙️ ${escapeHtml(cat.name)}</span>
-        </div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalHealthSettings'); openServiceCategoryModal('${cat.id}')" style="font-size:0.75rem; padding:2px 8px;">
-          Editar Reglas
-        </button>
-      </div>
-      <div class="form-row" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
-        <div style="flex:1; min-width:110px;">
-          <label style="font-size:0.72rem; color:var(--text-secondary);">Intervalo KM</label>
-          <input type="number" class="form-control hs-cat-km" data-id="${cat.id}" value="${cat.recommendedIntervalKm || 10000}" style="padding:4px 8px; font-size:0.8rem;">
-        </div>
-        <div style="flex:1; min-width:110px;">
-          <label style="font-size:0.72rem; color:var(--text-secondary);">Intervalo Meses</label>
-          <input type="number" class="form-control hs-cat-months" data-id="${cat.id}" value="${cat.recommendedIntervalMonths || 12}" style="padding:4px 8px; font-size:0.8rem;">
-        </div>
-        <div style="flex:1; min-width:90px;">
-          <label style="font-size:0.72rem; color:var(--text-secondary);">Peso Salud %</label>
-          <input type="number" class="form-control hs-cat-weight" data-id="${cat.id}" value="${cat.weightPercentage || 10}" min="1" max="100" style="padding:4px 8px; font-size:0.8rem;">
-        </div>
-      </div>
-    </div>
-  `).join('');
+  const hwOil = document.getElementById('hwOil');
+  const hwTires = document.getElementById('hwTires');
+  const hwBrakes = document.getElementById('hwBrakes');
+  const hwBat = document.getElementById('hwBattery');
+  const hwFilt = document.getElementById('hwFilters');
+  const hwBelts = document.getElementById('hwBelts');
+  const hwDocs = document.getElementById('hwDocs');
+
+  if (elOil) elOil.value = cfg.oilKm;
+  if (elTires) elTires.value = cfg.tiresKm;
+  if (elPads) elPads.value = cfg.brakePadsKm;
+  if (elDiscs) elDiscs.value = cfg.brakeDiscsKm;
+  if (elBat) elBat.value = cfg.batteryMonths;
+  if (elFilt) elFilt.value = cfg.filtersKm;
+  if (elBeltKm) elBeltKm.value = cfg.beltKm;
+  if (elBeltM) elBeltM.value = cfg.beltMonths;
+
+  if (hwOil) hwOil.value = cfg.weights.oil;
+  if (hwTires) hwTires.value = cfg.weights.tires;
+  if (hwBrakes) hwBrakes.value = cfg.weights.brakes;
+  if (hwBat) hwBat.value = cfg.weights.battery;
+  if (hwFilt) hwFilt.value = cfg.weights.filters;
+  if (hwBelts) hwBelts.value = cfg.weights.belts;
+  if (hwDocs) hwDocs.value = cfg.weights.docs;
 
   openModal('modalHealthSettings');
 }
 
 function saveHealthSettings(e) {
   if (e) e.preventDefault();
-  const categories = getHealthServiceCategories();
 
-  document.querySelectorAll('.hs-cat-km').forEach(inp => {
-    const id = inp.dataset.id;
-    const cat = categories.find(c => c.id === id);
-    if (cat) cat.recommendedIntervalKm = Number(inp.value) || 10000;
-  });
+  const cfg = {
+    oilKm: Number(document.getElementById('hsOilKm').value) || 5000,
+    tiresKm: Number(document.getElementById('hsTiresKm').value) || 50000,
+    brakePadsKm: Number(document.getElementById('hsBrakePadsKm').value) || 30000,
+    brakeDiscsKm: Number(document.getElementById('hsBrakeDiscsKm').value) || 80000,
+    batteryMonths: Number(document.getElementById('hsBatteryMonths').value) || 36,
+    filtersKm: Number(document.getElementById('hsFiltersKm').value) || 15000,
+    beltKm: Number(document.getElementById('hsBeltKm').value) || 60000,
+    beltMonths: Number(document.getElementById('hsBeltMonths').value) || 48,
+    weights: {
+      oil: Number(document.getElementById('hwOil').value) || 20,
+      tires: Number(document.getElementById('hwTires').value) || 20,
+      brakes: Number(document.getElementById('hwBrakes').value) || 20,
+      battery: Number(document.getElementById('hwBattery').value) || 15,
+      filters: Number(document.getElementById('hwFilters').value) || 10,
+      belts: Number(document.getElementById('hwBelts').value) || 10,
+      docs: Number(document.getElementById('hwDocs').value) || 5
+    }
+  };
 
-  document.querySelectorAll('.hs-cat-months').forEach(inp => {
-    const id = inp.dataset.id;
-    const cat = categories.find(c => c.id === id);
-    if (cat) cat.recommendedIntervalMonths = Number(inp.value) || 12;
-  });
-
-  document.querySelectorAll('.hs-cat-weight').forEach(inp => {
-    const id = inp.dataset.id;
-    const cat = categories.find(c => c.id === id);
-    if (cat) cat.weightPercentage = Number(inp.value) || 10;
-  });
-
-  appState.serviceCategories = categories;
+  appState.healthSettings = cfg;
+  try {
+    localStorage.setItem('GARAGEONE_HEALTH_SETTINGS', JSON.stringify(cfg));
+  } catch (err) {}
   saveState();
   closeModal('modalHealthSettings');
   renderVehicleHealth();
@@ -4921,15 +4660,15 @@ function navigateToHealthHistory(targetTab, filterKeyword) {
   }
 }
 
-function quickAddHealthService(categoryName) {
+function quickAddHealthService(categoryKey) {
   if (typeof openServiceModal === 'function') {
     openServiceModal();
     setTimeout(() => {
       const catSelect = document.getElementById('servCategory');
       if (catSelect) {
         let matchOption = Array.from(catSelect.options).find(o => 
-          o.value.toLowerCase().includes(categoryName.toLowerCase()) || 
-          o.text.toLowerCase().includes(categoryName.toLowerCase())
+          o.value.toLowerCase().includes(categoryKey.toLowerCase()) || 
+          o.text.toLowerCase().includes(categoryKey.toLowerCase())
         );
         if (matchOption) catSelect.value = matchOption.value;
       }
@@ -4968,8 +4707,8 @@ function calculateDaysDiff(d1Str) {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
-// Dynamic Health Engine Calculation
 function calculateVehicleHealth(veh) {
+  const cfg = getHealthSettings();
   if (!veh) return null;
 
   const currentKm = Number(veh.km || 0);
@@ -4978,110 +4717,239 @@ function calculateVehicleHealth(veh) {
   const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id);
   const fuels = (appState.fuels || []).filter(f => f.vehicleId === veh.id);
 
-  const categories = getHealthServiceCategories().filter(c => c.affectsHealth !== false);
-  const evaluatedComponents = [];
   const missingItems = [];
-  const allSmartAlerts = [];
 
-  categories.forEach(cat => {
-    // Search latest service matching this category
-    const catServices = services.filter(s => {
-      const sCat = (s.category || '').toLowerCase();
-      const sTitle = (s.title || '').toLowerCase();
-      const sDesc = (s.description || '').toLowerCase();
-      const targetName = (cat.name || '').toLowerCase();
-      
-      return sCat.includes(targetName) || targetName.includes(sCat) ||
-             sTitle.includes(targetName) || sDesc.includes(targetName);
-    }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  // 1. Aceite
+  const oilServices = services.filter(s => 
+    (s.category && s.category.toLowerCase() === 'aceite') ||
+    (s.title && s.title.toLowerCase().includes('aceite')) ||
+    (s.description && s.description.toLowerCase().includes('aceite'))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    if (catServices.length > 0) {
-      const lastService = catServices[0];
-      const lastKm = Number(lastService.mileage || lastService.km || currentKm);
-      const kmUsed = Math.max(0, currentKm - lastKm);
-      const monthsElapsed = calculateMonthsDiff(lastService.date);
+  let oilData = { hasData: false, score: 0, categoryKey: 'aceite', remainingKm: cfg.oilKm, detail: 'Sin historial registrado', alert: null };
+  if (oilServices.length > 0) {
+    const lastOil = oilServices[0];
+    const lastKm = Number(lastOil.mileage || lastOil.km || currentKm);
+    const interval = Number(lastOil.nextKm || (lastKm + cfg.oilKm)) - lastKm;
+    const effInterval = interval > 0 ? interval : cfg.oilKm;
+    const kmUsed = Math.max(0, currentKm - lastKm);
+    const remKm = Math.max(0, effInterval - kmUsed);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / effInterval) * 100)));
 
-      let wearPct = 0;
-      let remainingKm = 0;
-      let remainingMonths = 0;
-
-      const method = cat.calculationMethod || 'both';
-
-      if (method === 'km') {
-        const interval = cat.recommendedIntervalKm || 10000;
-        wearPct = (kmUsed / interval) * 100;
-        remainingKm = Math.max(0, interval - kmUsed);
-      } else if (method === 'time') {
-        const intervalM = cat.recommendedIntervalMonths || 12;
-        wearPct = (monthsElapsed / intervalM) * 100;
-        remainingMonths = Math.max(0, intervalM - monthsElapsed);
-      } else if (method === 'both') {
-        const intervalKm = cat.recommendedIntervalKm || 10000;
-        const intervalM = cat.recommendedIntervalMonths || 12;
-        const kmWear = (kmUsed / intervalKm) * 100;
-        const timeWear = (monthsElapsed / intervalM) * 100;
-        wearPct = Math.max(kmWear, timeWear);
-        remainingKm = Math.max(0, intervalKm - kmUsed);
-        remainingMonths = Math.max(0, intervalM - monthsElapsed);
-      } else {
-        wearPct = 0;
-      }
-
-      const score = Math.max(0, Math.min(100, Math.round(100 - wearPct)));
-      const warnThreshold = cat.warningThresholdPct || 80;
-
-      let detailText = `Último servicio: ${lastService.date || 'Reciente'}`;
-      if (remainingKm > 0) detailText += ` • Restan ${remainingKm.toLocaleString()} km`;
-
-      let alertMsg = null;
-      if (wearPct >= warnThreshold) {
-        alertMsg = `Atención: ${cat.name} alcanza el ${Math.round(wearPct)}% de su vida útil recomendada.`;
-        allSmartAlerts.push({ type: wearPct >= (cat.criticalThresholdPct || 100) ? 'danger' : 'warning', text: alertMsg });
-      }
-
-      evaluatedComponents.push({
-        id: cat.id,
-        name: cat.name,
-        hasData: true,
-        score: score,
-        weight: cat.weightPercentage || 10,
-        detail: detailText,
-        remainingKm,
-        remainingMonths,
-        lastDate: lastService.date,
-        alertMsg
-      });
-    } else {
-      missingItems.push({ name: cat.name, key: cat.name });
-      evaluatedComponents.push({
-        id: cat.id,
-        name: cat.name,
-        hasData: false,
-        score: 0,
-        weight: cat.weightPercentage || 10,
-        detail: 'Sin historial registrado'
-      });
+    oilData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'aceite',
+      remainingKm: remKm,
+      usedKm: kmUsed,
+      interval: effInterval,
+      lastDate: lastOil.date,
+      oilType: lastOil.title || 'Aceite de motor',
+      detail: `Restan ${remKm.toLocaleString()} km`
+    };
+    if (remKm <= 1000) {
+      oilData.alert = `Proximo cambio de aceite en ${remKm.toLocaleString()} km.`;
     }
-  });
+  } else {
+    missingItems.push({ name: 'Ultimo cambio de aceite', key: 'aceite' });
+  }
 
-  // Documentation Evaluation
+  // 2. Llantas
+  const tireServices = services.filter(s =>
+    (s.category && (s.category.toLowerCase() === 'llantas' || s.category.toLowerCase() === 'neumaticos')) ||
+    (s.title && (s.title.toLowerCase().includes('llanta') || s.title.toLowerCase().includes('neumatic'))) ||
+    (s.description && s.description.toLowerCase().includes('llanta'))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let tireData = { hasData: false, score: 0, categoryKey: 'llantas', remainingKm: cfg.tiresKm, detail: 'Sin historial de llantas', alert: null };
+  if (tireServices.length > 0) {
+    const lastTire = tireServices[0];
+    const lastKm = Number(lastTire.mileage || lastTire.km || currentKm);
+    const lifespan = cfg.tiresKm;
+    const kmUsed = Math.max(0, currentKm - lastKm);
+    const remKm = Math.max(0, lifespan - kmUsed);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
+    const condText = score >= 60 ? 'Buenas condiciones' : (score >= 30 ? 'Desgaste moderado' : 'Reemplazo cercano');
+
+    tireData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'llantas',
+      remainingKm: remKm,
+      usedKm: kmUsed,
+      condition: condText,
+      detail: `${condText} • Restan ${remKm.toLocaleString()} km`
+    };
+    if (score < 25) {
+      tireData.alert = `La vida util de llantas es inferior al 25% (restan ${remKm.toLocaleString()} km).`;
+    }
+  } else {
+    missingItems.push({ name: 'Cambio de llantas', key: 'llantas' });
+  }
+
+  // 3. Frenos
+  const brakeServices = services.filter(s =>
+    (s.category && s.category.toLowerCase() === 'frenos') ||
+    (s.title && (s.title.toLowerCase().includes('freno') || s.title.toLowerCase().includes('pastilla') || s.title.toLowerCase().includes('disco'))) ||
+    (s.description && s.description.toLowerCase().includes('freno'))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let brakeData = { hasData: false, score: 0, categoryKey: 'frenos', remainingKm: cfg.brakePadsKm, detail: 'Sin historial de frenos', alert: null };
+  if (brakeServices.length > 0) {
+    const lastBrake = brakeServices[0];
+    const lastKm = Number(lastBrake.mileage || lastBrake.km || currentKm);
+    const isDisc = (lastBrake.title || '').toLowerCase().includes('disco');
+    const lifespan = isDisc ? cfg.brakeDiscsKm : cfg.brakePadsKm;
+    const kmUsed = Math.max(0, currentKm - lastKm);
+    const remKm = Math.max(0, lifespan - kmUsed);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
+
+    brakeData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'frenos',
+      remainingKm: remKm,
+      usedKm: kmUsed,
+      detail: `Restan ${remKm.toLocaleString()} km`
+    };
+    if (score < 25) {
+      brakeData.alert = `Desgaste de frenos critico. Restan solo ${remKm.toLocaleString()} km.`;
+    }
+  } else {
+    missingItems.push({ name: 'Cambio de frenos', key: 'frenos' });
+  }
+
+  // 4. Bateria
+  const batServices = services.filter(s =>
+    (s.category && (s.category.toLowerCase() === 'bateria' || s.category.toLowerCase() === 'bateria')) ||
+    (s.title && (s.title.toLowerCase().includes('bateria') || s.title.toLowerCase().includes('bateria')))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let batteryData = { hasData: false, score: 0, categoryKey: 'bateria', remainingMonths: cfg.batteryMonths, detail: 'Sin historial de bateria', alert: null };
+  if (batServices.length > 0) {
+    const lastBat = batServices[0];
+    const monthsElapsed = calculateMonthsDiff(lastBat.date);
+    const lifespanM = cfg.batteryMonths;
+    const remMonths = Math.max(0, lifespanM - monthsElapsed);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (monthsElapsed / lifespanM) * 100)));
+
+    batteryData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'bateria',
+      remainingMonths: remMonths,
+      monthsElapsed: monthsElapsed,
+      detail: `Instalada hace ${monthsElapsed} meses • Restan ${remMonths} meses`
+    };
+    if (monthsElapsed >= Math.floor(lifespanM * 0.8)) {
+      batteryData.alert = `La bateria supera el 80% de su vida util (instalada hace ${monthsElapsed} meses).`;
+    }
+  } else {
+    missingItems.push({ name: 'Ultimo cambio de bateria', key: 'bateria' });
+  }
+
+  // 5. Filtros
+  const filterServices = services.filter(s =>
+    (s.category && s.category.toLowerCase() === 'filtros') ||
+    (s.title && (s.title.toLowerCase().includes('filtro') || s.title.toLowerCase().includes('filter')))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let filterData = { hasData: false, score: 0, categoryKey: 'filtros', remainingKm: cfg.filtersKm, detail: 'Sin historial de filtros', alert: null };
+  if (filterServices.length > 0) {
+    const lastFilt = filterServices[0];
+    const lastKm = Number(lastFilt.mileage || lastFilt.km || currentKm);
+    const kmUsed = Math.max(0, currentKm - lastKm);
+    const remKm = Math.max(0, cfg.filtersKm - kmUsed);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / cfg.filtersKm) * 100)));
+
+    filterData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'filtros',
+      remainingKm: remKm,
+      detail: `Restan ${remKm.toLocaleString()} km`
+    };
+    if (score < 25) {
+      filterData.alert = `Filtros requieren reemplazo cercano (restan ${remKm.toLocaleString()} km).`;
+    }
+  } else {
+    missingItems.push({ name: 'Cambio de filtros', key: 'filtros' });
+  }
+
+  // 6. Correas
+  const beltServices = services.filter(s =>
+    (s.category && (s.category.toLowerCase() === 'correa' || s.category.toLowerCase() === 'correas')) ||
+    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('banda')))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let beltData = { hasData: false, score: 0, categoryKey: 'correa', detail: 'Sin historial de correas', alert: null };
+  if (beltServices.length > 0) {
+    const lastBelt = beltServices[0];
+    const lastKm = Number(lastBelt.mileage || lastBelt.km || currentKm);
+    const kmUsed = Math.max(0, currentKm - lastKm);
+    const kmPct = (kmUsed / cfg.beltKm) * 100;
+    const monthsElapsed = calculateMonthsDiff(lastBelt.date);
+    const monthPct = (monthsElapsed / cfg.beltMonths) * 100;
+
+    const worstWear = Math.max(kmPct, monthPct);
+    const score = Math.max(0, Math.min(100, Math.round(100 - worstWear)));
+    const remKm = Math.max(0, cfg.beltKm - kmUsed);
+
+    beltData = {
+      hasData: true,
+      score: score,
+      categoryKey: 'correa',
+      remainingKm: remKm,
+      detail: `Uso: ${Math.round(worstWear)}% • Restan ${remKm.toLocaleString()} km`
+    };
+    if (score < 25) {
+      beltData.alert = `Correa de distribucion supera el 75% de desgaste estimado.`;
+    }
+  } else {
+    missingItems.push({ name: 'Revision de correas', key: 'correa' });
+  }
+
+  // 7. Documentacion
   let docScores = [];
+  let docAlerts = [];
+  let docDetails = [];
+
   if (documents.length > 0) {
     documents.forEach(doc => {
       const days = calculateDaysDiff(doc.expiryDate || doc.expirationDate || doc.fechaVencimiento);
+      let statusText = 'Vigente';
+      let docScore = 100;
+
       if (days <= 0) {
-        docScores.push(0);
-        allSmartAlerts.push({ type: 'danger', text: `${doc.name || doc.type || 'Documento'} se encuentra VENCIDO.` });
+        statusText = 'Vencido';
+        docScore = 0;
+        docAlerts.push(`${doc.name || doc.type || 'Documento'} se encuentra VENCIDO.`);
       } else if (days <= 30) {
-        docScores.push(50);
-        allSmartAlerts.push({ type: 'warning', text: `${doc.name || doc.type || 'Documento'} vence en ${days} días.` });
+        statusText = `Vence en ${days} dias`;
+        docScore = 50;
+        docAlerts.push(`${doc.name || doc.type || 'Documento'} vence en ${days} dias.`);
       } else {
-        docScores.push(100);
+        statusText = 'Vigente';
+        docScore = 100;
       }
+      docScores.push(docScore);
+      docDetails.push(`${doc.name || doc.type}: ${statusText}`);
     });
   }
 
-  // Reminders Evaluation
+  const hasDocsData = documents.length > 0;
+  const docAvgScore = hasDocsData ? Math.round(docScores.reduce((a, b) => a + b, 0) / docScores.length) : 0;
+  if (!hasDocsData) missingItems.push({ name: 'Documentacion del vehiculo', key: 'guantera' });
+
+  const docData = {
+    hasData: hasDocsData,
+    score: docAvgScore,
+    categoryKey: 'guantera',
+    details: docDetails.length > 0 ? docDetails.join(' • ') : 'Sin documentos registrados',
+    alerts: docAlerts
+  };
+
+  // 8. Recordatorios
   let dueRem = 0, upcomingRem = 0, pendingRem = 0;
   reminders.forEach(r => {
     const days = calculateDaysDiff(r.dueDate || r.date);
@@ -5090,88 +4958,208 @@ function calculateVehicleHealth(veh) {
     else if (days <= 7) upcomingRem++;
     else pendingRem++;
   });
+
+  // 9. Gastos
+  const currentYear = new Date().getFullYear();
+  let totalHistoric = 0;
+  let yearTotal = 0;
+
+  services.forEach(s => {
+    const cost = Number(s.cost || s.totalCost || 0);
+    totalHistoric += cost;
+    if (s.date && new Date(s.date).getFullYear() === currentYear) {
+      yearTotal += cost;
+    }
+  });
+
+  fuels.forEach(f => {
+    const cost = Number(f.cost || f.totalCost || 0);
+    totalHistoric += cost;
+    if (f.date && new Date(f.date).getFullYear() === currentYear) {
+      yearTotal += cost;
+    }
+  });
+
+  const monthlyAvg = yearTotal > 0 ? Math.round(yearTotal / Math.max(1, new Date().getMonth() + 1)) : 0;
+
+  // RELIABILITY & SCORE CALCULATION
+  const componentsList = [
+    { name: 'Aceite', data: oilData, weight: cfg.weights.oil },
+    { name: 'Llantas', data: tireData, weight: cfg.weights.tires },
+    { name: 'Frenos', data: brakeData, weight: cfg.weights.brakes },
+    { name: 'Bateria', data: batteryData, weight: cfg.weights.battery },
+    { name: 'Filtros', data: filterData, weight: cfg.weights.filters },
+    { name: 'Correas', data: beltData, weight: cfg.weights.belts },
+    { name: 'Documentacion', data: docData, weight: cfg.weights.docs }
+  ];
+
+  const presentComponents = componentsList.filter(c => c.data.hasData);
+  const confidencePct = Math.round((presentComponents.length / componentsList.length) * 100);
+
+  let evaluatedWeightSum = 0;
+  let weightedHealthSum = 0;
+
+  if (presentComponents.length > 0) {
+    presentComponents.forEach(c => {
+      evaluatedWeightSum += c.weight;
+      weightedHealthSum += (c.data.score * c.weight);
+    });
+  }
+
+  const rawHealthPct = evaluatedWeightSum > 0 
+    ? Math.round(weightedHealthSum / evaluatedWeightSum)
+    : 0;
+
+  // Summary Metrics Breakdown
+  const evaluatedCount = presentComponents.length;
+  const healthyCount = presentComponents.filter(c => c.data.score >= 70).length;
+  const warningCount = presentComponents.filter(c => c.data.score < 70).length;
+  const noDataCount = componentsList.length - presentComponents.length;
+
+  // Confidence Levels: Low (<50%), Medium (50-70%), High (>70%)
+  let overallHealthPct = null;
+  let ratingLabel = 'SIN INFORMACION SUFICIENTE';
+  let ratingClass = 'health-status-nodata';
+  let ratingColor = '#64748b';
+  let confidenceColor = '#ef4444';
+  let confidenceMsg = 'No hay suficiente historial para calcular una salud confiable.';
+
+  if (confidencePct >= 70) {
+    overallHealthPct = rawHealthPct;
+    confidenceColor = '#10b981';
+    confidenceMsg = 'El analisis es altamente confiable porque existe suficiente historial del vehiculo.';
+    if (rawHealthPct >= 95) {
+      ratingLabel = 'EXCELENTE';
+      ratingClass = 'health-status-excellent';
+      ratingColor = '#3b82f6';
+    } else if (rawHealthPct >= 85) {
+      ratingLabel = 'MUY BUENO';
+      ratingClass = 'health-status-verygood';
+      ratingColor = '#10b981';
+    } else if (rawHealthPct >= 70) {
+      ratingLabel = 'BUENO';
+      ratingClass = 'health-status-good';
+      ratingColor = '#eab308';
+    } else if (rawHealthPct >= 50) {
+      ratingLabel = 'REQUIERE ATENCION';
+      ratingClass = 'health-status-warning';
+      ratingColor = '#f97316';
+    } else {
+      ratingLabel = 'CRITICO';
+      ratingClass = 'health-status-critical';
+      ratingColor = '#ef4444';
+    }
+  } else if (confidencePct >= 50) {
+    overallHealthPct = rawHealthPct;
+    ratingLabel = 'SALUD ESTIMADA';
+    ratingClass = 'health-status-warning';
+    ratingColor = '#f97316';
+    confidenceColor = '#f97316';
+    confidenceMsg = 'El analisis es una estimacion. Agregue mas datos para mayor precision.';
+  }
+
+  // Aggregate Smart Alerts
+  const allSmartAlerts = [];
+  if (oilData.alert) allSmartAlerts.push({ type: 'warning', text: oilData.alert });
+  if (tireData.alert) allSmartAlerts.push({ type: 'danger', text: tireData.alert });
+  if (brakeData.alert) allSmartAlerts.push({ type: 'danger', text: brakeData.alert });
+  if (batteryData.alert) allSmartAlerts.push({ type: 'warning', text: batteryData.alert });
+  if (filterData.alert) allSmartAlerts.push({ type: 'info', text: filterData.alert });
+  if (beltData.alert) allSmartAlerts.push({ type: 'danger', text: beltData.alert });
+  if (docData.alerts && docData.alerts.length > 0) {
+    docData.alerts.forEach(a => allSmartAlerts.push({ type: 'warning', text: a }));
+  }
   if (dueRem > 0) {
     allSmartAlerts.push({ type: 'danger', text: `Tienes ${dueRem} recordatorio(s) de servicio VENCIDOS.` });
   }
 
-  // Financial Summary
-  const currentYear = new Date().getFullYear();
-  let totalHistoric = 0, yearTotal = 0;
-  services.forEach(s => {
-    const cost = Number(s.cost || s.totalCost || 0);
-    totalHistoric += cost;
-    if (s.date && new Date(s.date).getFullYear() === currentYear) yearTotal += cost;
-  });
-  fuels.forEach(f => {
-    const cost = Number(f.cost || f.totalCost || 0);
-    totalHistoric += cost;
-    if (f.date && new Date(f.date).getFullYear() === currentYear) yearTotal += cost;
-  });
-  const monthlyAvg = yearTotal > 0 ? Math.round(yearTotal / Math.max(1, new Date().getMonth() + 1)) : 0;
-
-  // Global Score Calculation
-  const presentComponents = evaluatedComponents.filter(c => c.hasData);
-  const confidencePct = categories.length > 0 ? Math.round((presentComponents.length / categories.length) * 100) : 0;
-
-  let totalWeightSum = 0;
-  let weightedScoreSum = 0;
-
-  presentComponents.forEach(c => {
-    totalWeightSum += c.weight;
-    weightedScoreSum += (c.score * c.weight);
-  });
-
-  const rawHealthPct = totalWeightSum > 0 ? Math.round(weightedScoreSum / totalWeightSum) : 0;
-  const overallHealthPct = presentComponents.length > 0 ? rawHealthPct : null;
-
-  let ratingLabel = 'SIN INFORMACIÓN SUFICIENTE';
-  let ratingClass = 'health-status-nodata';
-  let ratingColor = '#64748b';
-  let confidenceColor = '#ef4444';
-  let confidenceMsg = 'Registra mantenimientos en la bitácora para generar una evaluación precisa.';
-
-  if (confidencePct >= 50 && overallHealthPct !== null) {
-    confidenceColor = confidencePct >= 75 ? '#10b981' : '#f97316';
-    confidenceMsg = confidencePct >= 75 ? 'El análisis es altamente confiable con buen respaldo de datos.' : 'Análisis con nivel medio de datos registrados.';
-
-    if (rawHealthPct >= 90) {
-      ratingLabel = 'EXCELENTE';
-      ratingClass = 'health-status-excellent';
-      ratingColor = '#3b82f6';
-    } else if (rawHealthPct >= 75) {
-      ratingLabel = 'MUY BUENO';
-      ratingClass = 'health-status-verygood';
-      ratingColor = '#10b981';
-    } else if (rawHealthPct >= 60) {
-      ratingLabel = 'BUENO';
-      ratingClass = 'health-status-good';
-      ratingColor = '#eab308';
-    } else if (rawHealthPct >= 45) {
-      ratingLabel = 'REQUIERE ATENCIÓN';
-      ratingClass = 'health-status-warning';
-      ratingColor = '#f97316';
-    } else {
-      ratingLabel = 'CRÍTICO';
-      ratingClass = 'health-status-critical';
-      ratingColor = '#ef4444';
-    }
+  // Maintenance Assistant Smart Answers
+  let lowestComp = null;
+  if (presentComponents.length > 0) {
+    const sorted = [...presentComponents].sort((a, b) => a.data.score - b.data.score);
+    lowestComp = sorted[0];
   }
 
-  // Diagnostics
-  const sortedPresent = [...presentComponents].sort((a, b) => a.score - b.score);
-  const lowestComp = sortedPresent.length > 0 ? sortedPresent[0] : null;
-
-  let firstAction = 'Todos los componentes monitoreados operan correctamente.';
+  let firstAction = 'Todo funciona correctamente.';
   if (dueRem > 0) {
     firstAction = `Atender ${dueRem} recordatorio(s) vencido(s).`;
-  } else if (lowestComp && lowestComp.score < 70) {
-    firstAction = `Revisar ${lowestComp.name} (${lowestComp.score}% de vida útil).`;
+  } else if (lowestComp && lowestComp.data.score < 70) {
+    firstAction = `Revisar ${lowestComp.name} (${lowestComp.data.score}% de vida util).`;
+  } else if (oilData.hasData && oilData.remainingKm <= 1000) {
+    firstAction = `Cambiar aceite pronto (restan ${oilData.remainingKm.toLocaleString()} km).`;
   } else if (missingItems.length > 0) {
     firstAction = `Registrar ${missingItems[0].name.toLowerCase()} para aumentar la confiabilidad.`;
   }
 
-  const worstWearText = lowestComp ? `${lowestComp.name} (${lowestComp.score}%)` : 'Sin datos';
-  const nextServiceText = dueRem > 0 ? `${dueRem} servicio(s) vencido(s) en Recordatorios` : 'Sin alertas críticas inmediatas.';
+  let worstWearText = lowestComp ? `${lowestComp.name} (${lowestComp.data.score}%)` : 'Sin datos suficientes';
+  let nextServiceText = 'No hay servicios inmediatos pendientes.';
+  if (oilData.hasData && oilData.remainingKm > 0) {
+    nextServiceText = `Cambio de aceite (${oilData.remainingKm.toLocaleString()} km restantes)`;
+  } else if (dueRem > 0) {
+    nextServiceText = `${dueRem} servicio(s) vencido(s) en Recordatorios`;
+  }
+
+  let docStatusSummary = docData.hasData ? (docData.alerts.length > 0 ? `${docData.alerts.length} por vencer/vencidos` : 'Todos vigentes') : 'Sin documentos registrados';
+  const lastEvaluationText = getRelativeTimeString(veh.lastHealthUpdate || Date.now());
+
+  // 10. Componentes Adicionales / Mantenimientos Específicos
+  const customCategories = (appState.serviceCategories || []).filter(c => c.affectsHealth === true);
+  const customComponentsData = [];
+
+  customCategories.forEach(cat => {
+    const catNameLower = (cat.name || '').toLowerCase();
+    const isStandard = ['aceite', 'llanta', 'freno', 'bater', 'filtro', 'correa', 'document'].some(k => catNameLower.includes(k));
+    if (isStandard) return; // Keep standard components in main section
+
+    const catServices = services.filter(s => {
+      const sCat = (s.category || '').toLowerCase();
+      const sTitle = (s.title || '').toLowerCase();
+      const sDesc = (s.description || '').toLowerCase();
+      return sCat.includes(catNameLower) || catNameLower.includes(sCat) || sTitle.includes(catNameLower) || sDesc.includes(catNameLower);
+    }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    if (catServices.length > 0) {
+      const lastS = catServices[0];
+      const lastKm = Number(lastS.mileage || lastS.km || currentKm);
+      const kmUsed = Math.max(0, currentKm - lastKm);
+      const monthsElapsed = calculateMonthsDiff(lastS.date);
+
+      let wearKmPct = cat.recommendedIntervalKm > 0 ? (kmUsed / cat.recommendedIntervalKm) * 100 : 0;
+      let wearMonthsPct = cat.recommendedIntervalMonths > 0 ? (monthsElapsed / cat.recommendedIntervalMonths) * 100 : 0;
+      let wearPct = Math.max(wearKmPct, wearMonthsPct);
+      let score = Math.max(0, Math.min(100, Math.round(100 - wearPct)));
+
+      let remKm = cat.recommendedIntervalKm > 0 ? Math.max(0, cat.recommendedIntervalKm - kmUsed) : null;
+      let remMonths = cat.recommendedIntervalMonths > 0 ? Math.max(0, cat.recommendedIntervalMonths - monthsElapsed) : null;
+
+      let detailParts = [];
+      if (remKm !== null) detailParts.push(`Restan ${remKm.toLocaleString()} km`);
+      if (remMonths !== null) detailParts.push(`Restan ${remMonths} meses`);
+      let detail = detailParts.length > 0 ? detailParts.join(' • ') : `Último: ${lastS.date || 'Reciente'}`;
+
+      customComponentsData.push({
+        id: cat.id,
+        name: cat.name,
+        hasData: true,
+        score: score,
+        detail: detail,
+        lastDate: lastS.date
+      });
+    } else {
+      let detailParts = [];
+      if (cat.recommendedIntervalKm) detailParts.push(`Intervalo: ${cat.recommendedIntervalKm.toLocaleString()} km`);
+      if (cat.recommendedIntervalMonths) detailParts.push(`Intervalo: ${cat.recommendedIntervalMonths} meses`);
+      let detail = detailParts.length > 0 ? detailParts.join(' • ') : 'Sin historial registrado';
+
+      customComponentsData.push({
+        id: cat.id,
+        name: cat.name,
+        hasData: false,
+        score: 0,
+        detail: detail
+      });
+    }
+  });
 
   return {
     veh,
@@ -5184,15 +5172,24 @@ function calculateVehicleHealth(veh) {
     confidenceColor,
     confidenceMsg,
     missingItems,
-    evaluatedComponents,
-    evaluatedCount: presentComponents.length,
-    healthyCount: presentComponents.filter(c => c.score >= 70).length,
-    warningCount: presentComponents.filter(c => c.score < 70).length,
-    noDataCount: categories.length - presentComponents.length,
+    evaluatedCount,
+    healthyCount,
+    warningCount,
+    noDataCount,
     firstAction,
     worstWearText,
     nextServiceText,
+    docStatusSummary,
+    lastEvaluationText,
     allSmartAlerts,
+    oilData,
+    tireData,
+    brakeData,
+    batteryData,
+    filterData,
+    beltData,
+    docData,
+    customComponentsData,
     remindersSummary: { dueRem, upcomingRem, pendingRem },
     expensesSummary: { yearTotal, monthlyAvg, totalHistoric }
   };
@@ -5217,17 +5214,19 @@ function renderVehicleHealth() {
   const h = calculateVehicleHealth(veh);
   if (!h) return;
 
+  // SVG Circle Stroke calculation
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const scoreVal = h.overallHealthPct !== null ? h.overallHealthPct : 0;
   const strokeOffset = circumference - (scoreVal / 100) * circumference;
 
+  // Render Smart Alerts Block
   let alertsHtml = '';
   if (h.allSmartAlerts.length > 0) {
     alertsHtml = `
       <div class="health-alerts-container">
         <h3 style="font-size:0.92rem; font-weight:700; margin-bottom:8px; color:var(--text-primary);">
-          Alertas del Motor de Salud (${h.allSmartAlerts.length})
+          Alertas Inteligentes (${h.allSmartAlerts.length})
         </h3>
         ${h.allSmartAlerts.map(a => `
           <div class="health-alert-item health-alert-${a.type}">
@@ -5241,20 +5240,21 @@ function renderVehicleHealth() {
     alertsHtml = `
       <div class="health-alerts-container">
         <div class="health-alert-item health-alert-success">
-          <span><strong>Estado Mecánico Óptimo.</strong> Todos los tipos de servicio configurados registran un desgaste dentro de parámetros normales.</span>
+          <span><strong>Sin observaciones críticas.</strong> Todos los componentes evaluados operan dentro de parámetros normales.</span>
         </div>
       </div>
     `;
   }
 
+  // Render Reliability Confidence Banner with Progress Bar & Actionable Tips
   let confidenceTipsHtml = '';
   if (h.missingItems.length > 0) {
     confidenceTipsHtml = `
       <div class="health-confidence-tips">
-        <strong>Registra historiales para aumentar la confiabilidad:</strong>
+        <strong>Para aumentar la confiabilidad del análisis registra:</strong>
         <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
-          ${h.missingItems.slice(0, 4).map(item => `
-            <button type="button" class="btn btn-secondary btn-sm btn-quick-add" onclick="quickAddHealthService('${escapeHtml(item.name)}')" style="font-size:0.75rem; padding:4px 10px;">
+          ${h.missingItems.map(item => `
+            <button type="button" class="btn btn-secondary btn-sm btn-quick-add" onclick="quickAddHealthService('${item.key}')" style="font-size:0.75rem; padding:4px 10px;">
               + ${escapeHtml(item.name)}
             </button>
           `).join('')}
@@ -5264,7 +5264,7 @@ function renderVehicleHealth() {
   }
 
   container.innerHTML = `
-    <!-- HERO HEALTH SCORE CARD -->
+    <!-- MAIN HERO SCORE CARD -->
     <div class="health-hero-card">
       <div class="health-hero-header">
         <div class="health-hero-title">
@@ -5285,7 +5285,7 @@ function renderVehicleHealth() {
               ${h.overallHealthPct !== null ? h.overallHealthPct + '%' : '--%'}
             </div>
           </div>
-          <span style="font-size:0.72rem; color:#94a3b8; margin-top:6px; font-weight:700; text-transform:uppercase;">Salud Total</span>
+          <span style="font-size:0.72rem; color:#94a3b8; margin-top:6px; font-weight:700; text-transform:uppercase;">Salud</span>
         </div>
 
         <div class="health-summary-info">
@@ -5294,11 +5294,15 @@ function renderVehicleHealth() {
           </div>
 
           <div class="health-hero-text">
-            ${h.overallHealthPct === null ? 'No hay suficientes datos registrados en la bitácora.' : (h.allSmartAlerts.length === 0 ? 'Sin observaciones críticas detectadas.' : `Se han detectado ${h.allSmartAlerts.length} observación(es) en el motor de salud.`)}
+            ${h.overallHealthPct === null ? 'No hay suficientes datos registrados para calcular un porcentaje de salud verídico.' : (h.allSmartAlerts.length === 0 ? 'Sin observaciones críticas detectadas.' : `Se han detectado ${h.allSmartAlerts.length} observación(es) de mantenimiento.`)}
           </div>
 
           <div class="health-next-service">
-            <strong>Próxima acción:</strong> ${escapeHtml(h.firstAction)}
+            <strong>Próximo servicio:</strong> ${escapeHtml(h.nextServiceText)}
+          </div>
+
+          <div style="font-size:0.74rem; color:#94a3b8; margin-top:8px; font-weight:600;">
+            Última evaluación: ${escapeHtml(h.lastEvaluationText)}
           </div>
         </div>
       </div>
@@ -5307,7 +5311,7 @@ function renderVehicleHealth() {
     <!-- GENERAL EVALUATION SUMMARY CARDS -->
     <div class="health-summary-grid">
       <div class="health-summary-box">
-        <div class="health-summary-val" style="color:#38bdf8;">${h.evaluatedCount} / ${h.evaluatedComponents.length}</div>
+        <div class="health-summary-val" style="color:#38bdf8;">${h.evaluatedCount} / 7</div>
         <div class="health-summary-lbl">Evaluados</div>
       </div>
       <div class="health-summary-box">
@@ -5316,18 +5320,20 @@ function renderVehicleHealth() {
       </div>
       <div class="health-summary-box">
         <div class="health-summary-val" style="color:#fb923c;">${h.warningCount}</div>
-        <div class="health-summary-lbl">Atención</div>
+        <div class="health-summary-lbl">Advertencias</div>
       </div>
       <div class="health-summary-box">
         <div class="health-summary-val" style="color:#94a3b8;">${h.noDataCount}</div>
-        <div class="health-summary-lbl">Sin Registro</div>
+        <div class="health-summary-lbl">Sin Datos</div>
       </div>
     </div>
 
     <!-- ENHANCED CONFIDENCE INDICATOR -->
     <div class="health-confidence-banner">
       <div class="health-confidence-header">
-        <div class="health-confidence-title">Confiabilidad del Análisis</div>
+        <div class="health-confidence-title">
+          Confiabilidad del Análisis
+        </div>
         <strong style="color:${h.confidenceColor}; font-size:0.95rem;">${h.confidencePct}%</strong>
       </div>
       <div class="confidence-bar-bg">
@@ -5339,44 +5345,221 @@ function renderVehicleHealth() {
       ${confidenceTipsHtml}
     </div>
 
+    <!-- SMART MAINTENANCE ASSISTANT PANEL -->
+    <div class="health-assistant-card">
+      <h3 style="font-size:0.9rem; font-weight:800; color:var(--text-primary);">
+        Diagnóstico y Recomendaciones Rápidas
+      </h3>
+      <div class="health-assistant-grid">
+        <div class="health-assistant-item">
+          <div class="health-assistant-q">¿Qué revisar primero?</div>
+          <div class="health-assistant-a">${escapeHtml(h.firstAction)}</div>
+        </div>
+        <div class="health-assistant-item">
+          <div class="health-assistant-q">Mayor desgaste</div>
+          <div class="health-assistant-a">${escapeHtml(h.worstWearText)}</div>
+        </div>
+        <div class="health-assistant-item">
+          <div class="health-assistant-q">Documentación</div>
+          <div class="health-assistant-a">${escapeHtml(h.docStatusSummary)}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- SMART ALERTS -->
     ${alertsHtml}
 
-    <!-- DYNAMIC COMPONENT EVALUATION CARDS GRID -->
+    <!-- SECCIÓN 1: COMPONENTES PRINCIPALES (ESTÁNDAR) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3 style="font-size:0.95rem; font-weight:800; color:var(--text-primary); margin:0;">Evaluación Dinámica por Tipo de Servicio</h3>
-      <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()" style="font-size:0.78rem;">+ Nuevo Tipo Servicio</button>
+      <h3 style="font-size:0.95rem; font-weight:800; color:var(--text-primary); margin:0;">🛡️ Componentes Principales</h3>
     </div>
 
     <div class="health-grid">
-      ${h.evaluatedComponents.map(comp => `
-        <div class="health-card ${!comp.hasData ? 'health-card-nodata' : ''}">
-          <div>
-            <div class="health-card-header">
-              <div class="health-card-title ${!comp.hasData ? 'health-icon-nodata' : ''}">
-                ${escapeHtml(comp.name)}
-              </div>
-              <div class="health-card-score" style="color:${!comp.hasData ? '#64748b' : (comp.score >= 70 ? '#34d399' : (comp.score >= 40 ? '#fb923c' : '#f87171'))};">
-                ${comp.hasData ? comp.score + '%' : 'Sin datos'}
-              </div>
+      <!-- 1. Aceite -->
+      <div class="health-card ${!h.oilData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.oilData.hasData ? 'health-icon-nodata' : ''}">
+              Aceite
             </div>
-            <div class="health-card-progress">
-              <div class="health-card-progress-fill ${!comp.hasData ? 'health-card-progress-nodata' : ''}" 
-                   style="width:${!comp.hasData ? '100%' : comp.score + '%'}; background:${!comp.hasData ? '#475569' : (comp.score >= 70 ? '#10b981' : (comp.score >= 40 ? '#f97316' : '#ef4444'))};"></div>
-            </div>
-            <div class="health-card-details">
-              ${escapeHtml(comp.detail)}
+            <div class="health-card-score" style="color:${!h.oilData.hasData ? '#64748b' : (h.oilData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.oilData.hasData ? h.oilData.score + '%' : 'Sin historial'}
             </div>
           </div>
-          <div class="health-card-footer">
-            <span style="font-size:0.75rem; color:var(--text-secondary);">${comp.hasData ? 'Ponderación: ' + comp.weight + '%' : 'Sin registro'}</span>
-            ${comp.hasData 
-              ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', '${escapeHtml(comp.name)}')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
-              : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('${escapeHtml(comp.name)}')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar</button>`
-            }
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.oilData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.oilData.hasData ? '100%' : h.oilData.score + '%'}; background:${!h.oilData.hasData ? '#475569' : (h.oilData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.oilData.detail)}
           </div>
         </div>
-      `).join('')}
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.oilData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.oilData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'aceite')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('aceite')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 2. Llantas -->
+      <div class="health-card ${!h.tireData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.tireData.hasData ? 'health-icon-nodata' : ''}">
+              Llantas
+            </div>
+            <div class="health-card-score" style="color:${!h.tireData.hasData ? '#64748b' : (h.tireData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.tireData.hasData ? h.tireData.score + '%' : 'Sin historial'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.tireData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.tireData.hasData ? '100%' : h.tireData.score + '%'}; background:${!h.tireData.hasData ? '#475569' : (h.tireData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.tireData.detail)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.tireData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.tireData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'llantas')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('llantas')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 3. Frenos -->
+      <div class="health-card ${!h.brakeData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.brakeData.hasData ? 'health-icon-nodata' : ''}">
+              Frenos
+            </div>
+            <div class="health-card-score" style="color:${!h.brakeData.hasData ? '#64748b' : (h.brakeData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.brakeData.hasData ? h.brakeData.score + '%' : 'Sin historial'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.brakeData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.brakeData.hasData ? '100%' : h.brakeData.score + '%'}; background:${!h.brakeData.hasData ? '#475569' : (h.brakeData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.brakeData.detail)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.brakeData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.brakeData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'frenos')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('frenos')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 4. Batería -->
+      <div class="health-card ${!h.batteryData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.batteryData.hasData ? 'health-icon-nodata' : ''}">
+              Batería
+            </div>
+            <div class="health-card-score" style="color:${!h.batteryData.hasData ? '#64748b' : (h.batteryData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.batteryData.hasData ? h.batteryData.score + '%' : 'Sin historial'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.batteryData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.batteryData.hasData ? '100%' : h.batteryData.score + '%'}; background:${!h.batteryData.hasData ? '#475569' : (h.batteryData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.batteryData.detail)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.batteryData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.batteryData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'bateria')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('bateria')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 5. Filtros -->
+      <div class="health-card ${!h.filterData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.filterData.hasData ? 'health-icon-nodata' : ''}">
+              Filtros
+            </div>
+            <div class="health-card-score" style="color:${!h.filterData.hasData ? '#64748b' : (h.filterData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.filterData.hasData ? h.filterData.score + '%' : 'Sin historial'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.filterData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.filterData.hasData ? '100%' : h.filterData.score + '%'}; background:${!h.filterData.hasData ? '#475569' : (h.filterData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.filterData.detail)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.filterData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.filterData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'filtro')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('filtros')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 6. Correas -->
+      <div class="health-card ${!h.beltData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.beltData.hasData ? 'health-icon-nodata' : ''}">
+              Correas
+            </div>
+            <div class="health-card-score" style="color:${!h.beltData.hasData ? '#64748b' : (h.beltData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.beltData.hasData ? h.beltData.score + '%' : 'Sin historial'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.beltData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.beltData.hasData ? '100%' : h.beltData.score + '%'}; background:${!h.beltData.hasData ? '#475569' : (h.beltData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.beltData.detail)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.beltData.hasData ? 'Servicios' : 'Sin datos'}</span>
+          ${h.beltData.hasData 
+            ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', 'correa')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+            : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('correa')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar primer servicio</button>`
+          }
+        </div>
+      </div>
+
+      <!-- 7. Documentación -->
+      <div class="health-card ${!h.docData.hasData ? 'health-card-nodata' : ''}">
+        <div>
+          <div class="health-card-header">
+            <div class="health-card-title ${!h.docData.hasData ? 'health-icon-nodata' : ''}">
+              Documentación
+            </div>
+            <div class="health-card-score" style="color:${!h.docData.hasData ? '#64748b' : (h.docData.score >= 50 ? '#34d399' : '#f87171')};">
+              ${h.docData.hasData ? h.docData.score + '%' : 'Sin documentos'}
+            </div>
+          </div>
+          <div class="health-card-progress">
+            <div class="health-card-progress-fill ${!h.docData.hasData ? 'health-card-progress-nodata' : ''}" style="width:${!h.docData.hasData ? '100%' : h.docData.score + '%'}; background:${!h.docData.hasData ? '#475569' : (h.docData.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+          </div>
+          <div class="health-card-details">
+            ${escapeHtml(h.docData.details)}
+          </div>
+        </div>
+        <div class="health-card-footer">
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${h.docData.hasData ? 'Guantera' : 'Sin datos'}</span>
+          <button class="btn btn-secondary btn-sm" onclick="switchTab('tabGuantera')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>
+        </div>
+      </div>
 
       <!-- Recordatorios Summary -->
       <div class="health-card">
@@ -5418,7 +5601,130 @@ function renderVehicleHealth() {
         </div>
       </div>
     </div>
+
+    <!-- SECCIÓN 2: COMPONENTES ADICIONALES / MANTENIMIENTOS ESPECÍFICOS -->
+    <div style="margin-top:24px; margin-bottom:12px; border-top:1px solid var(--border-color); padding-top:18px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="font-size:0.95rem; font-weight:800; color:#38bdf8; margin:0;">⚙️ Componentes Adicionales / Mantenimientos Específicos</h3>
+        <p class="subtitle" style="font-size:0.8rem; margin:2px 0 0 0;">Servicios personalizados que participan en el análisis de salud.</p>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()" style="font-size:0.78rem;">+ Nuevo Servicio</button>
+    </div>
+
+    ${h.customComponentsData && h.customComponentsData.length > 0 ? `
+      <div class="health-grid">
+        ${h.customComponentsData.map(c => `
+          <div class="health-card ${!c.hasData ? 'health-card-nodata' : ''}">
+            <div>
+              <div class="health-card-header">
+                <div class="health-card-title ${!c.hasData ? 'health-icon-nodata' : ''}">
+                  ${escapeHtml(c.name)}
+                </div>
+                <div class="health-card-score" style="color:${!c.hasData ? '#64748b' : (c.score >= 50 ? '#34d399' : '#f87171')};">
+                  ${c.hasData ? c.score + '%' : 'Sin historial'}
+                </div>
+              </div>
+              <div class="health-card-progress">
+                <div class="health-card-progress-fill ${!c.hasData ? 'health-card-progress-nodata' : ''}" 
+                     style="width:${!c.hasData ? '100%' : c.score + '%'}; background:${!c.hasData ? '#475569' : (c.score >= 50 ? '#10b981' : '#ef4444')};"></div>
+              </div>
+              <div class="health-card-details">
+                ${escapeHtml(c.detail)}
+              </div>
+            </div>
+            <div class="health-card-footer">
+              <span style="font-size:0.75rem; color:var(--text-secondary);">${c.hasData ? 'Personalizado' : 'Sin datos'}</span>
+              ${c.hasData 
+                ? `<button class="btn btn-secondary btn-sm" onclick="navigateToHealthHistory('tabMaintenance', '${escapeHtml(c.name)}')" style="font-size:0.75rem; padding:4px 10px;">Ver historial</button>`
+                : `<button class="btn btn-sm btn-quick-add" onclick="quickAddHealthService('${escapeHtml(c.name)}')" style="font-size:0.75rem; padding:4px 10px;">+ Registrar</button>`
+              }
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div style="background:rgba(255,255,255,0.02); border:1px dashed rgba(255,255,255,0.1); border-radius:12px; padding:20px; text-align:center;">
+        <p class="subtitle" style="margin:0 0 10px 0; font-size:0.83rem;">No hay mantenimientos específicos configurados para participar en Salud.</p>
+        <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()">+ Configurar un servicio personalizado</button>
+      </div>
+    `}
   `;
+}
+
+// Category Editor Helper Functions
+function openServiceCategoryModal(catId = null) {
+  const form = document.getElementById('formServiceCategory');
+  if (form) form.reset();
+
+  document.getElementById('catId').value = '';
+  document.getElementById('modalCategoryTitle').textContent = 'Nuevo Tipo de Servicio';
+  
+  const affectsCheck = document.getElementById('catAffectsHealth');
+  if (affectsCheck) affectsCheck.checked = false;
+  toggleHealthCategoryInputs(false);
+
+  if (catId) {
+    const categories = appState.serviceCategories || [];
+    const cat = categories.find(c => c.id === catId);
+    if (cat) {
+      document.getElementById('modalCategoryTitle').textContent = 'Editar Tipo de Servicio';
+      document.getElementById('catId').value = cat.id;
+      document.getElementById('catName').value = cat.name || '';
+      
+      const affects = cat.affectsHealth === true;
+      if (affectsCheck) affectsCheck.checked = affects;
+      toggleHealthCategoryInputs(affects);
+
+      if (document.getElementById('catIntervalKm')) document.getElementById('catIntervalKm').value = cat.recommendedIntervalKm || '';
+      if (document.getElementById('catIntervalMonths')) document.getElementById('catIntervalMonths').value = cat.recommendedIntervalMonths || '';
+    }
+  }
+
+  openModal('modalServiceCategory');
+}
+
+function toggleHealthCategoryInputs(checked) {
+  const container = document.getElementById('catHealthFieldsContainer');
+  if (container) container.style.display = checked ? 'block' : 'none';
+}
+
+function saveServiceCategory(e) {
+  if (e) e.preventDefault();
+  const catId = document.getElementById('catId').value;
+  const name = (document.getElementById('catName').value || '').trim();
+  if (!name) return;
+
+  const affectsHealth = document.getElementById('catAffectsHealth').checked;
+  const intervalKm = Number(document.getElementById('catIntervalKm').value) || 0;
+  const intervalMonths = Number(document.getElementById('catIntervalMonths').value) || 0;
+
+  if (!appState.serviceCategories) appState.serviceCategories = [];
+
+  if (catId) {
+    const idx = appState.serviceCategories.findIndex(c => c.id === catId);
+    if (idx !== -1) {
+      appState.serviceCategories[idx] = {
+        ...appState.serviceCategories[idx],
+        name,
+        affectsHealth,
+        recommendedIntervalKm: intervalKm,
+        recommendedIntervalMonths: intervalMonths
+      };
+    }
+  } else {
+    const newCat = {
+      id: 'cat_' + Date.now(),
+      name,
+      affectsHealth,
+      recommendedIntervalKm: intervalKm,
+      recommendedIntervalMonths: intervalMonths
+    };
+    appState.serviceCategories.push(newCat);
+  }
+
+  saveState();
+  closeModal('modalServiceCategory');
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 
