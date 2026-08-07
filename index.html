@@ -218,7 +218,7 @@
             <p class="subtitle">Servicios mecánicos y facturas</p>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="openModal('modalNewCategory')">+ Crear servicio</button>
+            <button class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()">+ Crear Tipo Servicio</button>
             <button class="btn btn-primary btn-sm" onclick="openServiceModal()">+ Registrar Servicio</button>
           </div>
         </div>
@@ -368,11 +368,11 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Descargar PDF</span>
             </button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;">
+            <button class="btn btn-secondary btn-block" onclick="openVehicleShareBannerModal('share')" style="flex:1; min-width:130px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
               <span>Compartir</span>
             </button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:120px;">
+            <button class="btn btn-secondary btn-block" onclick="openVehicleShareBannerModal('email')" style="flex:1; min-width:120px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               <span data-i18n="btnShareEmail">Correo</span>
             </button>
@@ -910,100 +910,194 @@
     </div>
   </div>
 
-  <!-- Modal: Ajustes de Salud del Vehículo -->
-  <div id="modalHealthSettings" class="modal-backdrop">
-    <div class="modal-card" style="max-width:520px;">
+  <!-- Modal: Ficha Técnica & Banner de Venta (Zero WhatsApp Icons) -->
+  <div id="modalVehicleShareBanner" class="modal-backdrop">
+    <div class="modal-card" style="max-width:680px; width:92%;">
       <div class="modal-header">
-        <h2>Ajustes de Salud del Vehículo</h2>
+        <h2>Ficha Técnica y Banner de Venta</h2>
+        <button class="close-btn" onclick="closeModal('modalVehicleShareBanner')">✕</button>
+      </div>
+
+      <!-- Real-time Preview Poster Card -->
+      <div id="shareBannerPreviewCard" class="share-banner-preview">
+        <!-- Live preview card rendered via JS -->
+      </div>
+
+      <!-- Config Controls Form -->
+      <div style="margin-top:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px;">
+        <h3 style="font-size:0.9rem; font-weight:700; color:#38bdf8; margin-bottom:12px;">Configurar Detalles del Vehículo</h3>
+        
+        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label style="font-size:0.8rem;">Precio de Venta (Opcional)</label>
+            <input type="text" id="sharePriceInput" class="form-control" placeholder="Ej. ₡12,500,000" oninput="updateShareBannerPreview()">
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label style="font-size:0.8rem;">Cilindrada Motor</label>
+            <input type="text" id="shareEngineInput" class="form-control" placeholder="Ej. 2.0L / 1600 cc" oninput="updateShareBannerPreview()">
+          </div>
+        </div>
+
+        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+          <div class="form-group" style="flex:1; min-width:130px;">
+            <label style="font-size:0.8rem;">Transmisión</label>
+            <select id="shareTransSelect" class="form-control" onchange="updateShareBannerPreview()">
+              <option value="Automático">Automático</option>
+              <option value="Manual">Manual</option>
+              <option value="Secuencial">Secuencial</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1; min-width:110px;">
+            <label style="font-size:0.8rem;">Puertas</label>
+            <select id="shareDoorsSelect" class="form-control" onchange="updateShareBannerPreview()">
+              <option value="4 Puertas">4 Puertas</option>
+              <option value="2 Puertas">2 Puertas</option>
+              <option value="5 Puertas">5 Puertas (SUV/Hatchback)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1; min-width:140px;">
+            <label style="font-size:0.8rem;">Sistema de Radio / Audio</label>
+            <input type="text" id="shareRadioInput" class="form-control" placeholder="Ej. Pantalla Apple CarPlay" oninput="updateShareBannerPreview()">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:10px;">
+          <label style="font-size:0.8rem; display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; color:#38bdf8;">
+            <input type="checkbox" id="shareAbsCheck" onchange="updateShareBannerPreview()" checked>
+            <span>Incluye Sistema de Frenos ABS</span>
+          </label>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label style="font-size:0.8rem; margin-bottom:6px; display:block;">Equipamiento & Extras Incluidos</label>
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:6px;" id="shareEquipCheckboxesContainer">
+            <!-- Dynamically populated equip badges -->
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:0.8rem;">Notas Adicionales / Puntos Destacados</label>
+          <textarea id="shareNotesInput" class="form-control" rows="2" placeholder="Ej. Un solo dueño, mantenimiento exclusivo en agencia, llantas nuevas..." oninput="updateShareBannerPreview()"></textarea>
+        </div>
+      </div>
+
+      <!-- Action Buttons (Standard System Vector Icons) -->
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+        <button type="button" class="btn btn-primary" onclick="shareBannerViaEmail()" style="flex:1; min-width:130px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>Enviar por Correo</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="shareBannerViaSystemShare()" style="flex:1; min-width:130px; display:inline-flex; align-items:center; justify-content:center; gap:6px; color:#38bdf8; border-color:rgba(56,189,248,0.3);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <span>Compartir Ficha</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="copyShareBannerText()" style="flex:1; min-width:120px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>Copiar Texto</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="downloadShareBannerPDF()" style="flex:1; min-width:120px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Descargar PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Tipo de Servicio & Participación en Salud -->
+  <div id="modalServiceCategory" class="modal-backdrop">
+    <div class="modal-card" style="max-width:540px;">
+      <div class="modal-header">
+        <h2 id="modalCategoryTitle">Nuevo Tipo de Servicio</h2>
+        <button class="close-btn" onclick="closeModal('modalServiceCategory')">✕</button>
+      </div>
+      <form id="formServiceCategory" onsubmit="saveServiceCategory(event)">
+        <input type="hidden" id="catId">
+        <div class="form-group">
+          <label>Nombre del Tipo de Servicio</label>
+          <input type="text" id="catName" class="form-control" placeholder="Ej. Aceite de Diferencial Trasero" required>
+        </div>
+
+        <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); border-radius:10px; padding:12px; margin-top:14px; margin-bottom:14px;">
+          <h3 style="font-size:0.88rem; font-weight:700; color:#38bdf8; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <span>💚</span> Participación en Salud del Vehículo
+          </h3>
+
+          <div class="form-group" style="margin-bottom:10px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.85rem;">
+              <input type="checkbox" id="catAffectsHealth" onchange="toggleHealthCategoryInputs(this.checked)" checked>
+              <span>¿Este servicio afecta e influye en la Salud del Vehículo?</span>
+            </label>
+          </div>
+
+          <div id="catHealthFieldsContainer">
+            <div class="form-group" style="margin-bottom:10px;">
+              <label style="font-size:0.78rem;">Método de Cálculo del Desgaste</label>
+              <select id="catCalcMethod" class="form-control" onchange="toggleCalcMethodFields(this.value)">
+                <option value="both">Ambos (Kilometraje o Tiempo, lo que ocurra primero)</option>
+                <option value="km">Únicamente Kilometraje</option>
+                <option value="time">Únicamente Tiempo (Meses)</option>
+                <option value="manual">Ajuste / Registro Manual</option>
+              </select>
+            </div>
+
+            <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+              <div class="form-group" id="groupCatIntervalKm" style="flex:1; min-width:130px;">
+                <label style="font-size:0.78rem;">Intervalo en KM</label>
+                <input type="number" id="catIntervalKm" class="form-control" placeholder="Ej. 40000" min="500" step="500">
+              </div>
+              <div class="form-group" id="groupCatIntervalMonths" style="flex:1; min-width:130px;">
+                <label style="font-size:0.78rem;">Intervalo en Meses</label>
+                <input type="number" id="catIntervalMonths" class="form-control" placeholder="Ej. 24" min="1" step="1">
+              </div>
+            </div>
+
+            <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <div class="form-group" style="flex:1; min-width:110px;">
+                <label style="font-size:0.78rem;">Peso en Salud (%)</label>
+                <input type="number" id="catWeightPct" class="form-control" min="1" max="100" placeholder="Ej. 15">
+              </div>
+              <div class="form-group" style="flex:1; min-width:110px;">
+                <label style="font-size:0.78rem;">Umbral Advertencia %</label>
+                <input type="number" id="catWarnPct" class="form-control" min="50" max="99" value="80">
+              </div>
+              <div class="form-group" style="flex:1; min-width:110px;">
+                <label style="font-size:0.78rem;">Umbral Crítico %</label>
+                <input type="number" id="catCritPct" class="form-control" min="80" max="100" value="100">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalServiceCategory')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Tipo de Servicio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Ajustes de Salud del Vehículo (Motor Dinámico) -->
+  <div id="modalHealthSettings" class="modal-backdrop">
+    <div class="modal-card" style="max-width:580px; width:92%;">
+      <div class="modal-header">
+        <h2>Ajustes del Motor de Salud</h2>
+        <button class="close-btn" onclick="closeModal('modalHealthSettings')">✕</button>
       </div>
       <form id="formHealthSettings" onsubmit="saveHealthSettings(event)">
-        <p class="subtitle" style="margin-bottom:14px; font-size:0.83rem;">Personaliza las vidas útiles recomendadas y los pesos de ponderación para el cálculo del estado general del automóvil.</p>
-        
-        <h3 style="font-size:0.88rem; font-weight:700; margin-bottom:10px; color:#38bdf8; border-bottom:1px solid var(--border-color); padding-bottom:4px;">Vidas Útiles Sugeridas</h3>
-        
-        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Aceite (km)</label>
-            <input type="number" id="hsOilKm" class="form-control" min="1000" step="500" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Llantas (km)</label>
-            <input type="number" id="hsTiresKm" class="form-control" min="5000" step="1000" required>
-          </div>
+        <p class="subtitle" style="margin-bottom:12px; font-size:0.83rem;">Personaliza qué tipos de servicio participan en el cálculo de salud, sus intervalos recomendados y su peso en el promedio general.</p>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:6px;">
+          <h3 style="font-size:0.88rem; font-weight:700; color:#38bdf8; margin:0;">Categorías de Servicio Configurar</h3>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openServiceCategoryModal()" style="font-size:0.78rem;">+ Nuevo Tipo Servicio</button>
         </div>
 
-        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Pastillas Freno (km)</label>
-            <input type="number" id="hsBrakePadsKm" class="form-control" min="5000" step="1000" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Discos Freno (km)</label>
-            <input type="number" id="hsBrakeDiscsKm" class="form-control" min="10000" step="5000" required>
-          </div>
+        <div id="healthSettingsCategoriesList" style="max-height:360px; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:8px;">
+          <!-- Dynamically populated list of service categories -->
         </div>
 
-        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Batería (Meses)</label>
-            <input type="number" id="hsBatteryMonths" class="form-control" min="6" step="6" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Filtros Promedio (km)</label>
-            <input type="number" id="hsFiltersKm" class="form-control" min="2000" step="1000" required>
-          </div>
-        </div>
-
-        <div class="form-row" style="display:flex; gap:10px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Correas (km)</label>
-            <input type="number" id="hsBeltKm" class="form-control" min="10000" step="5000" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:140px;">
-            <label style="font-size:0.78rem;">Correas (Meses)</label>
-            <input type="number" id="hsBeltMonths" class="form-control" min="12" step="6" required>
-          </div>
-        </div>
-
-        <h3 style="font-size:0.88rem; font-weight:700; margin-top:12px; margin-bottom:10px; color:#38bdf8; border-bottom:1px solid var(--border-color); padding-bottom:4px;">Pesos del Promedio Ponderado (%)</h3>
-        
-        <div class="form-row" style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Aceite %</label>
-            <input type="number" id="hwOil" class="form-control" min="0" max="100" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Llantas %</label>
-            <input type="number" id="hwTires" class="form-control" min="0" max="100" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Frenos %</label>
-            <input type="number" id="hwBrakes" class="form-control" min="0" max="100" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Batería %</label>
-            <input type="number" id="hwBattery" class="form-control" min="0" max="100" required>
-          </div>
-        </div>
-
-        <div class="form-row" style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Filtros %</label>
-            <input type="number" id="hwFilters" class="form-control" min="0" max="100" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Correas %</label>
-            <input type="number" id="hwBelts" class="form-control" min="0" max="100" required>
-          </div>
-          <div class="form-group" style="flex:1; min-width:80px;">
-            <label style="font-size:0.75rem;">Docs %</label>
-            <input type="number" id="hwDocs" class="form-control" min="0" max="100" required>
-          </div>
-        </div>
-
-        <div class="modal-footer" style="margin-top:14px;">
-          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalHealthSettings')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Ajustes</button>
+        <div class="modal-footer" style="margin-top:16px;">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalHealthSettings')">Cerrar</button>
+          <button type="submit" class="btn btn-primary">Guardar Ajustes de Salud</button>
         </div>
       </form>
     </div>
