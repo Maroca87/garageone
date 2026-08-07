@@ -1194,6 +1194,7 @@ function renderApp() {
   renderMiniVehiclesList();
   renderMaintenanceFilterPills();
   populateServCategorySelect();
+  renderCustomCategoriesList();
   renderGuantera();
   renderVehicleHealth();
   const heroEl = document.getElementById('activeVehicleHero');
@@ -1399,7 +1400,7 @@ async function deleteVehicleDirect(vehId, event = null) {
   }
   if (!vehId) return;
 
-  if (!confirm('¿Estás seguro de que deseas eliminar este vehículo y sus registros asociados (servicios, gasolina y recordatorios)? Los documentos y configuraciones de salud se conservarán.')) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este vehículo? Al eliminarlo, se borrarán sus servicios, recargas de gasolina, recordatorios y los datos de salud asociados al vehículo. (Los documentos de Guantera y las configuraciones de servicios permanecerán intactos).')) {
     return;
   }
 
@@ -1407,7 +1408,23 @@ async function deleteVehicleDirect(vehId, event = null) {
   const fuelsToDelete = (appState.fuels || []).filter(f => f.vehicleId === vehId);
   const remindersToDelete = (appState.reminders || []).filter(r => r.vehicleId === vehId);
 
-  // 1. Remove from in-memory appState immediately (keep documents, emergencyContacts, serviceCategories intact)
+  // 1. Delete from IndexedDB FIRST to prevent race conditions during state reload
+  try {
+    await LocalDB.delete(STORES.VEHICLES, vehId);
+    for (const s of servicesToDelete) {
+      await LocalDB.delete(STORES.SERVICES, s.id);
+    }
+    for (const f of fuelsToDelete) {
+      await LocalDB.delete(STORES.FUELS, f.id);
+    }
+    for (const r of remindersToDelete) {
+      await LocalDB.delete(STORES.REMINDERS, r.id);
+    }
+  } catch (e) {
+    console.error('Error al eliminar vehículo y registros en IndexedDB:', e);
+  }
+
+  // 2. Remove from in-memory appState immediately (keep documents, emergencyContacts, serviceCategories intact)
   appState.vehicles = (appState.vehicles || []).filter(v => v.id !== vehId);
   appState.services = (appState.services || []).filter(s => s.vehicleId !== vehId);
   appState.fuels = (appState.fuels || []).filter(f => f.vehicleId !== vehId);
@@ -1419,27 +1436,11 @@ async function deleteVehicleDirect(vehId, event = null) {
 
   saveState();
 
-  // 2. Immediately re-render UI in real time
+  // 3. Immediately re-render UI in real time
   renderApp();
   if (typeof renderRemindersTab === 'function') renderRemindersTab();
   if (typeof renderGuantera === 'function') renderGuantera();
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
-
-  // 3. Delete from DB in background
-  try {
-    await SyncService.executeCrud('DELETE', STORES.VEHICLES, { id: vehId });
-    for (const s of servicesToDelete) {
-      await SyncService.executeCrud('DELETE', STORES.SERVICES, { id: s.id });
-    }
-    for (const f of fuelsToDelete) {
-      await SyncService.executeCrud('DELETE', STORES.FUELS, { id: f.id });
-    }
-    for (const r of remindersToDelete) {
-      await SyncService.executeCrud('DELETE', STORES.REMINDERS, { id: r.id });
-    }
-  } catch (e) {
-    console.error('Error al eliminar datos del vehículo en IndexedDB:', e);
-  }
 }
 
 async function deleteServiceDirect(servId, event = null) {
@@ -1986,21 +1987,33 @@ function renderCustomCategoriesList() {
 
   syncServiceCategoriesWithState();
 
-  const cats = SERVICE_CATEGORIES || [];
+  const allCatNames = new Set();
+  (SERVICE_CATEGORIES || []).forEach(c => c && typeof c === 'string' && allCatNames.add(c));
+  (appState.serviceCategories || []).forEach(c => {
+    const name = typeof c === 'string' ? c : (c ? c.name : '');
+    if (name) allCatNames.add(name);
+  });
+
+  const cats = Array.from(allCatNames);
   const healthCats = appState.serviceCategories || [];
 
+  if (cats.length === 0) {
+    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">No hay servicios disponibles.</div>`;
+    return;
+  }
+
   container.innerHTML = cats.map(cat => {
-    const hInfo = healthCats.find(c => c.name && c.name.toLowerCase() === cat.toLowerCase());
-    const isHealth = hInfo && hInfo.affectsHealth === true;
+    const hInfo = healthCats.find(c => (typeof c === 'object' && c && c.name ? c.name.toLowerCase() : String(c).toLowerCase()) === cat.toLowerCase());
+    const isHealth = hInfo && (hInfo.affectsHealth === true || String(hInfo.affectsHealth) === 'true');
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.1);">
         <div style="display:flex; align-items:center; gap:6px;">
-          <span style="color:#ffffff; font-weight:600;">${escapeHtml(cat)}</span>
-          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.1); padding:1px 6px; border-radius:4px; font-weight:600;">Salud</span>' : ''}
+          <span style="color:var(--text-primary); font-weight:600;">${escapeHtml(cat)}</span>
+          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 6px; border-radius:4px; font-weight:600;">Salud</span>' : ''}
         </div>
-        <div style="display:flex; gap:4px;">
-          <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.7rem; padding:2px 6px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
-          <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.7rem; padding:2px 6px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(cat)}')">Eliminar</button>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:3px 8px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
+          <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.72rem; padding:3px 8px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(cat)}')">Eliminar</button>
         </div>
       </div>
     `;
