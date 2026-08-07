@@ -368,11 +368,11 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Descargar PDF</span>
             </button>
-            <button class="btn btn-secondary btn-block" onclick="openShareVehicleSaleModal()" style="flex:1; min-width:130px;">
+            <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
               <span>Compartir</span>
             </button>
-            <button class="btn btn-secondary btn-block" onclick="openShareVehicleSaleModal()" style="flex:1; min-width:120px;">
+            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:120px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               <span data-i18n="btnShareEmail">Correo</span>
             </button>
@@ -719,8 +719,8 @@
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="downloadReportPDF()" style="background:#0a84ff; color:#fff; border:none; font-weight:700;">Descargar PDF</button>
           <button class="btn btn-secondary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir</button>
-          <button class="btn btn-secondary btn-sm" onclick="openShareVehicleSaleModal()">Compartir Datos</button>
-          <button class="btn btn-secondary btn-sm" onclick="openShareVehicleSaleModal()">Correo</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareReportText()">Compartir Datos</button>
+          <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
           <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
         </div>
       </div>
@@ -1007,76 +1007,16 @@
         </div>
       </form>
     </div>
-  <!-- Modal: Ficha Comercial de Venta (Vehículo) -->
-  <div id="modalShareVehicleSale" class="modal-backdrop">
-    <div class="modal-card" style="max-width:540px;">
-      <div class="modal-header">
-        <h2 style="font-size:1.05rem;">Ficha Comercial de Venta (Vehículo)</h2>
-        <button class="modal-close" onclick="closeModal('modalShareVehicleSale')">&times;</button>
-      </div>
-      <form id="formShareVehicleSale" onsubmit="event.preventDefault();">
-        <p class="subtitle" style="margin-bottom:12px; font-size:0.82rem;">
-          Selecciona las características que deseas destacar para generar la oferta o ficha de venta de tu vehículo:
-        </p>
-
-        <!-- Datos del Auto Pre-cargados -->
-        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-bottom:14px;">
-          <div style="font-weight:700; color:#38bdf8; font-size:0.95rem;" id="saleVehTitle">Marca Modelo (Año)</div>
-          <div style="font-size:0.8rem; color:#94a3b8; margin-top:4px;" id="saleVehMeta">Placa • Kilometraje • Estado de Salud</div>
-        </div>
-
-        <div class="form-group" style="margin-bottom:12px;">
-          <label style="font-size:0.78rem; font-weight:700; color:var(--text-primary);">Precio de Venta Sugerido (Opcional):</label>
-          <input type="text" id="saleVehPrice" class="form-control" placeholder="Ej: ₡6,500,000 / $12,500 / Negociable" style="font-size:0.85rem;">
-        </div>
-
-        <div style="font-weight:700; font-size:0.82rem; margin-bottom:8px; color:var(--text-primary);">Características y Extras a Incluir:</div>
-        
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleMaint" checked> <span>Mantenimientos al día</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleDocs" checked> <span>RTV y Marchamo al día</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleHealth" checked> <span>Excelente Estado Mecánico</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleAC" checked> <span>Aire Acondicionado 100%</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleTires" checked> <span>Llantas en Buen Estado</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; background:rgba(255,255,255,0.02); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05); cursor:pointer;">
-            <input type="checkbox" id="chkSaleOwner" checked> <span>Un Solo Dueño / Impecable</span>
-          </label>
-        </div>
-
-        <div class="form-group" style="margin-bottom:16px;">
-          <label style="font-size:0.78rem; font-weight:700; color:var(--text-primary);">Nota Adicional o Equipamiento Extra (Opcional):</label>
-          <input type="text" id="saleVehNotes" class="form-control" placeholder="Ej: Aros de lujo, pantalla táctil, alarma, 2 llaves..." style="font-size:0.82rem;">
-        </div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary" onclick="execShareVehicleSale('text')" style="flex:1; min-width:140px;">
-            Compartir / Copiar Texto
-          </button>
-          <button type="button" class="btn btn-secondary" onclick="execShareVehicleSale('email')" style="flex:1; min-width:140px; color:#38bdf8; border-color:rgba(56,189,248,0.3);">
-            Enviar por Correo
-          </button>
-        </div>
-      </form>
-    </div>
   </div>
 
-  <script src="db.js?v=9999"></script>
-  <script src="auth-service.js?v=9999"></script>
-  <script src="sync-service.js?v=9999"></script>
-  <script src="app.js?v=9999"></script>
+
+  <script src="db.js?v=999"></script>
+  <script src="auth-service.js?v=999"></script>
+  <script src="sync-service.js?v=999"></script>
+  <script src="app.js?v=999"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=9999').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=999').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>

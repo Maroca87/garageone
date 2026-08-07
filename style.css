@@ -1185,7 +1185,7 @@ h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-.modal-backdrop.open { display: flex !important; z-index: 9999 !important; }
+.modal-backdrop.open { display: flex; }
 
 .modal-card {
   background: #09090b; border: 1px solid var(--border-color);
