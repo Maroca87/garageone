@@ -301,11 +301,10 @@
       <section id="tabHealth" class="tab-content">
         <div class="section-header" style="flex-wrap:wrap; gap:10px;">
           <div class="section-header-title">
-            <h1>🚗 Salud del Vehículo</h1>
+            <h1>Salud del Vehículo</h1>
             <p class="subtitle">Motor de análisis y estado general del vehículo</p>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" onclick="openHealthSettingsModal()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#38bdf8;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Ajustes de Salud
           </button>
         </div>
@@ -915,8 +914,7 @@
   <div id="modalHealthSettings" class="modal-backdrop">
     <div class="modal-card" style="max-width:520px;">
       <div class="modal-header">
-        <h2>⚙️ Ajustes de Salud del Vehículo</h2>
-        <button class="modal-close" onclick="closeModal('modalHealthSettings')">&times;</button>
+        <h2>Ajustes de Salud del Vehículo</h2>
       </div>
       <form id="formHealthSettings" onsubmit="saveHealthSettings(event)">
         <p class="subtitle" style="margin-bottom:14px; font-size:0.83rem;">Personaliza las vidas útiles recomendadas y los pesos de ponderación para el cálculo del estado general del automóvil.</p>
@@ -1012,13 +1010,13 @@
   </div>
 
 
-  <script src="db.js?v=800"></script>
-  <script src="auth-service.js?v=800"></script>
-  <script src="sync-service.js?v=800"></script>
-  <script src="app.js?v=800"></script>
+  <script src="db.js?v=999"></script>
+  <script src="auth-service.js?v=999"></script>
+  <script src="sync-service.js?v=999"></script>
+  <script src="app.js?v=999"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=800').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=999').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>
