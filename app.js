@@ -815,15 +815,30 @@ function loadState() {
   const finalState = sanitizeState(state);
   // Restore custom service categories if saved
   if (finalState.serviceCategories && Array.isArray(finalState.serviceCategories) && finalState.serviceCategories.length > 0) {
-    SERVICE_CATEGORIES.splice(0, SERVICE_CATEGORIES.length, ...finalState.serviceCategories);
+    finalState.serviceCategories.forEach(cat => {
+      const catName = typeof cat === 'string' ? cat : (cat.name || '');
+      if (catName && !SERVICE_CATEGORIES.includes(catName)) {
+        SERVICE_CATEGORIES.push(catName);
+      }
+    });
   }
   return finalState;
 }
 
 function saveState() {
   try {
-    // Persist current service categories in appState
-    appState.serviceCategories = [...SERVICE_CATEGORIES];
+    if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
+      appState.serviceCategories = [];
+    }
+    SERVICE_CATEGORIES.forEach(catName => {
+      if (typeof catName === 'string' && catName && !appState.serviceCategories.some(c => (c.name || c).toLowerCase() === catName.toLowerCase())) {
+        appState.serviceCategories.push({
+          id: 'cat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          name: catName,
+          affectsHealth: false
+        });
+      }
+    });
     const key = getUserStorageKey(currentUser);
     localStorage.setItem(key, JSON.stringify(appState));
     localStorage.setItem('GARAGEONE_UNIFIED_MASTER_STATE_V100', JSON.stringify(appState));
@@ -2573,93 +2588,93 @@ function getSmartOfflineResponse(question, veh, vehContext, recentServicesText, 
   // Diagnóstico de Códigos OBD-II
   if (qLower.includes('p0300')) {
     response = `**[Código OBD-II: P0300 - Misfire / Falla Múltiple de Encendido]**\n\n` +
-      `⚠️ **Severidad:** ALTA (Riesgo de daño al catalizador por gasolina no quemada).\n\n` +
-      `🔧 **Posibles Causas:**\n` +
+      `**Severidad:** ALTA (Riesgo de daño al catalizador por gasolina no quemada).\n\n` +
+      `**Posibles Causas:**\n` +
       `• Bujías desgastadas o descalibradas.\n` +
       `• Bobinas de encendido (Coils) defectuosas o con fuga de chispa.\n` +
       `• Inyectores sucios o presión de combustible baja.\n` +
       `• Entrada de aire no medida (fuga en junta de múltiple de admisión).\n\n` +
-      `💡 **Solución Recomendada:** Reemplazar juego de bujías, probar resistencia de bobinas y borrar códigos con escáner.`;
+      `**Solución Recomendada:** Reemplazar juego de bujías, probar resistencia de bobinas y borrar códigos con escáner.`;
   }
   else if (qLower.includes('p0420')) {
     response = `**[Código OBD-II: P0420 - Eficiencia de Catalizador por Debajo del Umbral]**\n\n` +
-      `⚠️ **Severidad:** MODERADA.\n\n` +
-      `🔧 **Posibles Causas:**\n` +
+      `**Severidad:** MODERADA.\n\n` +
+      `**Posibles Causas:**\n` +
       `• Convertidor catalítico degradado o tapado.\n` +
       `• Sensor de oxígeno posterior (Bank 1 Sensor 2) descalibrado.\n` +
       `• Fuga en el sistema de escape antes del catalizador.\n\n` +
-      `💡 **Solución Recomendada:** Inspeccionar fugas de escape, verificar lecturas del sensor de O2 posterior y comprobar temperatura de entrada/salida del catalizador.`;
+      `**Solución Recomendada:** Inspeccionar fugas de escape, verificar lecturas del sensor de O2 posterior y comprobar temperatura de entrada/salida del catalizador.`;
   }
   else if (qLower.includes('p0171')) {
     response = `**[Código OBD-II: P0171 - Sistema Mezcla Demasiado Pobre (Banco 1)]**\n\n` +
-      `⚠️ **Severidad:** MODERADA.\n\n` +
-      `🔧 **Posibles Causas:**\n` +
+      `**Severidad:** MODERADA.\n\n` +
+      `**Posibles Causas:**\n` +
       `• Sensor MAF (Flujo de Aire) sucio o defectuoso.\n` +
       `• Chupón / Fuga de vacío en mangueras de admisión.\n` +
       `• Filtro de gasolina obstruido o bomba de combustible débil.\n\n` +
-      `💡 **Solución Recomendada:** Limpiar sensor MAF con limpia-contactos especial sin residuo e inspeccionar mangueras de vacío.`;
+      `**Solución Recomendada:** Limpiar sensor MAF con limpia-contactos especial sin residuo e inspeccionar mangueras de vacío.`;
   }
   else if (qLower.includes('check engine') || qLower.includes('luz de motor') || qLower.includes('testigo') || qLower.includes('obd')) {
     response = `**[Diagnóstico de Luz Check Engine]**\n\n` +
-      `⚠️ **Evaluación:** La computadora de a bordo ha detectado una anomalía en las emisiones o la combustión de **${escapeHtml(vehName)}** (${vehKm} KM).\n\n` +
-      `🔧 **Causas Frecuentes:**\n` +
+      `**Evaluación:** La computadora de a bordo ha detectado una anomalía en las emisiones o la combustión de **${escapeHtml(vehName)}** (${vehKm} KM).\n\n` +
+      `**Causas Frecuentes:**\n` +
       `1. **Sensor de Oxígeno / MAF:** Fallas en lectura de aire/combustible.\n` +
       `2. **Bujías / Bobinas:** Desgaste que genera pequeñas fallas de encendido.\n` +
       `3. **Sistema EVAP:** Tapón de gasolina flojo o válvula purge sucia.\n\n` +
-      `💡 **Pasos:**\n` +
+      `**Pasos:**\n` +
       `• Si la luz es **fija**, puedes conducir con precaución hacia el taller.\n` +
       `• Si la luz **parpadea**, apaga el motor de inmediato para proteger el catalizador.`;
   }
   else if (qLower.includes('freno') || qLower.includes('chillido') || qLower.includes('pedal') || qLower.includes('vibracion al frenar')) {
     response = `**[Diagnóstico del Sistema de Frenos]**\n\n` +
-      `⚠️ **Severidad:** MODERADA / ALTA.\n\n` +
-      `🔧 **Análisis Técnico para ${escapeHtml(vehName)}:**\n` +
+      `**Severidad:** MODERADA / ALTA.\n\n` +
+      `**Análisis Técnico para ${escapeHtml(vehName)}:**\n` +
       `• **Chillido metálico:** Indicador de fricción de pastillas al límite (reemplazo urgente).\n` +
       `• **Pedal esponjoso / Blando:** Aire en la tubería o líquido DOT3/DOT4 degradado.\n` +
       `• **Vibración al frenar a alta velocidad:** Discos de freno alabeados (torcidos por calor).\n\n` +
-      `💡 **Solución Recomendada:** Revisar espesor de pastillas, medir grosor de discos con micrómetro y realizar purga/reemplazo de líquido de frenos.`;
+      `**Solución Recomendada:** Revisar espesor de pastillas, medir grosor de discos con micrómetro y realizar purga/reemplazo de líquido de frenos.`;
   }
   else if (qLower.includes('calienta') || qLower.includes('temperatura') || qLower.includes('refrigerante') || qLower.includes('vapor') || qLower.includes('radiador') || qLower.includes('coolant')) {
     response = `**[Diagnóstico de Sobrecalentamiento]**\n\n` +
-      `🚨 **Severidad:** CRÍTICA (Riesgo de soplar empaque de culata o torcer el bloque del motor).\n\n` +
-      `🔧 **Causas Principales:**\n` +
+      `**Severidad:** CRÍTICA (Riesgo de soplar empaque de culata o torcer el bloque del motor).\n\n` +
+      `**Causas Principales:**\n` +
       `• Termostato trabado en cerrado.\n` +
       `• Electroventilador / Abanico no enciende (relevador o termoswitch dañados).\n` +
       `• Fuga en mangueras, radiador o bomba de agua.\n` +
       `• Fuga interna por empaque de cabezote soplado.\n\n` +
-      `💡 **Acción Inmediata:** Apaga el vehículo de inmediato y deja enfriar el motor 30-40 min. **NUNCA abras la tapa del radiador mientras esté caliente.**`;
+      `**Acción Inmediata:** Apaga el vehículo de inmediato y deja enfriar el motor 30-40 min. **NUNCA abras la tapa del radiador mientras esté caliente.**`;
   }
   else if (qLower.includes('humo') || qLower.includes('escape')) {
     response = `**[Diagnóstico por Color de Humo en el Escape]**\n\n` +
-      `🔧 **Identificación:**\n` +
+      `**Identificación:**\n` +
       `• **Humo Blanco Denso (Olor dulce):** Refrigerante ingresando a cilindros (empaque de culata quemado).\n` +
       `• **Humo Azul / Grisáceo:** Motor quemando aceite (sellos de válvula o anillos de pistón gastados).\n` +
       `• **Humo Negro:** Mezcla rica de gasolina (filtro de aire sucio, inyector goteando o sensor MAF defectuoso).\n\n` +
-      `💡 **Recomendación:** Revisa el nivel de aceite y refrigerante inmediatamente en tu **${escapeHtml(vehName)}**.`;
+      `**Recomendación:** Revisa el nivel de aceite y refrigerante inmediatamente en tu **${escapeHtml(vehName)}**.`;
   }
   else if (qLower.includes('bateria') || qLower.includes('arranca') || qLower.includes('alternador') || qLower.includes('start')) {
     response = `**[Diagnóstico del Sistema Eléctrico y Arranque]**\n\n` +
-      `🔧 **Síntomas Comunes:**\n` +
+      `**Síntomas Comunes:**\n` +
       `• **Chasquido "Tak-Tak-Tak" al girar la llave:** Batería baja o bornes sulfatados.\n` +
       `• **Motor gira lento:** Batería al final de vida útil (duración típica: 2 a 3 años).\n` +
       `• **Luz de batería encendida en tablero:** Alternador no genera carga (debe marcar 13.8V a 14.4V encendido).\n\n` +
-      `💡 **Acción Recomendada:** Limpiar bornes con agua y bicarbonato, y medir voltaje con multímetro.`;
+      `**Acción Recomendada:** Limpiar bornes con agua y bicarbonato, y medir voltaje con multímetro.`;
   }
   else if (qLower.includes('vibracion') || qLower.includes('volante') || qLower.includes('alineacion') || qLower.includes('balanceo') || qLower.includes('ruido') || qLower.includes('crujido')) {
     response = `**[Diagnóstico de Dirección, Suspensión y Transmisión]**\n\n` +
-      `🔧 **Análisis Técnico para ${escapeHtml(vehName)} (${vehKm} KM):**\n` +
+      `**Análisis Técnico para ${escapeHtml(vehName)} (${vehKm} KM):**\n` +
       `• **Vibración en volante a >80 km/h:** Llantas desbalanceadas o aro golpeado.\n` +
       `• **Golpe seco en huecos / terreno irregular:** Bujes de meseta, bocinas o cabezales de compensadores vencidos.\n` +
       `• **Crujido al girar volante completo:** Punta de eje (junta homocinética) desgranada.\n\n` +
-      `💡 **Recomendación:** Lleva el vehículo a inspección de tren delantero y alineación.`;
+      `**Recomendación:** Lleva el vehículo a inspección de tren delantero y alineación.`;
   }
   else if (qLower.includes('aceite') || qLower.includes('viscosidad') || qLower.includes('filtro')) {
     response = `**[Recomendaciones de Aceite y Lubricación]**\n\n` +
-      `🔧 **Información Técnica:**\n` +
+      `**Información Técnica:**\n` +
       `• **Aceite 100% Sintético (5W-30 / 5W-20 / 0W-20):** Intervalo recomendado cada 8.000 a 10.000 KM.\n` +
       `• **Aceite Semi-Sintético (10W-40):** Intervalo recomendado cada 7.000 KM.\n` +
       `• **Aceite Mineral (20W-50 / 15W-40):** Intervalo recomendado cada 5.000 KM.\n\n` +
-      `💡 **Consejo:** Reemplaza el filtro de aceite en CADA cambio sin excepción para proteger el motor.`;
+      `**Consejo:** Reemplaza el filtro de aceite en CADA cambio sin excepción para proteger el motor.`;
   }
   else if (qLower.includes('hola') || qLower.includes('buenas') || qLower.includes('saludos') || qLower.includes('como estas')) {
     response = `**¡Hola ${escapeHtml(userName)}! Bienvenido a GarageOne.**\n\n` +
@@ -3239,13 +3254,13 @@ Kilometraje Actual: ${veh.km.toLocaleString()} KM
 Servicios Previos Registrados: ${appState.services.filter(s => s.vehicleId === veh.id).length}
 
 Estructura tu respuesta exactamente así:
-### 📋 Diagnóstico de Salud
+### Diagnóstico de Salud
 (Brinda un resumen rápido de cómo se encuentra el auto según su edad y kilometraje)
 
-### 🔧 Predicción de Desgaste
+### Predicción de Desgaste
 (Lista de componentes que están próximos a fallar o requerir cambio)
 
-### 🚨 Recomendaciones Críticas
+### Recomendaciones Críticas
 (Qué debe hacer el dueño inmediatamente)`;
 
   const aiRes = await executeAiQuery(promptText, "Generar diagnóstico integral");
@@ -3475,7 +3490,7 @@ function renderServiceList(vehId) {
             <div class="log-title">${escapeHtml(s.title)}</div>
             <div class="log-meta">${s.date} • ${s.km.toLocaleString()} km ${s.shop ? `• ${escapeHtml(s.shop)}` : ''}</div>
             ${s.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(s.notes)}</div>` : ''}
-            ${s.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewReceipt('${s.id}')">${SVG_ICONS.document} Factura</span>` : ''}
+            ${s.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewReceipt('${s.id}')">${SVG_ICONS.document} Ver Adjunto</span>` : ''}
           </div>
         </div>
         <div class="log-item-side">
@@ -3504,7 +3519,6 @@ function openServiceModal(servId = null) {
       document.getElementById('servCost').value = s.cost;
       document.getElementById('servDate').value = s.date;
       document.getElementById('servKm').value = s.km;
-      if (document.getElementById('servNextKm')) document.getElementById('servNextKm').value = s.nextKm || '';
       document.getElementById('servShop').value = s.shop || '';
       if (document.getElementById('servNotes')) document.getElementById('servNotes').value = s.notes || '';
     }
@@ -3652,6 +3666,11 @@ function renderUserSettings() {
 
   applyNavigationPermissions();
   renderStorageStats();
+
+  const backupFreqEl = document.getElementById('backupFrequency');
+  if (backupFreqEl) backupFreqEl.value = appState.backupFrequency || 'off';
+  renderBackupHistory();
+
   applyLanguageTranslations();
 }
 
@@ -3887,8 +3906,6 @@ function saveService(e) {
   const cost = parseFloat(document.getElementById('servCost').value);
   const date = document.getElementById('servDate').value;
   const km = parseInt(document.getElementById('servKm').value);
-  const nextKmVal = document.getElementById('servNextKm') ? document.getElementById('servNextKm').value : '';
-  const nextKm = nextKmVal ? parseInt(nextKmVal) : null;
   const shop = document.getElementById('servShop').value.trim();
   const notes = document.getElementById('servNotes') ? document.getElementById('servNotes').value.trim() : '';
   const receiptInput = document.getElementById('servReceiptFile');
@@ -3902,7 +3919,7 @@ function saveService(e) {
     const servData = {
       id: servId || undefined,
       vehicleId: veh.id,
-      category, title, cost: safeCost, date, km: safeKm, nextKm, shop, notes,
+      category, title, cost: safeCost, date, km: safeKm, shop, notes,
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
     };
 
@@ -3917,7 +3934,12 @@ function saveService(e) {
     closeModal('modalService');
     document.getElementById('formService').reset();
     setTodayDates();
+
+    // Reset filter to 'all' so that all services are immediately visible for editing or deleting
+    currentFilter = 'all';
+    renderMaintenanceFilterPills();
     renderApp();
+    if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
   };
 
   if (receiptInput && receiptInput.files && receiptInput.files[0]) {
@@ -5143,19 +5165,18 @@ function calculateVehicleHealth(veh) {
   const lastEvaluationText = getRelativeTimeString(veh.lastHealthUpdate || Date.now());
 
   // 10. Componentes Adicionales / Mantenimientos Específicos
-  const customCategories = (appState.serviceCategories || []).filter(c => c.affectsHealth === true);
+  const customCategories = (appState.serviceCategories || []).filter(c => typeof c === 'object' && c !== null && (c.affectsHealth === true || String(c.affectsHealth) === 'true'));
   const customComponentsData = [];
 
   customCategories.forEach(cat => {
-    const catNameLower = (cat.name || '').toLowerCase();
-    const isStandard = ['aceite', 'llanta', 'freno', 'bater', 'filtro', 'correa', 'document'].some(k => catNameLower.includes(k));
-    if (isStandard) return; // Keep standard components in main section
+    const catNameLower = (cat.name || '').toLowerCase().trim();
+    if (!catNameLower) return;
 
     const catServices = services.filter(s => {
-      const sCat = (s.category || '').toLowerCase();
-      const sTitle = (s.title || '').toLowerCase();
-      const sDesc = (s.description || '').toLowerCase();
-      return sCat.includes(catNameLower) || catNameLower.includes(sCat) || sTitle.includes(catNameLower) || sDesc.includes(catNameLower);
+      const sCat = (s.category || '').toLowerCase().trim();
+      const sTitle = (s.title || '').toLowerCase().trim();
+      const sNotes = (s.notes || '').toLowerCase().trim();
+      return sCat === catNameLower || (sCat && catNameLower.includes(sCat)) || (sCat && sCat.includes(catNameLower)) || (sTitle && sTitle.includes(catNameLower)) || (sNotes && sNotes.includes(catNameLower));
     }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
     if (catServices.length > 0) {
@@ -5807,19 +5828,109 @@ function downloadReportPDFDirect() {
 function createManualBackup() {
   try {
     const xmlStr = objectToXML(appState);
-    const blob = new Blob([xmlStr], { type: 'application/xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", url);
-    dlAnchorElem.setAttribute("download", `GarageOne_Backup_${new Date().toISOString().substring(0,10)}.xml`);
-    document.body.appendChild(dlAnchorElem);
-    dlAnchorElem.click();
-    dlAnchorElem.remove();
-    URL.revokeObjectURL(url);
+    const now = new Date();
+    const backupItem = {
+      id: 'bk_' + Date.now(),
+      filename: `GarageOne_Backup_${now.toISOString().substring(0,10)}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xml`,
+      date: now.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
+      timestamp: Date.now(),
+      sizeKb: Math.round(xmlStr.length / 1024) || 1,
+      type: 'manual',
+      xmlData: xmlStr
+    };
+
+    appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
+    saveState();
+    renderBackupHistory();
+
     const status = document.getElementById('backupStatus');
-    if (status) status.textContent = 'Respaldo XML generado exitosamente.';
+    if (status) status.textContent = 'Respaldo generado y guardado en el historial.';
   } catch (e) {
-    alert('Error al generar respaldo manual: ' + e.message);
+    console.error('Error al generar respaldo manual:', e);
+  }
+}
+
+function renderBackupHistory() {
+  const container = document.getElementById('backupHistory');
+  if (!container) return;
+
+  const history = appState.backupHistory || [];
+  if (history.length === 0) {
+    container.innerHTML = `<div style="font-size:0.78rem; color:var(--text-secondary); text-align:center; padding:8px;">No hay respaldos en el historial.</div>`;
+    return;
+  }
+
+  container.innerHTML = history.map(item => `
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div style="flex:1; overflow:hidden;">
+        <div style="font-size:0.83rem; font-weight:700; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHtml(item.filename)}</div>
+        <div style="font-size:0.75rem; color:var(--text-secondary);">${item.date} • ${item.sizeKb} KB ${item.type === 'auto' ? '• Auto' : ''}</div>
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.75rem;" onclick="downloadBackupItem('${item.id}')">Descargar</button>
+        <button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.75rem; color:#ff453a; border-color:rgba(255,69,58,0.3);" onclick="deleteBackupItem('${item.id}')">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function downloadBackupItem(id) {
+  const item = (appState.backupHistory || []).find(b => b.id === id);
+  if (!item || !item.xmlData) return;
+  const blob = new Blob([item.xmlData], { type: 'application/xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const dlAnchorElem = document.createElement('a');
+  dlAnchorElem.setAttribute("href", url);
+  dlAnchorElem.setAttribute("download", item.filename);
+  document.body.appendChild(dlAnchorElem);
+  dlAnchorElem.click();
+  dlAnchorElem.remove();
+  URL.revokeObjectURL(url);
+}
+
+function deleteBackupItem(id) {
+  if (confirm('¿Eliminar este respaldo del historial?')) {
+    appState.backupHistory = (appState.backupHistory || []).filter(b => b.id !== id);
+    saveState();
+    renderBackupHistory();
+  }
+}
+
+function saveBackupFrequency(freq) {
+  appState.backupFrequency = freq;
+  saveState();
+  if (freq !== 'off') {
+    checkAndTriggerAutoBackup(true);
+  }
+}
+
+function checkAndTriggerAutoBackup(forceCheck = false) {
+  const freq = appState.backupFrequency || 'off';
+  if (freq === 'off') return;
+
+  const now = Date.now();
+  const lastTime = appState.lastAutoBackupTimestamp || 0;
+  let intervalMs = 86400000; // daily
+  if (freq === 'weekly') intervalMs = 604800000;
+  if (freq === 'monthly') intervalMs = 2592000000;
+
+  if (now - lastTime >= intervalMs || (forceCheck && (now - lastTime >= intervalMs))) {
+    const xmlStr = objectToXML(appState);
+    const nowDate = new Date();
+    const backupItem = {
+      id: 'bk_' + now,
+      filename: `GarageOne_AutoBackup_${nowDate.toISOString().substring(0,10)}_${String(nowDate.getHours()).padStart(2,'0')}${String(nowDate.getMinutes()).padStart(2,'0')}.xml`,
+      date: nowDate.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
+      timestamp: now,
+      sizeKb: Math.round(xmlStr.length / 1024) || 1,
+      type: 'auto',
+      xmlData: xmlStr
+    };
+
+    appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
+    appState.lastAutoBackupTimestamp = now;
+    saveState();
+    renderBackupHistory();
   }
 }
 
@@ -5840,10 +5951,13 @@ function importBackupXml(e) {
         if (parsedData.fuels && Array.isArray(parsedData.fuels)) appState.fuels = parsedData.fuels;
         if (parsedData.documents && Array.isArray(parsedData.documents)) appState.documents = parsedData.documents;
         if (parsedData.reminders && Array.isArray(parsedData.reminders)) appState.reminders = parsedData.reminders;
+        if (parsedData.serviceCategories && Array.isArray(parsedData.serviceCategories)) appState.serviceCategories = parsedData.serviceCategories;
+        if (parsedData.backupHistory && Array.isArray(parsedData.backupHistory)) appState.backupHistory = parsedData.backupHistory;
         if (parsedData.activeVehicleId) appState.activeVehicleId = parsedData.activeVehicleId;
         saveState();
         await loadAppStateFromDB();
         renderApp();
+        renderBackupHistory();
         alert('Respaldo XML restaurado con éxito.');
       }
     } catch (err) {
