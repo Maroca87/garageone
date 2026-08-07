@@ -4270,14 +4270,12 @@ function openShareVehicleSaleModal() {
     closeModal('modalCertifiedReport');
   } catch (e) {}
 
-  const veh = getActiveVehicle();
-  if (!veh) {
-    alert('Primero debes registrar un vehículo en la pestaña Garaje.');
-    openVehicleModal();
-    return;
-  }
+  const veh = getActiveVehicle() || { name: 'Mi Vehículo', year: new Date().getFullYear(), plate: 'N/A', km: 0 };
+  let h = null;
+  try {
+    h = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
+  } catch (e) {}
 
-  const h = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
   const titleEl = document.getElementById('saleVehTitle');
   const metaEl = document.getElementById('saleVehMeta');
 
@@ -4285,7 +4283,7 @@ function openShareVehicleSaleModal() {
     titleEl.textContent = `${veh.name || 'Vehículo'} (${veh.year || 'N/A'})`;
   }
   if (metaEl) {
-    const healthText = h && h.overallHealthPct !== null ? `Salud: ${h.overallHealthPct}% (${h.ratingLabel})` : 'Al día';
+    const healthText = h && h.overallHealthPct !== null ? `Salud: ${h.overallHealthPct}% (${h.ratingLabel})` : 'Excelente Estado';
     metaEl.textContent = `Placa: ${veh.plate || 'Sin placa'} • ${ (veh.km || 0).toLocaleString() } km • ${healthText}`;
   }
 
@@ -4293,8 +4291,7 @@ function openShareVehicleSaleModal() {
 }
 
 function execShareVehicleSale(mode) {
-  const veh = getActiveVehicle();
-  if (!veh) return;
+  const veh = getActiveVehicle() || { name: 'Mi Vehículo', year: new Date().getFullYear(), plate: 'N/A', km: 0 };
 
   const price = document.getElementById('saleVehPrice') ? document.getElementById('saleVehPrice').value.trim() : '';
   const notes = document.getElementById('saleVehNotes') ? document.getElementById('saleVehNotes').value.trim() : '';
@@ -4335,7 +4332,7 @@ function execShareVehicleSale(mode) {
   } else {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text).then(() => {
-        alert('¡Ficha comercial de venta copiada al portapapeles con éxito!\n\nPuedes pegarla (Ctrl+V) en cualquier chat o mensaje.');
+        alert('¡Ficha comercial de venta copiada al portapapeles con éxito!\n\nPuedes pegarla en cualquier chat o mensaje.');
       }).catch(() => {
         alert(text);
       });
