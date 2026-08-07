@@ -517,46 +517,31 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </span>
         <span class="nav-label" data-i18n="navHealth">Salud</span>
-      </button>
-
-      <button class="nav-item" onclick="switchTab('tabReports', this)">
-        <span class="nav-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        </span>
-        <span class="nav-label" data-i18n="navReports">Reportes</span>
-      </button>
-    </nav>
-
   </div>
 
-  <!-- MODALS -->
+  <!-- MODALS CONTAINER -->
 
-  <!-- Modal: Agregar / Editar Vehículo -->
+  <!-- Modal: Registrar / Editar Vehículo -->
   <div id="modalVehicle" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="modalVehicleTitle">Nuevo Vehículo</h3>
+        <h3 id="modalVehicleTitle">Registrar Vehículo</h3>
         <button class="close-btn" onclick="closeModal('modalVehicle')">✕</button>
       </div>
       <form id="formVehicle" onsubmit="saveVehicle(event)">
         <input type="hidden" id="vehId">
         <div class="form-group">
-          <label>Tipo de Vehículo</label>
-          <select id="vehType" class="form-control">
-            <option value="Automóvil">Automóvil</option>
-            <option value="Motocicleta">Motocicleta</option>
-            <option value="Camioneta / SUV">Camioneta / SUV</option>
-            <option value="Camión">Camión</option>
-          </select>
+          <label>Nombre / Apodo del Vehículo</label>
+          <input type="text" id="vehName" class="form-control" placeholder="" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Marca</label>
-            <input type="text" id="vehBrand" class="form-control" placeholder="Toyota, Ford..." required>
+            <input type="text" id="vehMake" class="form-control" placeholder="" required>
           </div>
           <div class="form-group">
             <label>Modelo</label>
-            <input type="text" id="vehModel" class="form-control" placeholder="Corolla, Ranger..." required>
+            <input type="text" id="vehModel" class="form-control" placeholder="" required>
           </div>
         </div>
         <div class="form-row">
@@ -570,12 +555,16 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Kilometraje Actual (KM)</label>
+          <label>Odómetro Actual (km)</label>
           <input type="number" id="vehKm" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
-          <label>Foto del Vehículo (Opcional)</label>
-          <input type="file" id="vehPhoto" class="form-control" accept="image/*">
+          <label>Número de Chasis / VIN (Opcional)</label>
+          <input type="text" id="vehVin" class="form-control" placeholder="">
+        </div>
+        <div class="form-group">
+          <label>Fotografía del Vehículo (Opcional)</label>
+          <input type="file" id="vehPhotoFile" class="form-control" accept="image/*">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalVehicle')">Cancelar</button>
@@ -585,81 +574,66 @@
     </div>
   </div>
 
-  <!-- Modal: Actualizar Odometer -->
-  <div id="modalOdometer" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Actualizar Odómetro</h3>
-        <button class="close-btn" onclick="closeModal('modalOdometer')">✕</button>
-      </div>
-      <form id="formOdometer" onsubmit="saveOdometer(event)">
-        <p class="form-help">Ingresa la lectura actual de kilómetros de tu odómetro.</p>
-        <div class="form-group">
-          <label>Nuevo Kilometraje (KM)</label>
-          <input type="number" id="quickOdometerInput" class="form-control" placeholder="" required>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalOdometer')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Actualizar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal: Registrar / Editar Mantenimiento -->
+  <!-- Modal: Registrar / Editar Servicio Mecánico -->
   <div id="modalService" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="modalServiceTitle">Registrar Mantenimiento</h3>
+        <h3 id="modalServiceTitle">Registrar Servicio</h3>
         <button class="close-btn" onclick="closeModal('modalService')">✕</button>
       </div>
       <form id="formService" onsubmit="saveService(event)">
         <input type="hidden" id="servId">
         <div class="form-group">
-          <label>Tipo de Servicio / Repuesto</label>
-          <select id="servCategory" class="form-control" required onchange="handleServCategoryChange(this.value)">
-            <!-- Populated dynamically -->
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Descripción del Trabajo</label>
+          <label>Título del Mantenimiento / Reparación</label>
           <input type="text" id="servTitle" class="form-control" placeholder="" required>
         </div>
+        <div class="form-group">
+          <label>Tipo / Categoría de Servicio</label>
+          <select id="servCategory" class="form-control" onchange="handleServCategoryChange(this.value)" required>
+            <!-- Dynamic Categories -->
+          </select>
+        </div>
         <div class="form-row">
-          <div class="form-group">
-            <label>Costo Total (<span class="currency-lbl">₡</span>)</label>
-            <input type="number" step="any" id="servCost" class="form-control" placeholder="" required>
-          </div>
           <div class="form-group">
             <label>Fecha</label>
             <input type="date" id="servDate" class="form-control" required>
           </div>
+          <div class="form-group">
+            <label>Kilometraje (km)</label>
+            <input type="number" id="servKm" class="form-control" placeholder="" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Costo Total</label>
+            <input type="number" id="servCost" class="form-control" step="0.01" placeholder="" required>
+          </div>
+          <div class="form-group">
+            <label>Próximo Cambio (km opcional)</label>
+            <input type="number" id="servNextKm" class="form-control" placeholder="">
+          </div>
         </div>
         <div class="form-group">
-          <label>Kilometraje al realizar el Servicio</label>
-          <input type="number" id="servKm" class="form-control" placeholder="" required>
-        </div>
-        <div class="form-group">
-          <label>Taller / Proveedor (Opcional)</label>
+          <label>Taller Mecánico / Tallerista (Opcional)</label>
           <input type="text" id="servShop" class="form-control" placeholder="">
         </div>
         <div class="form-group">
-          <label>Notas Adicionales / Detalles (Opcional)</label>
-          <input type="text" id="servNotes" class="form-control" placeholder="">
+          <label>Detalles / Repuestos Utilizados (Opcional)</label>
+          <textarea id="servNotes" class="form-control" rows="2" placeholder=""></textarea>
         </div>
         <div class="form-group">
-          <label>Foto de Factura / Comprobante</label>
-          <input type="file" id="servReceipt" class="form-control" accept="image/*,application/pdf">
+          <label>Foto de Factura / Comprobante (Opcional)</label>
+          <input type="file" id="servReceiptFile" class="form-control" accept="image/*,application/pdf">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-tertiary" onclick="closeModal('modalService')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Servicio</button>
+          <button type="submit" class="btn btn-primary">Guardar Registro</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: Registrar / Editar Combustible -->
+  <!-- Modal: Registrar Recarga de Gasolina -->
   <div id="modalFuel" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-header">
@@ -670,12 +644,12 @@
         <input type="hidden" id="fuelId">
         <div class="form-row">
           <div class="form-group">
-            <label>Monto Total (<span class="currency-lbl">₡</span>)</label>
-            <input type="number" step="any" id="fuelCost" class="form-control" placeholder="" required>
+            <label>Costo Total (Monto)</label>
+            <input type="number" id="fuelCost" class="form-control" step="0.01" placeholder="" required>
           </div>
           <div class="form-group">
-            <label>Litros Cargados</label>
-            <input type="number" step="any" id="fuelVolume" class="form-control" placeholder="" required>
+            <label>Litros / Galones Cargados</label>
+            <input type="number" id="fuelLiters" class="form-control" step="0.01" placeholder="" required>
           </div>
         </div>
         <div class="form-group">
@@ -714,15 +688,9 @@
   <!-- Modal: Expediente Certificado -->
   <div id="modalCertifiedReport" class="modal-backdrop">
     <div class="modal-card print-wrapper">
-      <div class="modal-header no-print">
-        <h3 data-i18n="certifiedModalTitle">Expediente de Venta</h3>
-        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="downloadReportPDF()" style="background:#0a84ff; color:#fff; border:none; font-weight:700;">Descargar PDF</button>
-          <button class="btn btn-secondary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir</button>
-          <button class="btn btn-secondary btn-sm" onclick="shareReportText()">Compartir Datos</button>
-          <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
-          <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
-        </div>
+      <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 data-i18n="certifiedModalTitle" style="margin:0;">Expediente de Venta</h3>
+        <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
       </div>
       
       <div class="certified-document" id="certifiedDocumentContent">
@@ -747,7 +715,8 @@
 
         <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); border-radius:12px; padding:14px; margin-top:14px; margin-bottom:14px;">
           <h4 style="font-size:0.88rem; font-weight:700; color:#38bdf8; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-            <span>💚</span> Participación en Salud del Vehículo
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>Participación en Salud del Vehículo</span>
           </h4>
 
           <div class="form-group" style="margin-bottom:10px;">
@@ -1044,7 +1013,8 @@
 
         <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); border-radius:12px; padding:14px; margin-top:16px; margin-bottom:16px;">
           <h3 style="font-size:0.88rem; font-weight:700; color:#38bdf8; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-            <span>💚</span> Participación en Salud del Vehículo
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>Participación en Salud del Vehículo</span>
           </h3>
 
           <div class="form-group" style="margin-bottom:10px;">

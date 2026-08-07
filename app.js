@@ -1969,7 +1969,7 @@ function renderCustomCategoriesList() {
       <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.08);">
         <div style="display:flex; align-items:center; gap:6px;">
           <span style="color:#ffffff; font-weight:600;">${escapeHtml(cat)}</span>
-          ${isHealth ? '<span style="font-size:0.7rem; color:#34d399; background:rgba(52,211,153,0.1); padding:1px 6px; border-radius:4px; font-weight:600;">💚 Salud</span>' : ''}
+          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.1); padding:1px 6px; border-radius:4px; font-weight:600;">Salud</span>' : ''}
         </div>
         <div style="display:flex; gap:4px;">
           <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.7rem; padding:2px 6px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
