@@ -802,6 +802,48 @@ function sanitizeState(parsed) {
   return state;
 }
 
+function syncServiceCategoriesWithState() {
+  if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
+    appState.serviceCategories = [];
+  }
+  const defaultCats = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
+  
+  defaultCats.forEach(defName => {
+    if (!SERVICE_CATEGORIES.includes(defName)) {
+      SERVICE_CATEGORIES.push(defName);
+    }
+    if (!appState.serviceCategories.some(c => (c.name || c).toLowerCase() === defName.toLowerCase())) {
+      appState.serviceCategories.push({
+        id: 'cat_def_' + defName.toLowerCase(),
+        name: defName,
+        affectsHealth: false
+      });
+    }
+  });
+
+  appState.serviceCategories.forEach(c => {
+    const catName = typeof c === 'string' ? c : (c.name || '');
+    if (catName && !SERVICE_CATEGORIES.includes(catName)) {
+      SERVICE_CATEGORIES.push(catName);
+    }
+  });
+
+  if (appState.services && Array.isArray(appState.services)) {
+    appState.services.forEach(s => {
+      if (s.category && !SERVICE_CATEGORIES.includes(s.category)) {
+        SERVICE_CATEGORIES.push(s.category);
+        if (!appState.serviceCategories.some(c => (c.name || c).toLowerCase() === s.category.toLowerCase())) {
+          appState.serviceCategories.push({
+            id: 'cat_srv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            name: s.category,
+            affectsHealth: false
+          });
+        }
+      }
+    });
+  }
+}
+
 function loadState() {
   let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   try {
@@ -813,32 +855,17 @@ function loadState() {
     }
   } catch (e) { console.error('Error loading state from cache:', e); }
   const finalState = sanitizeState(state);
-  // Restore custom service categories if saved
-  if (finalState.serviceCategories && Array.isArray(finalState.serviceCategories) && finalState.serviceCategories.length > 0) {
-    finalState.serviceCategories.forEach(cat => {
-      const catName = typeof cat === 'string' ? cat : (cat.name || '');
-      if (catName && !SERVICE_CATEGORIES.includes(catName)) {
-        SERVICE_CATEGORIES.push(catName);
-      }
-    });
+
+  if (finalState.serviceCategories && Array.isArray(finalState.serviceCategories)) {
+    appState.serviceCategories = finalState.serviceCategories;
   }
+  syncServiceCategoriesWithState();
   return finalState;
 }
 
 function saveState() {
   try {
-    if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
-      appState.serviceCategories = [];
-    }
-    SERVICE_CATEGORIES.forEach(catName => {
-      if (typeof catName === 'string' && catName && !appState.serviceCategories.some(c => (c.name || c).toLowerCase() === catName.toLowerCase())) {
-        appState.serviceCategories.push({
-          id: 'cat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-          name: catName,
-          affectsHealth: false
-        });
-      }
-    });
+    syncServiceCategoriesWithState();
     const key = getUserStorageKey(currentUser);
     localStorage.setItem(key, JSON.stringify(appState));
     localStorage.setItem('GARAGEONE_UNIFIED_MASTER_STATE_V100', JSON.stringify(appState));
@@ -933,6 +960,7 @@ async function loadAppStateFromDB() {
   if (appState.vehicles.length > 0 && (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId))) {
     appState.activeVehicleId = appState.vehicles[0].id;
   }
+  syncServiceCategoriesWithState();
 }
 
 async function initAsyncStorage() {
@@ -1371,37 +1399,47 @@ async function deleteVehicleDirect(vehId, event = null) {
   }
   if (!vehId) return;
 
-  if (!confirm('¿Estás seguro de que deseas eliminar este vehículo y todos sus datos asociados?')) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este vehículo y sus registros asociados (servicios, gasolina y recordatorios)? Los documentos y configuraciones de salud se conservarán.')) {
     return;
   }
 
   const servicesToDelete = (appState.services || []).filter(s => s.vehicleId === vehId);
   const fuelsToDelete = (appState.fuels || []).filter(f => f.vehicleId === vehId);
-  const documentsToDelete = (appState.documents || []).filter(d => d.vehicleId === vehId);
   const remindersToDelete = (appState.reminders || []).filter(r => r.vehicleId === vehId);
 
-  await SyncService.executeCrud('DELETE', STORES.VEHICLES, { id: vehId });
-
-  for (const s of servicesToDelete) {
-    await SyncService.executeCrud('DELETE', STORES.SERVICES, { id: s.id });
-  }
-  for (const f of fuelsToDelete) {
-    await SyncService.executeCrud('DELETE', STORES.FUELS, { id: f.id });
-  }
-  for (const d of documentsToDelete) {
-    await SyncService.executeCrud('DELETE', STORES.DOCUMENTS, { id: d.id });
-  }
-  for (const r of remindersToDelete) {
-    await SyncService.executeCrud('DELETE', STORES.REMINDERS, { id: r.id });
-  }
+  // 1. Remove from in-memory appState immediately (keep documents, emergencyContacts, serviceCategories intact)
+  appState.vehicles = (appState.vehicles || []).filter(v => v.id !== vehId);
+  appState.services = (appState.services || []).filter(s => s.vehicleId !== vehId);
+  appState.fuels = (appState.fuels || []).filter(f => f.vehicleId !== vehId);
+  appState.reminders = (appState.reminders || []).filter(r => r.vehicleId !== vehId);
 
   if (appState.activeVehicleId === vehId) {
-    const remaining = await LocalDB.getAll(STORES.VEHICLES);
-    appState.activeVehicleId = remaining.length > 0 ? remaining[0].id : '';
+    appState.activeVehicleId = appState.vehicles.length > 0 ? appState.vehicles[0].id : '';
   }
 
-  await loadAppStateFromDB();
+  saveState();
+
+  // 2. Immediately re-render UI in real time
   renderApp();
+  if (typeof renderRemindersTab === 'function') renderRemindersTab();
+  if (typeof renderGuantera === 'function') renderGuantera();
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
+
+  // 3. Delete from DB in background
+  try {
+    await SyncService.executeCrud('DELETE', STORES.VEHICLES, { id: vehId });
+    for (const s of servicesToDelete) {
+      await SyncService.executeCrud('DELETE', STORES.SERVICES, { id: s.id });
+    }
+    for (const f of fuelsToDelete) {
+      await SyncService.executeCrud('DELETE', STORES.FUELS, { id: f.id });
+    }
+    for (const r of remindersToDelete) {
+      await SyncService.executeCrud('DELETE', STORES.REMINDERS, { id: r.id });
+    }
+  } catch (e) {
+    console.error('Error al eliminar datos del vehículo en IndexedDB:', e);
+  }
 }
 
 async function deleteServiceDirect(servId, event = null) {
@@ -1946,6 +1984,8 @@ function renderCustomCategoriesList() {
   const container = document.getElementById('customCategoriesListContainer');
   if (!container) return;
 
+  syncServiceCategoriesWithState();
+
   const cats = SERVICE_CATEGORIES || [];
   const healthCats = appState.serviceCategories || [];
 
@@ -2007,10 +2047,18 @@ function deleteCategory(catName) {
     SERVICE_CATEGORIES.splice(idx, 1);
   }
 
+  if (appState.serviceCategories && Array.isArray(appState.serviceCategories)) {
+    appState.serviceCategories = appState.serviceCategories.filter(c => {
+      const cName = typeof c === 'string' ? c : (c.name || '');
+      return cName.toLowerCase() !== catName.toLowerCase();
+    });
+  }
+
   saveState();
   populateServCategorySelect();
   renderMaintenanceFilterPills();
   renderCustomCategoriesList();
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 // Save New Custom Category
