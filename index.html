@@ -719,8 +719,8 @@
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="downloadReportPDF()" style="background:#0a84ff; color:#fff; border:none; font-weight:700;">Descargar PDF</button>
           <button class="btn btn-secondary btn-sm" onclick="window.print()" data-i18n="btnPrint">Imprimir</button>
-          <button class="btn btn-secondary btn-sm" onclick="shareReportText()">Compartir Datos</button>
-          <button class="btn btn-secondary btn-sm" onclick="shareReportEmail()">Correo</button>
+          <button class="btn btn-secondary btn-sm" onclick="openShareVehicleSaleModal()">Compartir Datos</button>
+          <button class="btn btn-secondary btn-sm" onclick="openShareVehicleSaleModal()">Correo</button>
           <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
         </div>
       </div>
@@ -1070,13 +1070,13 @@
     </div>
   </div>
 
-  <script src="db.js?v=3000"></script>
-  <script src="auth-service.js?v=3000"></script>
-  <script src="sync-service.js?v=3000"></script>
-  <script src="app.js?v=3000"></script>
+  <script src="db.js?v=4000"></script>
+  <script src="auth-service.js?v=4000"></script>
+  <script src="sync-service.js?v=4000"></script>
+  <script src="app.js?v=4000"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=3000').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=4000').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>

@@ -4266,9 +4266,13 @@ function xmlToObject(xmlStr) {
 
 // Report Sharing (Text & Email Sales Prototype)
 function openShareVehicleSaleModal() {
+  try {
+    closeModal('modalCertifiedReport');
+  } catch (e) {}
+
   const veh = getActiveVehicle();
   if (!veh) {
-    alert('Primero debes registrar o seleccionar un vehículo.');
+    alert('Primero debes registrar un vehículo en la pestaña Garaje.');
     openVehicleModal();
     return;
   }
@@ -4329,14 +4333,9 @@ function execShareVehicleSale(mode) {
     const body = encodeURIComponent(text);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   } else {
-    if (navigator.share) {
-      navigator.share({
-        title: `Venta ${veh.name} (${veh.year})`,
-        text: text
-      }).catch(() => {});
-    } else if (navigator.clipboard) {
+    if (navigator.clipboard) {
       navigator.clipboard.writeText(text).then(() => {
-        alert('Ficha comercial de venta copiada al portapapeles.');
+        alert('¡Ficha comercial de venta copiada al portapapeles con éxito!\n\nPuedes pegarla (Ctrl+V) en cualquier chat o mensaje.');
       }).catch(() => {
         alert(text);
       });
