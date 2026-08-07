@@ -178,9 +178,12 @@ function closeModal(modalId) {
 
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
+  if (localStorage.getItem('GARAGEONE_CLEAN_BOOT_V200') !== 'true') {
+    await purgeAllAppDataAndUsers();
+  }
+  await initAsyncStorage();
   checkAuth();
   setTodayDates();
-  await initAsyncStorage();
 
   // Run initial reminder check and set periodic timer (every 30s)
   checkAndSendDueNotifications();
@@ -214,34 +217,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 const userSyncChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('garageone_user_database_sync') : null;
 
 function getUsersList() {
-  const storedAdminPwd = getStoredAdminPassword();
-  const adminUserWithPassword = { ...DEFAULT_ADMIN_USER, password: storedAdminPwd, createdByAdmin: true };
-
-  if (appState.users && appState.users.length > 0) {
-    let hasAdmin = appState.users.some(u => u && u.username && u.username.toLowerCase() === 'admin');
-    if (!hasAdmin) {
-      appState.users.unshift(adminUserWithPassword);
-    } else {
-      // Update admin password in list
-      const adminIdx = appState.users.findIndex(u => u && u.username && u.username.toLowerCase() === 'admin');
-      if (adminIdx !== -1) appState.users[adminIdx].password = storedAdminPwd;
-    }
+  if (appState.users && Array.isArray(appState.users)) {
     return appState.users;
   }
   try {
     const raw = localStorage.getItem(USERS_KEY);
     let list = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(list)) list = [];
-    let hasAdmin = list.some(u => u && u.username && u.username.toLowerCase() === 'admin');
-    if (!hasAdmin) {
-      list.unshift(adminUserWithPassword);
-    } else {
-      const adminIdx = list.findIndex(u => u && u.username && u.username.toLowerCase() === 'admin');
-      if (adminIdx !== -1) list[adminIdx].password = storedAdminPwd;
-    }
-    return list;
+    return Array.isArray(list) ? list : [];
   } catch (e) {
-    return [adminUserWithPassword];
+    return [];
+  }
+}
+
+async function purgeAllAppDataAndUsers() {
+  try {
+    if (typeof LocalDB !== 'undefined' && LocalDB.clear) {
+      for (const key in STORES) {
+        await LocalDB.clear(STORES[key]);
+      }
+    }
+  } catch (e) {}
+
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch (e) {}
+
+  localStorage.setItem('GARAGEONE_CLEAN_BOOT_V200', 'true');
+
+  appState = {
+    currency: 'CRC',
+    geminiApiKey: '',
+    groqApiKey: '',
+    aiEngineMode: 'groq_key',
+    vehicles: [],
+    activeVehicleId: '',
+    documents: [],
+    services: [],
+    fuels: [],
+    reminders: [],
+    users: [],
+    emergencyContacts: [
+      { id: 'c1', name: 'Grúa / Auxilio 24/7 INS', phone: '800-800-911', category: 'Auxilio' },
+      { id: 'c2', name: 'Taller Mecánico Central', phone: '2222-3333', category: 'Taller' },
+      { id: 'c3', name: 'Asistencia de Emergencia', phone: '911', category: 'Emergencia' }
+    ]
+  };
+
+  currentUser = null;
+  isAuthenticated = false;
+  if (typeof AuthService !== 'undefined') {
+    AuthService.currentUser = null;
+    AuthService.setSessionAuthenticated(false);
   }
 }
 
@@ -470,7 +497,12 @@ function checkAuth() {
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
-    showLoginForm();
+    const users = getUsersList();
+    if (!users || users.length === 0) {
+      showRegisterForm();
+    } else {
+      showLoginForm();
+    }
   }
 }
 
