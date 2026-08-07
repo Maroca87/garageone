@@ -3416,7 +3416,7 @@ function saveVehicle(e) {
 
   const processAndSave = async (photoBase64) => {
     const vehData = {
-      id: vehId || undefined,
+      id: vehId || ('veh_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
       type, brand, model, name, year, plate, km: safeKm,
       photo: photoBase64 || (targetVeh ? targetVeh.photo : '')
     };
@@ -3915,7 +3915,7 @@ function saveService(e) {
 
   const processAndSave = async (receiptBase64) => {
     const servData = {
-      id: servId || undefined,
+      id: servId || ('serv_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
       vehicleId: veh.id,
       category, title, cost: safeCost, date, km: safeKm, shop, notes,
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
@@ -3960,7 +3960,7 @@ async function saveFuel(e) {
   let targetFuel = fuelId ? appState.fuels.find(f => f.id === fuelId) : null;
 
   const fuelData = {
-    id: fuelId || undefined,
+    id: fuelId || ('fuel_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
     vehicleId: veh.id,
     cost: safeCost, volume: safeVolume, km: safeKm, date, notes
   };
@@ -4292,61 +4292,95 @@ function xmlToObject(xmlStr) {
 
 
 
-// Report Sharing (Text & Email)
-function shareReportText() {
+// Report Sharing (Text & Email Sales Prototype)
+function openShareVehicleSaleModal() {
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo.');
+    return;
+  }
+
+  const h = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
+  const titleEl = document.getElementById('saleVehTitle');
+  const metaEl = document.getElementById('saleVehMeta');
+
+  if (titleEl) {
+    titleEl.textContent = `${veh.name || 'Vehículo'} (${veh.year || 'N/A'})`;
+  }
+  if (metaEl) {
+    const healthText = h && h.overallHealthPct !== null ? `Salud: ${h.overallHealthPct}% (${h.ratingLabel})` : 'Al día';
+    metaEl.textContent = `Placa: ${veh.plate || 'Sin placa'} • ${ (veh.km || 0).toLocaleString() } km • ${healthText}`;
+  }
+
+  openModal('modalShareVehicleSale');
+}
+
+function execShareVehicleSale(mode) {
   const veh = getActiveVehicle();
   if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id);
-  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
-  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
 
-  const text = `Expediente de Vehículo - GarageOne\n\n` +
-    `• Vehículo: ${veh.name} (${veh.year})\n` +
+  const price = document.getElementById('saleVehPrice') ? document.getElementById('saleVehPrice').value.trim() : '';
+  const notes = document.getElementById('saleVehNotes') ? document.getElementById('saleVehNotes').value.trim() : '';
+
+  const chkMaint = document.getElementById('chkSaleMaint') ? document.getElementById('chkSaleMaint').checked : false;
+  const chkDocs = document.getElementById('chkSaleDocs') ? document.getElementById('chkSaleDocs').checked : false;
+  const chkHealth = document.getElementById('chkSaleHealth') ? document.getElementById('chkSaleHealth').checked : false;
+  const chkAC = document.getElementById('chkSaleAC') ? document.getElementById('chkSaleAC').checked : false;
+  const chkTires = document.getElementById('chkSaleTires') ? document.getElementById('chkSaleTires').checked : false;
+  const chkOwner = document.getElementById('chkSaleOwner') ? document.getElementById('chkSaleOwner').checked : false;
+
+  const features = [];
+  if (chkMaint) features.push('• Mantenimientos y servicios al día');
+  if (chkDocs) features.push('• Documentación (RTV y Marchamo) al día');
+  if (chkHealth) features.push('• Estado mecánico general en óptimas condiciones');
+  if (chkAC) features.push('• Aire acondicionado funcionando al 100%');
+  if (chkTires) features.push('• Llantas en excelente estado / buen grabado');
+  if (chkOwner) features.push('• Historial de un solo dueño / muy bien cuidado');
+  if (notes) features.push(`• Extras: ${notes}`);
+
+  const h = typeof calculateVehicleHealth === 'function' ? calculateVehicleHealth(veh) : null;
+  const healthInfo = h && h.overallHealthPct !== null ? `• Evaluación de Salud GarageOne: ${h.overallHealthPct}% (${h.ratingLabel})\n` : '';
+
+  let text = `OFERTA DE VENTA - VEHÍCULO EN EXCELENTE ESTADO\n\n` +
+    `🚗 Vehículo: ${veh.name} (${veh.year})\n` +
     `• Placa: ${veh.plate || 'N/A'}\n` +
-    `• Odómetro: ${veh.km.toLocaleString()} KM\n\n` +
-    `Resumen de Inversión:\n` +
-    `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
-    `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
-    `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
-    `Generado con GarageOne.`;
+    `• Kilometraje: ${(veh.km || 0).toLocaleString()} KM\n` +
+    (price ? `• Precio Sugerido: ${price}\n` : '') +
+    healthInfo +
+    `\nCaracterísticas Destacadas:\n` +
+    (features.length > 0 ? features.join('\n') : '• Vehículo al día y verificado.') +
+    `\n\nInteresados contactar directamente. Expediente certificado con GarageOne.`;
 
-  if (navigator.share) {
-    navigator.share({
-      title: `Expediente ${veh.name}`,
-      text: text
-    }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Resumen copiado al portapapeles.');
-    }).catch(() => {
-      alert(text);
-    });
+  if (mode === 'email') {
+    const subject = encodeURIComponent(`Oferta de Venta: ${veh.name} (${veh.year})`);
+    const body = encodeURIComponent(text);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   } else {
-    alert(text);
+    if (navigator.share) {
+      navigator.share({
+        title: `Venta ${veh.name} (${veh.year})`,
+        text: text
+      }).catch(() => {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Ficha comercial de venta copiada al portapapeles.');
+      }).catch(() => {
+        alert(text);
+      });
+    } else {
+      alert(text);
+    }
   }
+
+  closeModal('modalShareVehicleSale');
+}
+
+function shareReportText() {
+  openShareVehicleSaleModal();
 }
 
 function shareReportEmail() {
-  const veh = getActiveVehicle();
-  if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id);
-  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
-  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
-
-  const subject = `Expediente de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`;
-  const body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
-    `Vehículo: ${veh.name} (${veh.year})\n` +
-    `Placa: ${veh.plate || 'N/A'}\n` +
-    `Odómetro Actual: ${veh.km.toLocaleString()} KM\n\n` +
-    `RESUMEN FINANCIERO:\n` +
-    `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
-    `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
-    `- Inversión Total: ${formatCurrency(totalServ + totalFuel)}\n\n` +
-    `Generado por GarageOne.`;
-
-  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  openShareVehicleSaleModal();
 }
 
 // Internationalization (i18n) Engine
