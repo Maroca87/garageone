@@ -4344,6 +4344,9 @@ function execShareVehicleSale(mode) {
   closeModal('modalShareVehicleSale');
 }
 
+window.openShareVehicleSaleModal = openShareVehicleSaleModal;
+window.execShareVehicleSale = execShareVehicleSale;
+
 function shareReportText() {
   openShareVehicleSaleModal();
 }
