@@ -150,16 +150,14 @@ class AuthServiceEngine {
       throw new Error('Ya existe una cuenta con este nombre o correo en este dispositivo.');
     }
 
-    const isFirstUser = !users || users.length === 0;
-
     const newUser = {
       id: LocalDB.generateUUID(),
       email: cleanQuery.includes('@') ? cleanQuery : `${cleanQuery}@garageone.local`,
       username: userData.username || (cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery),
       name: userData.name || (cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery),
       password: password || '',
-      role: isFirstUser ? 'admin' : (userData.role || 'estandar'),
-      permissions: isFirstUser ? { tabGarage: true, tabMaintenance: true, tabFuel: true, tabGuantera: true, tabAI: true, tabReports: true, tabSettings: true, canManageUsers: true } : DEFAULT_PERMISSIONS,
+      role: userData.role || 'estandar',
+      permissions: DEFAULT_PERMISSIONS,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

@@ -1002,6 +1002,11 @@
         </div>
 
         <div class="modal-footer" style="margin-top:14px;">
+          <button type="button" class="btn btn-tertiary" onclick="closeModal('modalHealthSettings')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Ajustes</button>
+        </div>
+      </form>
+    </div>
   <!-- Modal: Ficha Comercial de Venta (Vehículo) -->
   <div id="modalShareVehicleSale" class="modal-backdrop">
     <div class="modal-card" style="max-width:540px;">
@@ -1065,13 +1070,13 @@
     </div>
   </div>
 
-  <script src="db.js?v=1300"></script>
-  <script src="auth-service.js?v=1300"></script>
-  <script src="sync-service.js?v=1300"></script>
-  <script src="app.js?v=1300"></script>
+  <script src="db.js?v=3000"></script>
+  <script src="auth-service.js?v=3000"></script>
+  <script src="sync-service.js?v=3000"></script>
+  <script src="app.js?v=3000"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=1300').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=3000').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>

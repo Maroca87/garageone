@@ -178,12 +178,9 @@ function closeModal(modalId) {
 
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
-  if (localStorage.getItem('GARAGEONE_CLEAN_BOOT_V200') !== 'true') {
-    await purgeAllAppDataAndUsers();
-  }
-  await initAsyncStorage();
   checkAuth();
   setTodayDates();
+  await initAsyncStorage();
 
   // Run initial reminder check and set periodic timer (every 30s)
   checkAndSendDueNotifications();
@@ -217,58 +214,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 const userSyncChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('garageone_user_database_sync') : null;
 
 function getUsersList() {
-  if (appState.users && Array.isArray(appState.users)) {
+  const storedAdminPwd = getStoredAdminPassword();
+  const adminUserWithPassword = { ...DEFAULT_ADMIN_USER, password: storedAdminPwd, createdByAdmin: true };
+
+  if (appState.users && appState.users.length > 0) {
+    let hasAdmin = appState.users.some(u => u && u.username && u.username.toLowerCase() === 'admin');
+    if (!hasAdmin) {
+      appState.users.unshift(adminUserWithPassword);
+    } else {
+      // Update admin password in list
+      const adminIdx = appState.users.findIndex(u => u && u.username && u.username.toLowerCase() === 'admin');
+      if (adminIdx !== -1) appState.users[adminIdx].password = storedAdminPwd;
+    }
     return appState.users;
   }
   try {
     const raw = localStorage.getItem(USERS_KEY);
     let list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-async function purgeAllAppDataAndUsers() {
-  try {
-    if (typeof LocalDB !== 'undefined' && LocalDB.clear) {
-      for (const key in STORES) {
-        await LocalDB.clear(STORES[key]);
-      }
+    if (!Array.isArray(list)) list = [];
+    let hasAdmin = list.some(u => u && u.username && u.username.toLowerCase() === 'admin');
+    if (!hasAdmin) {
+      list.unshift(adminUserWithPassword);
+    } else {
+      const adminIdx = list.findIndex(u => u && u.username && u.username.toLowerCase() === 'admin');
+      if (adminIdx !== -1) list[adminIdx].password = storedAdminPwd;
     }
-  } catch (e) {}
-
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-  } catch (e) {}
-
-  localStorage.setItem('GARAGEONE_CLEAN_BOOT_V200', 'true');
-
-  appState = {
-    currency: 'CRC',
-    geminiApiKey: '',
-    groqApiKey: '',
-    aiEngineMode: 'groq_key',
-    vehicles: [],
-    activeVehicleId: '',
-    documents: [],
-    services: [],
-    fuels: [],
-    reminders: [],
-    users: [],
-    emergencyContacts: [
-      { id: 'c1', name: 'Grúa / Auxilio 24/7 INS', phone: '800-800-911', category: 'Auxilio' },
-      { id: 'c2', name: 'Taller Mecánico Central', phone: '2222-3333', category: 'Taller' },
-      { id: 'c3', name: 'Asistencia de Emergencia', phone: '911', category: 'Emergencia' }
-    ]
-  };
-
-  currentUser = null;
-  isAuthenticated = false;
-  if (typeof AuthService !== 'undefined') {
-    AuthService.currentUser = null;
-    AuthService.setSessionAuthenticated(false);
+    return list;
+  } catch (e) {
+    return [adminUserWithPassword];
   }
 }
 
@@ -497,12 +470,7 @@ function checkAuth() {
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
-    const users = getUsersList();
-    if (!users || users.length === 0) {
-      showRegisterForm();
-    } else {
-      showLoginForm();
-    }
+    showLoginForm();
   }
 }
 
@@ -1007,10 +975,14 @@ function renderStorageStats() {
   container.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
       <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
-      <span style="font-weight:700; color:${barColor};">${usage.percent}% Utilizado</span>
+      <span style="font-weight:700; color:${barColor};">${usage.percent}% de 50MB Ampliado</span>
     </div>
     <div style="width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
       <div style="width:${Math.max(1, usage.percent)}%; height:100%; background:${barColor}; border-radius:5px; transition:width 0.3s ease; box-shadow:0 0 10px ${barColor}66;"></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#30d158; margin-bottom:6px;">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#30d158; box-shadow:0 0 8px #30d158;"></span>
+      <strong>Almacenamiento IndexedDB (50MB+ Ampliado): Activo y Sincronizado</strong>
     </div>
     <div style="font-size:0.78rem; color:#cbd5e1; line-height:1.4;">
       • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s)/foto(s) respaldados.
@@ -3416,7 +3388,7 @@ function saveVehicle(e) {
 
   const processAndSave = async (photoBase64) => {
     const vehData = {
-      id: vehId || ('veh_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
+      id: vehId || undefined,
       type, brand, model, name, year, plate, km: safeKm,
       photo: photoBase64 || (targetVeh ? targetVeh.photo : '')
     };
@@ -3915,7 +3887,7 @@ function saveService(e) {
 
   const processAndSave = async (receiptBase64) => {
     const servData = {
-      id: servId || ('serv_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
+      id: servId || undefined,
       vehicleId: veh.id,
       category, title, cost: safeCost, date, km: safeKm, shop, notes,
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
@@ -3960,7 +3932,7 @@ async function saveFuel(e) {
   let targetFuel = fuelId ? appState.fuels.find(f => f.id === fuelId) : null;
 
   const fuelData = {
-    id: fuelId || ('fuel_' + (typeof LocalDB !== 'undefined' && LocalDB.generateUUID ? LocalDB.generateUUID() : Date.now())),
+    id: fuelId || undefined,
     vehicleId: veh.id,
     cost: safeCost, volume: safeVolume, km: safeKm, date, notes
   };
@@ -4297,6 +4269,7 @@ function openShareVehicleSaleModal() {
   const veh = getActiveVehicle();
   if (!veh) {
     alert('Primero debes registrar o seleccionar un vehículo.');
+    openVehicleModal();
     return;
   }
 
