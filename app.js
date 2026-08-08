@@ -105,7 +105,19 @@ const SVG_ICONS = {
   alertCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
 };
 
+const DEFAULT_SYSTEM_CATEGORIES = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
 let SERVICE_CATEGORIES = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
+
+/**
+ * Determina si el nombre de una categoría corresponde a una categoría predefinida por el sistema.
+ * @param {string} catName - Nombre de la categoría a evaluar.
+ * @returns {boolean} True si la categoría es predefinida por el sistema, false en caso contrario.
+ */
+function isDefaultCategory(catName) {
+  if (!catName || typeof catName !== 'string') return false;
+  const lowerName = catName.trim().toLowerCase();
+  return DEFAULT_SYSTEM_CATEGORIES.some(def => def.toLowerCase() === lowerName);
+}
 
 // Default Seed Data
 const DEFAULT_STATE = {
@@ -1957,23 +1969,62 @@ function renderMaintenanceFilterPills() {
   container.innerHTML = html;
 }
 
-// Populate Category Dropdown in Modal Service
+/**
+ * Pobla el selector de categorías al crear o editar un servicio.
+ * Excluye los servicios predefinidos del sistema para mostrar únicamente
+ * los creados manualmente por el usuario.
+ */
 function populateServCategorySelect() {
   const select = document.getElementById('servCategory');
   if (!select) return;
 
   const currentVal = select.value;
   let html = '';
-  SERVICE_CATEGORIES.forEach(cat => {
-    html += `<option value="${cat}">${escapeHtml(cat)}</option>`;
+
+  const customCatsSet = new Set();
+
+  (appState.serviceCategories || []).forEach(c => {
+    const name = typeof c === 'string' ? c : (c ? c.name : '');
+    if (name && !isDefaultCategory(name)) {
+      customCatsSet.add(name);
+    }
   });
 
+  (SERVICE_CATEGORIES || []).forEach(cat => {
+    if (cat && typeof cat === 'string' && !isDefaultCategory(cat)) {
+      customCatsSet.add(cat);
+    }
+  });
+
+  const customCategories = Array.from(customCatsSet);
+
+  if (customCategories.length === 0) {
+    html = `<option value="" disabled selected>No hay servicios creados por el usuario</option>`;
+  } else {
+    customCategories.forEach(cat => {
+      html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+    });
+  }
+
+  html += `<option value="__NEW__">+ Crear nuevo servicio...</option>`;
+
   select.innerHTML = html;
-  if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+
+  if (currentVal && select.querySelector(`option[value="${escapeHtml(currentVal)}"]`)) {
+    select.value = currentVal;
+  } else if (currentVal && isDefaultCategory(currentVal)) {
+    const opt = document.createElement('option');
+    opt.value = currentVal;
+    opt.textContent = `${currentVal} (Predefinido)`;
+    select.insertBefore(opt, select.firstChild);
     select.value = currentVal;
   }
 }
 
+/**
+ * Maneja el cambio de selección en el selector de categoría de servicios.
+ * @param {string} val - Valor seleccionado.
+ */
 function handleServCategoryChange(val) {
   if (val === '__NEW__') {
     openModal('modalNewCategory');
@@ -1981,24 +2032,35 @@ function handleServCategoryChange(val) {
   }
 }
 
+/**
+ * Renderiza la lista de servicios personalizados disponibles creados por el usuario.
+ * Omite los servicios predefinidos por el sistema.
+ */
 function renderCustomCategoriesList() {
   const container = document.getElementById('customCategoriesListContainer');
   if (!container) return;
 
   syncServiceCategoriesWithState();
 
-  const allCatNames = new Set();
-  (SERVICE_CATEGORIES || []).forEach(c => c && typeof c === 'string' && allCatNames.add(c));
+  const customCatsSet = new Set();
   (appState.serviceCategories || []).forEach(c => {
     const name = typeof c === 'string' ? c : (c ? c.name : '');
-    if (name) allCatNames.add(name);
+    if (name && !isDefaultCategory(name)) {
+      customCatsSet.add(name);
+    }
   });
 
-  const cats = Array.from(allCatNames);
+  (SERVICE_CATEGORIES || []).forEach(c => {
+    if (c && typeof c === 'string' && !isDefaultCategory(c)) {
+      customCatsSet.add(c);
+    }
+  });
+
+  const cats = Array.from(customCatsSet);
   const healthCats = appState.serviceCategories || [];
 
   if (cats.length === 0) {
-    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">No hay servicios disponibles.</div>`;
+    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">No hay servicios personalizados creados por el usuario.</div>`;
     return;
   }
 
@@ -2009,7 +2071,7 @@ function renderCustomCategoriesList() {
       <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.1);">
         <div style="display:flex; align-items:center; gap:6px;">
           <span style="color:var(--text-primary); font-weight:600;">${escapeHtml(cat)}</span>
-          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 6px; border-radius:4px; font-weight:600;">Salud</span>' : ''}
+          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 6px; font-weight:600;">Salud</span>' : ''}
         </div>
         <div style="display:flex; gap:6px;">
           <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:3px 8px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
@@ -2020,6 +2082,10 @@ function renderCustomCategoriesList() {
   }).join('');
 }
 
+/**
+ * Carga los datos de una categoría personalizada para su edición en el modal.
+ * @param {string} catName - Nombre del servicio a editar.
+ */
 function loadCategoryForEdit(catName) {
   document.getElementById('editCatOldName').value = catName;
   document.getElementById('newCatName').value = catName;
@@ -2044,13 +2110,21 @@ function loadCategoryForEdit(catName) {
   }
 }
 
+/**
+ * Alias para cargar una categoría para su edición.
+ * @param {string} oldName - Nombre previo del servicio.
+ */
 function editCategoryName(oldName) {
   loadCategoryForEdit(oldName);
 }
 
+/**
+ * Elimina una categoría personalizada creada por el usuario.
+ * @param {string} catName - Nombre del servicio a eliminar.
+ */
 function deleteCategory(catName) {
-  if (SERVICE_CATEGORIES.length <= 1) {
-    alert('Debe existir al menos una categoría de servicio.');
+  if (isDefaultCategory(catName)) {
+    alert('Los servicios predefinidos por el sistema no se pueden eliminar.');
     return;
   }
   if (!confirm(`¿Eliminar el servicio "${catName}"?`)) return;
@@ -2074,7 +2148,10 @@ function deleteCategory(catName) {
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
-// Save New Custom Category
+/**
+ * Guarda o actualiza un servicio personalizado creado manualmente por el usuario.
+ * @param {Event} e - Evento de envío del formulario.
+ */
 function saveNewCategory(e) {
   e.preventDefault();
   const name = document.getElementById('newCatName').value.trim();
@@ -2105,15 +2182,17 @@ function saveNewCategory(e) {
       name,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
-      recommendedIntervalMonths: intervalMonths
+      recommendedIntervalMonths: intervalMonths,
+      isCustom: true
     };
   } else {
     appState.serviceCategories.push({
-      id: 'cat_' + Date.now(),
+      id: 'cat_custom_' + Date.now(),
       name,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
-      recommendedIntervalMonths: intervalMonths
+      recommendedIntervalMonths: intervalMonths,
+      isCustom: true
     });
   }
 
@@ -5806,17 +5885,26 @@ function toggleHealthCategoryInputs(checked) {
   if (container) container.style.display = checked ? 'block' : 'none';
 }
 
+/**
+ * Guarda o actualiza un tipo de servicio desde el modal de configuración de salud/categorías.
+ * Marca explícitamente el servicio como manual (isCustom: true).
+ * @param {Event} e - Evento de envío de formulario.
+ */
 function saveServiceCategory(e) {
   if (e) e.preventDefault();
-  const catId = document.getElementById('catId').value;
-  const name = (document.getElementById('catName').value || '').trim();
+  const catId = document.getElementById('catId')?.value;
+  const name = (document.getElementById('catName')?.value || '').trim();
   if (!name) return;
 
-  const affectsHealth = document.getElementById('catAffectsHealth').checked;
-  const intervalKm = Number(document.getElementById('catIntervalKm').value) || 0;
-  const intervalMonths = Number(document.getElementById('catIntervalMonths').value) || 0;
+  const affectsHealth = document.getElementById('catAffectsHealth')?.checked || false;
+  const intervalKm = Number(document.getElementById('catIntervalKm')?.value) || 0;
+  const intervalMonths = Number(document.getElementById('catIntervalMonths')?.value) || 0;
 
   if (!appState.serviceCategories) appState.serviceCategories = [];
+
+  if (!SERVICE_CATEGORIES.includes(name)) {
+    SERVICE_CATEGORIES.push(name);
+  }
 
   if (catId) {
     const idx = appState.serviceCategories.findIndex(c => c.id === catId);
@@ -5826,22 +5914,26 @@ function saveServiceCategory(e) {
         name,
         affectsHealth,
         recommendedIntervalKm: intervalKm,
-        recommendedIntervalMonths: intervalMonths
+        recommendedIntervalMonths: intervalMonths,
+        isCustom: true
       };
     }
   } else {
     const newCat = {
-      id: 'cat_' + Date.now(),
+      id: 'cat_custom_' + Date.now(),
       name,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
-      recommendedIntervalMonths: intervalMonths
+      recommendedIntervalMonths: intervalMonths,
+      isCustom: true
     };
     appState.serviceCategories.push(newCat);
   }
 
   saveState();
   closeModal('modalServiceCategory');
+  populateServCategorySelect();
+  renderCustomCategoriesList();
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
