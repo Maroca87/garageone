@@ -3884,17 +3884,81 @@ async function forceSyncNow() {
   }
 }
 
-// Reports & Financial Overview
-function renderReports() {
+/**
+ * Pobla el desplegable de filtro por mes en el módulo de reportes.
+ * Extrae los meses únicos (YYYY-MM) de los servicios y recargas de combustible del vehículo activo.
+ */
+function populateReportMonthFilter() {
+  const select = document.getElementById('reportMonthFilter');
+  if (!select) return;
+
+  const currentVal = select.value || 'all';
   const vehId = appState.activeVehicleId;
-  const services = appState.services.filter(s => s.vehicleId === vehId);
-  const fuels = appState.fuels.filter(f => f.vehicleId === vehId);
+  const services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
+  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
 
-  const totalServSpend = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuelSpend = fuels.reduce((sum, f) => sum + f.cost, 0);
+  const monthsSet = new Set();
 
-  document.getElementById('totalServiceSpend').textContent = formatCurrency(totalServSpend);
-  document.getElementById('totalFuelSpend').textContent = formatCurrency(totalFuelSpend);
+  services.forEach(s => {
+    if (s.date && typeof s.date === 'string' && s.date.length >= 7) {
+      monthsSet.add(s.date.substring(0, 7));
+    }
+  });
+
+  fuels.forEach(f => {
+    if (f.date && typeof f.date === 'string' && f.date.length >= 7) {
+      monthsSet.add(f.date.substring(0, 7));
+    }
+  });
+
+  const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+  const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  let html = `<option value="all">Todos los meses (Histórico)</option>`;
+  sortedMonths.forEach(mKey => {
+    const [year, monthNum] = mKey.split('-');
+    const monthIndex = parseInt(monthNum, 10) - 1;
+    const monthName = monthNamesEs[monthIndex] || mKey;
+    const label = `${monthName} ${year}`;
+    html += `<option value="${mKey}">${escapeHtml(label)}</option>`;
+  });
+
+  select.innerHTML = html;
+  if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+    select.value = currentVal;
+  } else {
+    select.value = 'all';
+  }
+}
+
+/**
+ * Renderiza el módulo de reportes y finanzas, aplicando el filtro por mes seleccionado.
+ */
+function renderReports() {
+  populateReportMonthFilter();
+
+  const vehId = appState.activeVehicleId;
+  const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
+
+  let services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
+  let fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
+
+  if (selectedMonth !== 'all') {
+    services = services.filter(s => s.date && s.date.startsWith(selectedMonth));
+    fuels = fuels.filter(f => f.date && f.date.startsWith(selectedMonth));
+  }
+
+  const totalServSpend = services.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+  const totalFuelSpend = fuels.reduce((sum, f) => sum + Number(f.cost || 0), 0);
+  const totalCombinedSpend = totalServSpend + totalFuelSpend;
+
+  const servEl = document.getElementById('totalServiceSpend');
+  const fuelEl = document.getElementById('totalFuelSpend');
+  const combinedEl = document.getElementById('totalCombinedSpend');
+
+  if (servEl) servEl.textContent = formatCurrency(totalServSpend);
+  if (fuelEl) fuelEl.textContent = formatCurrency(totalFuelSpend);
+  if (combinedEl) combinedEl.textContent = formatCurrency(totalCombinedSpend);
 
   renderCategoryDonutChart(services);
   renderMonthlyExpensesChart(services, fuels);
@@ -4163,27 +4227,46 @@ function viewFuelReceipt(fuelId) {
   }
 }
 
+/**
+ * Genera el informe técnico y expediente formal del vehículo,
+ * permitiendo su visualización completa o filtrada según el mes seleccionado.
+ */
 function generateCertifiedReport() {
   const veh = getActiveVehicle();
   if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date));
-  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
+
+  const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
+
+  let services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+  let fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
   const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed);
 
-  const totalServSpend = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuelSpend = fuels.reduce((sum, f) => sum + f.cost, 0);
+  let periodLabel = 'Histórico Completo';
+  if (selectedMonth !== 'all') {
+    services = services.filter(s => s.date && s.date.startsWith(selectedMonth));
+    fuels = fuels.filter(f => f.date && f.date.startsWith(selectedMonth));
+    const [year, monthNum] = selectedMonth.split('-');
+    const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const monthName = monthNamesEs[parseInt(monthNum, 10) - 1] || selectedMonth;
+    periodLabel = `Período: ${monthName} ${year}`;
+  }
+
+  const totalServSpend = services.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+  const totalFuelSpend = fuels.reduce((sum, f) => sum + Number(f.cost || 0), 0);
   const totalSpend = totalServSpend + totalFuelSpend;
 
   const lastService = services[0];
   const emissionDate = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const container = document.getElementById('certifiedDocumentContent');
+  if (!container) return;
+
   container.innerHTML = `
     <div class="cert-header" style="border-bottom:2px solid #000000; padding-bottom:12px; margin-bottom:16px; background:#ffffff; color:#000000;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div>
           <h1 style="color:#000000; margin:0 0 4px 0; font-size:1.4rem; text-transform:uppercase; letter-spacing:0.5px;">GARAGEONE - EXPEDIENTE TÉCNICO Y MANTENIMIENTO</h1>
-          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Reporte Detallado de Servicios Mecánicos para Taller</p>
+          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Reporte Detallado de Servicios Mecánicos para Taller • ${escapeHtml(periodLabel)}</p>
         </div>
         <div style="text-align:right; font-size:0.8rem; color:#475569;">
           <div>Emisión: <strong style="color:#000000;">${emissionDate}</strong></div>
@@ -4223,11 +4306,11 @@ function generateCertifiedReport() {
 
     <!-- Detailed Services Table -->
     <h3 style="margin:16px 0 8px 0; font-size:1.05rem; color:#0f172a; border-bottom:2px solid #0f172a; padding-bottom:4px;">
-      Historial Detallado de Trabajos y Repuestos
+      Historial Detallado de Trabajos y Repuestos (${escapeHtml(periodLabel)})
     </h3>
 
     ${services.length === 0 ? `
-      <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este vehículo.</p>
+      <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este período.</p>
     ` : `
       <table class="cert-table" style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.82rem; background:#ffffff; color:#0f172a;">
         <thead>
@@ -5970,7 +6053,12 @@ function verifyRecoveryUser() {
   }
 }
 
+/**
+ * Genera el reporte técnico con la selección de filtro de mes actual
+ * y desencadena la descarga directa en formato PDF.
+ */
 function downloadReportPDFDirect() {
+  generateCertifiedReport();
   if (typeof downloadReportPDF === 'function') {
     downloadReportPDF();
   } else if (typeof window.print === 'function') {
