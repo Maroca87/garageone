@@ -4365,6 +4365,10 @@ function generateCertifiedReport() {
   openModal('modalCertifiedReport');
 }
 
+/**
+ * Genera y descarga el archivo PDF del expediente técnico con alineación y márgenes ajustados.
+ * Utiliza un clon limpio en el DOM para evitar desplazamientos visuales y asegurar máxima nitidez.
+ */
 function downloadReportPDF() {
   const veh = getActiveVehicle();
   const element = document.getElementById('certifiedDocumentContent');
@@ -4373,31 +4377,31 @@ function downloadReportPDF() {
   const cleanName = (veh.plate || veh.name).replace(/[^a-zA-Z0-9]/g, '_');
   const fileName = `Expediente_Mecanico_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-  // Create in-DOM overlay container for WebKit / iOS compatibility (avoids blank -9999px paint bug)
   const wrapper = document.createElement('div');
   wrapper.style.position = 'fixed';
   wrapper.style.top = '0';
   wrapper.style.left = '0';
-  wrapper.style.width = '100vw';
-  wrapper.style.height = '100vh';
+  wrapper.style.width = '820px';
+  wrapper.style.minHeight = '100vh';
   wrapper.style.zIndex = '999999';
   wrapper.style.background = '#ffffff';
   wrapper.style.color = '#0f172a';
   wrapper.style.overflowY = 'auto';
-  wrapper.style.padding = '20px';
+  wrapper.style.padding = '15px';
   wrapper.style.boxSizing = 'border-box';
 
   const clone = element.cloneNode(true);
-  clone.style.maxWidth = '750px';
+  clone.style.width = '790px';
+  clone.style.maxWidth = '100%';
   clone.style.margin = '0 auto';
   clone.style.background = '#ffffff';
   clone.style.color = '#0f172a';
   clone.style.fontFamily = 'Arial, Helvetica, sans-serif';
+  clone.style.boxSizing = 'border-box';
 
-  // Ensure all text inside clone is dark black/slate
   const allNodes = clone.querySelectorAll('*');
   allNodes.forEach(el => {
-    if (el.tagName === 'TH' || el.style.background.includes('0f172a')) {
+    if (el.tagName === 'TH' || (el.style && el.style.background && el.style.background.includes('0f172a'))) {
       el.style.color = '#ffffff';
     } else {
       el.style.color = '#0f172a';
@@ -4409,18 +4413,20 @@ function downloadReportPDF() {
 
   if (window.html2pdf) {
     const opt = {
-      margin:       [8, 8, 8, 8],
+      margin:       [10, 10, 10, 10],
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
-        scale: 1.5, 
+        scale: 2, 
         useCORS: false, 
         allowTaint: true,
         scrollY: 0, 
         scrollX: 0,
+        windowWidth: 820,
         backgroundColor: '#ffffff'
       },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
     html2pdf().set(opt).from(clone).save().then(() => {

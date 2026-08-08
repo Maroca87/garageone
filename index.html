@@ -701,13 +701,7 @@
     <div class="modal-card print-wrapper">
       <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center;">
         <h3 data-i18n="certifiedModalTitle" style="margin:0;">Expediente Técnico y Mantenimiento</h3>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="downloadReportPDF()" style="color:#38bdf8; border-color:rgba(56,189,248,0.3); padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="2" x2="12" y2="3"/></svg>
-            <span>Descargar PDF</span>
-          </button>
-          <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
-        </div>
+        <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
       </div>
       
       <div class="certified-document" id="certifiedDocumentContent">
