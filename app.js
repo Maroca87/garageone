@@ -1526,7 +1526,6 @@ function checkAndSendDueNotifications() {
   if (!veh || !appState.reminders) return;
 
   const now = new Date();
-  // Cálculo de fecha local para evitar desfase de zona horaria con UTC (toISOString)
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
@@ -1543,27 +1542,55 @@ function checkAndSendDueNotifications() {
   const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
 
   reminders.forEach(r => {
-    let shouldNotify = false;
-    let detail = '';
+    if (!r.targetDate) return;
 
-    if (r.targetDate) {
-      if (r.targetDate < todayStr || (r.targetDate === todayStr && (!r.time || currentHoursMin >= r.time))) {
-        shouldNotify = true;
-        detail = `Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''}`;
-      } else if (r.targetDate === todayStr && r.time && r.time > currentHoursMin) {
-        // Programar timer preciso para la hora del recordatorio en el día de hoy
-        const [targetHour, targetMin] = r.time.split(':').map(Number);
-        const targetTimeObj = new Date();
-        targetTimeObj.setHours(targetHour, targetMin, 0, 0);
-        const delayMs = targetTimeObj.getTime() - now.getTime();
-        if (delayMs > 0 && delayMs <= 86400000 && !r._timerScheduled) {
-          r._timerScheduled = true;
-          setTimeout(() => {
-            r._timerScheduled = false;
-            checkAndSendDueNotifications();
-          }, delayMs);
-        }
+    // Obtener milisegundos milimétricos del objetivo en hora local
+    const [tYear, tMonth, tDay] = r.targetDate.split('-').map(Number);
+    const [tHour, tMin] = (r.time || '09:00').split(':').map(Number);
+    const targetDateObj = new Date(tYear, tMonth - 1, tDay, tHour, tMin, 0, 0);
+    const targetTimestamp = targetDateObj.getTime();
+
+    // 1. Programación en segundo plano para Service Worker / Sistema Operativo (Pantalla bloqueada / App cerrada)
+    if (targetTimestamp > now.getTime()) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          const sw = reg.active || navigator.serviceWorker.controller;
+          const reminderPayload = {
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            targetDate: r.targetDate,
+            time: r.time,
+            targetTimestamp: targetTimestamp,
+            vehicleName: veh.name || 'Vehículo'
+          };
+          if (sw) {
+            sw.postMessage({ type: 'SCHEDULE_REMINDER', reminder: reminderPayload });
+          }
+          // Registrar alarma nativa del SO con TimestampTrigger si está disponible
+          if ('showTrigger' in Notification.prototype && typeof TimestampTrigger !== 'undefined') {
+            try {
+              reg.showNotification(`GarageOne - ${r.title}`, {
+                body: `${veh.name || 'Vehículo'}: Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''} (${r.category || 'Recordatorio'})`,
+                icon: 'icons/icon-192.png',
+                badge: 'icons/icon-192.png',
+                vibrate: [200, 100, 200],
+                tag: `rem_${r.id}`,
+                showTrigger: new TimestampTrigger(targetTimestamp)
+              });
+            } catch (e) {}
+          }
+        }).catch(() => {});
       }
+      return;
+    }
+
+    // 2. Notificación para recordatorios vencidos o cumplidos en el momento actual
+    let shouldNotify = false;
+    let detail = `Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''}`;
+
+    if (r.targetDate < todayStr || (r.targetDate === todayStr && (!r.time || currentHoursMin >= r.time))) {
+      shouldNotify = true;
     }
 
     if (shouldNotify) {
@@ -1575,7 +1602,6 @@ function checkAndSendDueNotifications() {
         const notifTitle = `GarageOne - ${r.title}`;
         const notifBody = `${veh.name || 'Vehículo'}: ${detail} (${r.category || 'Recordatorio'})`;
 
-        // Emitir notificación del sistema mediante ServiceWorker o Notification API
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
             if ('serviceWorker' in navigator) {
@@ -1584,7 +1610,8 @@ function checkAndSendDueNotifications() {
                   body: notifBody,
                   icon: 'icons/icon-192.png',
                   badge: 'icons/icon-192.png',
-                  vibrate: [200, 100, 200]
+                  vibrate: [200, 100, 200],
+                  tag: `rem_${r.id}`
                 });
               }).catch(() => {
                 new Notification(notifTitle, { body: notifBody, icon: 'icons/icon-192.png' });
