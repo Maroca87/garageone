@@ -720,35 +720,7 @@ function saveChangePassword() {
   showStatus('¡Contraseña actualizada exitosamente!', '#30d158');
 }
 
-function lockApp() {
-  isAuthenticated = false;
-  const authScreen = document.getElementById('authScreen');
-  const appShell = document.getElementById('appShell');
-  const loginUser = document.getElementById('loginUser');
-  const loginPin = document.getElementById('loginPin');
-  const loginError = document.getElementById('loginError');
-
-  if (appShell) appShell.style.display = 'none';
-  if (authScreen) authScreen.style.display = 'flex';
-
-  showLoginForm();
-  if (currentUser && loginUser) {
-    loginUser.value = currentUser.username || currentUser.name || '';
-  }
-  if (loginPin) {
-    loginPin.value = '';
-    loginPin.focus();
-  }
-  if (loginError) {
-    loginError.style.display = 'block';
-    loginError.style.color = '#38bdf8';
-    loginError.textContent = 'Aplicación Bloqueada. Ingresa tu contraseña para desbloquear.';
-  }
-}
-
-async function switchUser() {
-  await handleLogout();
-}
+// Lógica de bloqueo de aplicación y cambio de usuario eliminada según solicitud
 
 async function handleLogout() {
   if (typeof AuthService !== 'undefined' && AuthService.logout) {
@@ -1504,23 +1476,37 @@ function requestNotificationPermission() {
     alert('Tu navegador o dispositivo no soporta notificaciones de sistema.');
     return;
   }
-  Notification.requestPermission().then(permission => {
+  const handlePermission = (permission) => {
     if (permission === 'granted') {
       alert('¡Notificaciones activadas con éxito! GarageOne te avisará de tus recordatorios pendientes.');
       checkAndSendDueNotifications();
-    } else {
+    } else if (permission === 'denied') {
       alert('Permiso de notificaciones no concedido.');
     }
-  });
+  };
+
+  try {
+    const res = Notification.requestPermission();
+    if (res && typeof res.then === 'function') {
+      res.then(handlePermission);
+    } else {
+      Notification.requestPermission(handlePermission);
+    }
+  } catch (e) {
+    console.error('Error al solicitar permiso de notificaciones:', e);
+  }
 }
 
 function checkAndSendDueNotifications() {
   const veh = getActiveVehicle();
   if (!veh || !appState.reminders) return;
 
-  const currentKm = Number(veh.km || 0);
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  // Cálculo de fecha local para evitar desfase de zona horaria con UTC (toISOString)
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${y}-${m}-${d}`;
   const currentHoursMin = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 
   let notifiedSet = new Set();
@@ -1541,7 +1527,7 @@ function checkAndSendDueNotifications() {
         shouldNotify = true;
         detail = `Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''}`;
       } else if (r.targetDate === todayStr && r.time && r.time > currentHoursMin) {
-        // Schedule precise timeout for today's upcoming reminder time
+        // Programar timer preciso para la hora del recordatorio en el día de hoy
         const [targetHour, targetMin] = r.time.split(':').map(Number);
         const targetTimeObj = new Date();
         targetTimeObj.setHours(targetHour, targetMin, 0, 0);
@@ -1555,13 +1541,9 @@ function checkAndSendDueNotifications() {
         }
       }
     }
-    if (r.targetKm && Number(r.targetKm) > 0 && currentKm >= Number(r.targetKm)) {
-      shouldNotify = true;
-      detail = `Odómetro: ${(Number(r.targetKm)).toLocaleString()} km`;
-    }
 
     if (shouldNotify) {
-      const notifKey = `${r.id}_${r.targetDate || ''}_${r.targetKm || ''}`;
+      const notifKey = `${r.id}_${r.targetDate || ''}_${r.time || ''}`;
       if (!notifiedSet.has(notifKey)) {
         notifiedSet.add(notifKey);
         updatedNotified = true;
@@ -1569,10 +1551,10 @@ function checkAndSendDueNotifications() {
         const notifTitle = `GarageOne - ${r.title}`;
         const notifBody = `${veh.name || 'Vehículo'}: ${detail} (${r.category || 'Recordatorio'})`;
 
-        // Trigger native phone system notification via ServiceWorker or Notification API
+        // Emitir notificación del sistema mediante ServiceWorker o Notification API
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            if ('serviceWorker' in navigator) {
               navigator.serviceWorker.ready.then(reg => {
                 reg.showNotification(notifTitle, {
                   body: notifBody,
@@ -1685,7 +1667,7 @@ function getReminderStatus(r, veh) {
 
 function renderRemindersListHelper(remindersList, veh) {
   if (!remindersList || remindersList.length === 0) {
-    return `<p class="subtitle" style="text-align:center; padding:20px;">No hay recordatorios registrados.<br>Toca "+ Nuevo Recordatorio" para agregar uno.</p>`;
+    return `<p class="subtitle" style="text-align:center; padding:20px;">No hay recordatorios registrados.</p>`;
   }
 
   const repeatLabels = {
@@ -1702,9 +1684,6 @@ function renderRemindersListHelper(remindersList, veh) {
 
     if (r.targetDate) {
       metaParts.push(`Fecha: <strong>${r.targetDate}${r.time ? ' ' + r.time : ''}</strong>`);
-    }
-    if (r.targetKm) {
-      metaParts.push(`Meta: <strong>${Number(r.targetKm).toLocaleString()} km</strong>`);
     }
     if (r.repeat && r.repeat !== 'none') {
       metaParts.push(`Frecuencia: <strong>${repeatLabels[r.repeat] || r.repeat}</strong>`);
@@ -1771,7 +1750,6 @@ function openReminderModal(remId = null) {
       document.getElementById('remId').value = r.id;
       document.getElementById('remTitle').value = r.title;
       document.getElementById('remCategory').value = r.category || 'Mantenimiento';
-      document.getElementById('remTargetKm').value = r.targetKm || '';
       document.getElementById('remTargetDate').value = r.targetDate || '';
       if (document.getElementById('remTime')) document.getElementById('remTime').value = r.time || '';
       if (document.getElementById('remRepeat')) document.getElementById('remRepeat').value = r.repeat || 'none';
@@ -1790,15 +1768,19 @@ async function saveReminder(e) {
   const remId = document.getElementById('remId').value;
   const title = document.getElementById('remTitle').value.trim();
   const category = document.getElementById('remCategory').value;
-  const targetKmVal = document.getElementById('remTargetKm').value;
   const targetDate = document.getElementById('remTargetDate').value;
   const time = document.getElementById('remTime') ? document.getElementById('remTime').value : '';
   const repeat = document.getElementById('remRepeat') ? document.getElementById('remRepeat').value : 'none';
   const notes = document.getElementById('remNotes').value.trim();
 
-  const targetKm = targetKmVal ? parseInt(targetKmVal) : null;
-
   if (!title) return;
+
+  // Solicitar permiso de notificaciones proactivamente si está en default
+  if ('Notification' in window && Notification.permission === 'default') {
+    try {
+      Notification.requestPermission();
+    } catch (e) {}
+  }
 
   let targetRem = null;
 
@@ -1807,7 +1789,6 @@ async function saveReminder(e) {
     if (targetRem) {
       targetRem.title = title;
       targetRem.category = category;
-      targetRem.targetKm = targetKm;
       targetRem.targetDate = targetDate;
       targetRem.time = time;
       targetRem.repeat = repeat;
@@ -1819,7 +1800,7 @@ async function saveReminder(e) {
     targetRem = {
       id: 'rem_' + Date.now(),
       vehicleId: veh.id,
-      title, category, targetKm, targetDate, time, repeat, notes,
+      title, category, targetDate, time, repeat, notes,
       createdAt: new Date().toISOString()
     };
     appState.reminders = appState.reminders || [];
@@ -2227,7 +2208,7 @@ function renderGuantera() {
   const docs = (appState.documents || []).filter(d => d.vehicleId === veh.id);
 
   if (docs.length === 0) {
-    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">No has agregado ningún documento a la Guantera Digital.<br>Toca •"+ Documento" para registrar tu Póliza, RTV o Licencia.</p>`;
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">No has registrado ningún documento a la guantera digital</p>`;
     return;
   }
 

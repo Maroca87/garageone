@@ -142,9 +142,6 @@
         <button class="header-icon-btn" onclick="switchTab('tabReminders')" title="Recordatorios" id="btnHeaderReminders">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </button>
-        <button class="header-icon-btn" onclick="lockApp()" title="Bloquear Aplicación" id="btnHeaderLock">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </button>
       </div>
       <div class="header-brand-center" onclick="switchTab('tabGarage')">
         <img src="icons/icon.svg?v=107" alt="GarageOne Logo" class="header-logo-img">
@@ -398,14 +395,6 @@
           </div>
           
           <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
-            <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="lockApp()" style="padding:10px 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              Bloquear Aplicación
-            </button>
-            <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="switchUser()" style="padding:10px 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-              Cambiar de Usuario
-            </button>
             <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="handleLogout()" style="padding:10px 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; color:#ff453a; border-color:rgba(255,69,58,0.3);">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               Cerrar Sesión
@@ -838,19 +827,13 @@
             <option value="Otro">Otro Recordatorio</option>
           </select>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Kilometraje Meta (Opcional)</label>
-            <input type="number" id="remTargetKm" class="form-control" placeholder="">
-          </div>
-          <div class="form-group">
-            <label>Fecha Meta (Opcional)</label>
-            <input type="date" id="remTargetDate" class="form-control">
-          </div>
+        <div class="form-group">
+          <label>Fecha Meta</label>
+          <input type="date" id="remTargetDate" class="form-control">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Hora (Opcional)</label>
+            <label>Hora</label>
             <input type="time" id="remTime" class="form-control">
           </div>
           <div class="form-group">
@@ -865,7 +848,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Nota adicional / Detalle (Opcional)</label>
+          <label>Nota adicional / Detalle</label>
           <input type="text" id="remNotes" class="form-control" placeholder="">
         </div>
         <div class="modal-footer">
