@@ -720,7 +720,31 @@ function saveChangePassword() {
   showStatus('¡Contraseña actualizada exitosamente!', '#30d158');
 }
 
-// Lógica de bloqueo de aplicación y cambio de usuario eliminada según solicitud
+function lockApp() {
+  isAuthenticated = false;
+  const authScreen = document.getElementById('authScreen');
+  const appShell = document.getElementById('appShell');
+  const loginUser = document.getElementById('loginUser');
+  const loginPin = document.getElementById('loginPin');
+  const loginError = document.getElementById('loginError');
+
+  if (appShell) appShell.style.display = 'none';
+  if (authScreen) authScreen.style.display = 'flex';
+
+  showLoginForm();
+  if (currentUser && loginUser) {
+    loginUser.value = currentUser.username || currentUser.name || '';
+  }
+  if (loginPin) {
+    loginPin.value = '';
+    loginPin.focus();
+  }
+  if (loginError) {
+    loginError.style.display = 'block';
+    loginError.style.color = '#38bdf8';
+    loginError.textContent = 'Aplicación Bloqueada. Ingresa tu contraseña para desbloquear.';
+  }
+}
 
 async function handleLogout() {
   if (typeof AuthService !== 'undefined' && AuthService.logout) {
@@ -1838,7 +1862,7 @@ function renderEmergencyContacts() {
 
   const contacts = appState.emergencyContacts || [];
   if (contacts.length === 0) {
-    container.innerHTML = `<p class="subtitle" style="text-align:center; color:rgba(255,255,255,0.7); width:100%; grid-column: 1 / -1;">No hay números guardados.<br>Toca •"+ Guardar Número" para registrar tus talleres, grúa o seguro.</p>`;
+    container.innerHTML = `<p class="subtitle" style="text-align:center; color:rgba(255,255,255,0.7); width:100%; grid-column: 1 / -1;">No hay números guardados.</p>`;
     return;
   }
 
