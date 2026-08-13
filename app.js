@@ -174,26 +174,33 @@ function formatCurrency(amount) {
   return '₡' + num.toLocaleString('es-CR', opts);
 }
 
-function getDistanceUnit() {
-  return (appState && appState.distanceUnit) ? appState.distanceUnit : 'km';
+function getVehicleUnit(veh = getActiveVehicle()) {
+  return (veh && veh.unitDistance) ? veh.unitDistance : 'km';
 }
 
-function formatDistance(kmValue) {
-  const numKm = Number(kmValue || 0);
-  const unit = getDistanceUnit();
-  if (unit === 'mi') {
-    const miles = Math.round(numKm * 0.621371);
-    return `${miles.toLocaleString()} mi`;
-  }
-  return `${numKm.toLocaleString()} km`;
+function formatVehicleDistance(val, veh = getActiveVehicle()) {
+  const unit = getVehicleUnit(veh);
+  const num = Number(val || 0);
+  return `${num.toLocaleString()} ${unit}`;
 }
 
-function changeDistanceUnitSetting(unit) {
-  appState.distanceUnit = unit === 'mi' ? 'mi' : 'km';
-  saveState();
-  renderUserSettings();
-  renderApp();
-  if (typeof renderRemindersTab === 'function') renderRemindersTab();
+function updateVehicleModalUnitLabel(unit) {
+  const lbl = document.getElementById('lblVehKm');
+  if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje Inicial (mi)' : 'Odómetro Inicial (km)';
+}
+
+function updateServiceModalUnitLabel() {
+  const veh = getActiveVehicle();
+  const unit = getVehicleUnit(veh);
+  const lbl = document.getElementById('lblServKm');
+  if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje (mi)' : 'Kilometraje (km)';
+}
+
+function updateFuelModalUnitLabel() {
+  const veh = getActiveVehicle();
+  const unit = getVehicleUnit(veh);
+  const lbl = document.getElementById('lblFuelKm');
+  if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje en Odómetro (mi)' : 'Kilometraje en Odómetro (km)';
 }
 
 function openModal(modalId) {
@@ -1270,7 +1277,7 @@ function renderApp() {
       </div>
       <div class="hero-odometer-box" onclick="openOdometerModal()" style="cursor:pointer;" title="Toca para actualizar odómetro">
         <span class="hero-odometer-lbl"><span data-i18n="lblOdometer">Odómetro</span> ${SVG_ICONS.zap}</span>
-        <span class="hero-odometer-val">${formatDistance(veh.km)}</span>
+        <span class="hero-odometer-val">${formatVehicleDistance(veh.km, veh)}</span>
       </div>
     </div>
     ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo">` : ''}
@@ -3681,7 +3688,12 @@ function openVehicleModal(vehId = null) {
       if (document.getElementById('vehPlate')) document.getElementById('vehPlate').value = v.plate || '';
       if (document.getElementById('vehKm')) document.getElementById('vehKm').value = v.km || 0;
       if (document.getElementById('vehVin')) document.getElementById('vehVin').value = v.vin || '';
+      if (document.getElementById('vehUnit')) document.getElementById('vehUnit').value = v.unitDistance || 'km';
+      updateVehicleModalUnitLabel(v.unitDistance || 'km');
     }
+  } else {
+    if (document.getElementById('vehUnit')) document.getElementById('vehUnit').value = 'km';
+    updateVehicleModalUnitLabel('km');
   }
 
   openModal('modalVehicle');
@@ -3717,6 +3729,8 @@ function saveVehicle(e) {
   const kmInputVal = document.getElementById('vehKm') ? document.getElementById('vehKm').value : '0';
   const km = parseInt(kmInputVal, 10);
   const vin = document.getElementById('vehVin') ? document.getElementById('vehVin').value.trim() : '';
+  const unitEl = document.getElementById('vehUnit');
+  const unitDistance = unitEl ? unitEl.value : 'km';
   const photoInput = document.getElementById('vehPhotoFile');
 
   const currentYear = new Date().getFullYear();
@@ -3731,7 +3745,7 @@ function saveVehicle(e) {
   const processAndSave = async (photoBase64) => {
     const vehData = {
       id: vehId || undefined,
-      type, brand, make: brand, model, name, year, plate, km: safeKm, vin,
+      type, brand, make: brand, model, name, year, plate, km: safeKm, vin, unitDistance,
       photo: photoBase64 || (targetVeh ? targetVeh.photo : '')
     };
 
@@ -3802,7 +3816,7 @@ function renderServiceList(vehId) {
           <div class="log-icon-badge">${svgCategoryMap[s.category] || SVG_ICONS.wrench}</div>
           <div>
             <div class="log-title">${escapeHtml(s.title)}</div>
-            <div class="log-meta">${s.date} • ${s.km.toLocaleString()} km ${s.shop ? `• ${escapeHtml(s.shop)}` : ''}</div>
+            <div class="log-meta">${s.date} • ${formatVehicleDistance(s.km, veh)} ${s.shop ? `• ${escapeHtml(s.shop)}` : ''}</div>
             ${s.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(s.notes)}</div>` : ''}
             ${s.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewReceipt('${s.id}')">${SVG_ICONS.document} Ver Adjunto</span>` : ''}
           </div>
@@ -3823,6 +3837,7 @@ function openServiceModal(servId = null) {
   document.getElementById('modalServiceTitle').textContent = 'Registrar Mantenimiento';
   populateServCategorySelect();
   setTodayDates();
+  updateServiceModalUnitLabel();
 
   if (servId) {
     const s = appState.services.find(item => item.id === servId);
@@ -3851,6 +3866,7 @@ function renderFuelList(vehId) {
 
   const effEl = document.getElementById('fuelEfficiencyVal');
   const costEl = document.getElementById('costPerKmVal');
+  const unitStr = veh ? getVehicleUnit(veh) : 'km';
 
   if (list.length >= 2) {
     let sortedAsc = [...list].sort((a, b) => Number(a.km) - Number(b.km));
@@ -3861,8 +3877,8 @@ function renderFuelList(vehId) {
     let efficiency = (totalKmDiff > 0 && totalVolume > 0) ? (totalKmDiff / totalVolume).toFixed(1) : 0;
     let costPerKm = totalKmDiff > 0 ? (totalCost / totalKmDiff) : 0;
 
-    if (effEl) effEl.textContent = efficiency > 0 ? `${efficiency} km/L` : '0 km/L';
-    if (costEl) costEl.textContent = costPerKm > 0 ? `${formatCurrency(costPerKm)}/km` : `${formatCurrency(0)}/km`;
+    if (effEl) effEl.textContent = efficiency > 0 ? `${efficiency} ${unitStr}/L` : `0 ${unitStr}/L`;
+    if (costEl) costEl.textContent = costPerKm > 0 ? `${formatCurrency(costPerKm)}/${unitStr}` : `${formatCurrency(0)}/${unitStr}`;
   } else if (list.length === 1) {
     let f = list[0];
     let vol = Number(f.volume || f.liters || 0);
@@ -3872,11 +3888,11 @@ function renderFuelList(vehId) {
     let costPerKm = (km > 0 && cost > 0) ? (cost / km) : 0;
     let efficiency = (km > 0 && vol > 0) ? (km / vol).toFixed(1) : 0;
 
-    if (effEl) effEl.textContent = efficiency > 0 ? `${efficiency} km/L` : '0 km/L';
-    if (costEl) costEl.textContent = costPerKm > 0 ? `${formatCurrency(costPerKm)}/km` : `${formatCurrency(0)}/km`;
+    if (effEl) effEl.textContent = efficiency > 0 ? `${efficiency} ${unitStr}/L` : `0 ${unitStr}/L`;
+    if (costEl) costEl.textContent = costPerKm > 0 ? `${formatCurrency(costPerKm)}/${unitStr}` : `${formatCurrency(0)}/${unitStr}`;
   } else {
-    if (effEl) effEl.textContent = `0 km/L`;
-    if (costEl) costEl.textContent = `${formatCurrency(0)}/km`;
+    if (effEl) effEl.textContent = `0 ${unitStr}/L`;
+    if (costEl) costEl.textContent = `${formatCurrency(0)}/${unitStr}`;
   }
 
   if (list.length === 0) {
@@ -3897,7 +3913,7 @@ function renderFuelList(vehId) {
           <div class="log-icon-badge">${SVG_ICONS.fuel}</div>
           <div>
             <div class="log-title">${f.volume || f.liters || 0} Litros</div>
-            <div class="log-meta">${f.date} • Odómetro: ${(Number(f.km)||0).toLocaleString()} km</div>
+            <div class="log-meta">${f.date} • Odómetro: ${formatVehicleDistance(f.km, veh)}</div>
             ${f.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(f.notes)}</div>` : ''}
             ${f.receipt ? `<span class="receipt-chip" onclick="event.stopPropagation(); viewFuelReceipt('${f.id}')">${SVG_ICONS.document} Ver Adjunto</span>` : ''}
           </div>
@@ -3917,6 +3933,7 @@ function openFuelModal(fuelId = null) {
   if (document.getElementById('fuelReceiptFile')) document.getElementById('fuelReceiptFile').value = '';
   document.getElementById('modalFuelTitle').textContent = 'Registrar Gasolina';
   setTodayDates();
+  updateFuelModalUnitLabel();
 
   if (fuelId) {
     const f = appState.fuels.find(item => item.id === fuelId);
@@ -3961,9 +3978,6 @@ function renderUserSettings() {
 
   const settingLang = document.getElementById('settingLanguage');
   if (settingLang) settingLang.value = appState.language || 'es';
-
-  const settingDist = document.getElementById('settingDistanceUnit');
-  if (settingDist) settingDist.value = appState.distanceUnit || 'km';
 
   const geminiInput = document.getElementById('geminiApiKeyInput');
   const geminiBadge = document.getElementById('geminiStatusBadge');
@@ -5217,7 +5231,12 @@ function calculateVehicleHealth(veh) {
   const cfg = getHealthSettings();
   if (!veh) return null;
 
-  const currentKm = Number(veh.km || 0);
+  const isMiles = veh.unitDistance === 'mi';
+  const unitLabel = isMiles ? 'mi' : 'km';
+  const convertToKm = (val) => isMiles ? Number(val || 0) * 1.60934 : Number(val || 0);
+  const convertFromKm = (kmVal) => isMiles ? Math.round(kmVal / 1.60934) : Math.round(kmVal);
+
+  const currentKm = convertToKm(veh.km);
   const services = (appState.services || []).filter(s => s.vehicleId === veh.id);
   const documents = (appState.documents || []).filter(d => d.vehicleId === veh.id);
   const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id);
@@ -5235,26 +5254,27 @@ function calculateVehicleHealth(veh) {
   let oilData = { hasData: false, score: 0, categoryKey: 'aceite', remainingKm: cfg.oilKm, detail: 'Sin historial registrado', alert: null };
   if (oilServices.length > 0) {
     const lastOil = oilServices[0];
-    const lastKm = Number(lastOil.mileage || lastOil.km || currentKm);
-    const interval = Number(lastOil.nextKm || (lastKm + cfg.oilKm)) - lastKm;
+    const lastKm = convertToKm(lastOil.mileage || lastOil.km || veh.km);
+    const interval = convertToKm(lastOil.nextKm) > 0 ? (convertToKm(lastOil.nextKm) - lastKm) : cfg.oilKm;
     const effInterval = interval > 0 ? interval : cfg.oilKm;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, effInterval - kmUsed);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / effInterval) * 100)));
+    const dispRem = convertFromKm(remKm);
 
     oilData = {
       hasData: true,
       score: score,
       categoryKey: 'aceite',
-      remainingKm: remKm,
-      usedKm: kmUsed,
-      interval: effInterval,
+      remainingKm: dispRem,
+      usedKm: convertFromKm(kmUsed),
+      interval: convertFromKm(effInterval),
       lastDate: lastOil.date,
       oilType: lastOil.title || 'Aceite de motor',
-      detail: `Restan ${remKm.toLocaleString()} km`
+      detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (remKm <= 1000) {
-      oilData.alert = `Proximo cambio de aceite en ${remKm.toLocaleString()} km.`;
+      oilData.alert = `Proximo cambio de aceite en ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
     missingItems.push({ name: 'Ultimo cambio de aceite', key: 'aceite' });
@@ -5270,24 +5290,25 @@ function calculateVehicleHealth(veh) {
   let tireData = { hasData: false, score: 0, categoryKey: 'llantas', remainingKm: cfg.tiresKm, detail: 'Sin historial de llantas', alert: null };
   if (tireServices.length > 0) {
     const lastTire = tireServices[0];
-    const lastKm = Number(lastTire.mileage || lastTire.km || currentKm);
+    const lastKm = convertToKm(lastTire.mileage || lastTire.km || veh.km);
     const lifespan = cfg.tiresKm;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, lifespan - kmUsed);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
     const condText = score >= 60 ? 'Buenas condiciones' : (score >= 30 ? 'Desgaste moderado' : 'Reemplazo cercano');
+    const dispRem = convertFromKm(remKm);
 
     tireData = {
       hasData: true,
       score: score,
       categoryKey: 'llantas',
-      remainingKm: remKm,
-      usedKm: kmUsed,
+      remainingKm: dispRem,
+      usedKm: convertFromKm(kmUsed),
       condition: condText,
-      detail: `${condText} • Restan ${remKm.toLocaleString()} km`
+      detail: `${condText} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      tireData.alert = `La vida util de llantas es inferior al 25% (restan ${remKm.toLocaleString()} km).`;
+      tireData.alert = `La vida util de llantas es inferior al 25% (restan ${dispRem.toLocaleString()} ${unitLabel}).`;
     }
   } else {
     missingItems.push({ name: 'Cambio de llantas', key: 'llantas' });
@@ -5303,23 +5324,24 @@ function calculateVehicleHealth(veh) {
   let brakeData = { hasData: false, score: 0, categoryKey: 'frenos', remainingKm: cfg.brakePadsKm, detail: 'Sin historial de frenos', alert: null };
   if (brakeServices.length > 0) {
     const lastBrake = brakeServices[0];
-    const lastKm = Number(lastBrake.mileage || lastBrake.km || currentKm);
+    const lastKm = convertToKm(lastBrake.mileage || lastBrake.km || veh.km);
     const isDisc = (lastBrake.title || '').toLowerCase().includes('disco');
     const lifespan = isDisc ? cfg.brakeDiscsKm : cfg.brakePadsKm;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, lifespan - kmUsed);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
+    const dispRem = convertFromKm(remKm);
 
     brakeData = {
       hasData: true,
       score: score,
       categoryKey: 'frenos',
-      remainingKm: remKm,
-      usedKm: kmUsed,
-      detail: `Restan ${remKm.toLocaleString()} km`
+      remainingKm: dispRem,
+      usedKm: convertFromKm(kmUsed),
+      detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      brakeData.alert = `Desgaste de frenos critico. Restan solo ${remKm.toLocaleString()} km.`;
+      brakeData.alert = `Desgaste de frenos critico. Restan solo ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
     missingItems.push({ name: 'Cambio de frenos', key: 'frenos' });
@@ -5363,20 +5385,21 @@ function calculateVehicleHealth(veh) {
   let filterData = { hasData: false, score: 0, categoryKey: 'filtros', remainingKm: cfg.filtersKm, detail: 'Sin historial de filtros', alert: null };
   if (filterServices.length > 0) {
     const lastFilt = filterServices[0];
-    const lastKm = Number(lastFilt.mileage || lastFilt.km || currentKm);
+    const lastKm = convertToKm(lastFilt.mileage || lastFilt.km || veh.km);
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, cfg.filtersKm - kmUsed);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / cfg.filtersKm) * 100)));
+    const dispRem = convertFromKm(remKm);
 
     filterData = {
       hasData: true,
       score: score,
       categoryKey: 'filtros',
-      remainingKm: remKm,
-      detail: `Restan ${remKm.toLocaleString()} km`
+      remainingKm: dispRem,
+      detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      filterData.alert = `Filtros requieren reemplazo cercano (restan ${remKm.toLocaleString()} km).`;
+      filterData.alert = `Filtros requieren reemplazo cercano (restan ${dispRem.toLocaleString()} ${unitLabel}).`;
     }
   } else {
     missingItems.push({ name: 'Cambio de filtros', key: 'filtros' });
@@ -5391,7 +5414,7 @@ function calculateVehicleHealth(veh) {
   let beltData = { hasData: false, score: 0, categoryKey: 'correa', detail: 'Sin historial de correas', alert: null };
   if (beltServices.length > 0) {
     const lastBelt = beltServices[0];
-    const lastKm = Number(lastBelt.mileage || lastBelt.km || currentKm);
+    const lastKm = convertToKm(lastBelt.mileage || lastBelt.km || veh.km);
     const kmUsed = Math.max(0, currentKm - lastKm);
     const kmPct = (kmUsed / cfg.beltKm) * 100;
     const monthsElapsed = calculateMonthsDiff(lastBelt.date);
@@ -5400,13 +5423,14 @@ function calculateVehicleHealth(veh) {
     const worstWear = Math.max(kmPct, monthPct);
     const score = Math.max(0, Math.min(100, Math.round(100 - worstWear)));
     const remKm = Math.max(0, cfg.beltKm - kmUsed);
+    const dispRem = convertFromKm(remKm);
 
     beltData = {
       hasData: true,
       score: score,
       categoryKey: 'correa',
-      remainingKm: remKm,
-      detail: `Uso: ${Math.round(worstWear)}% • Restan ${remKm.toLocaleString()} km`
+      remainingKm: dispRem,
+      detail: `Uso: ${Math.round(worstWear)}% • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
       beltData.alert = `Correa de distribucion supera el 75% de desgaste estimado.`;

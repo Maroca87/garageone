@@ -433,19 +433,12 @@
               <option value="en">English (Inglés)</option>
             </select>
           </div>
-          <div class="form-group" style="margin-bottom:12px;">
+          <div class="form-group">
             <label data-i18n="lblCurrency">Moneda del Sistema / Currency</label>
             <select id="settingCurrency" class="form-control" onchange="changeCurrencySetting(this.value)">
               <option value="CRC">Colones costarricenses (₡)</option>
               <option value="USD">Dólares estadounidenses ($)</option>
               <option value="EUR">Euros (€)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label data-i18n="lblDistanceUnit">Unidad de Distancia / Distance Unit</label>
-            <select id="settingDistanceUnit" class="form-control" onchange="changeDistanceUnitSetting(this.value)">
-              <option value="km">Kilómetros (km)</option>
-              <option value="mi">Millas (mi)</option>
             </select>
           </div>
         </div>
@@ -565,9 +558,18 @@
             <input type="text" id="vehPlate" class="form-control" placeholder="">
           </div>
         </div>
-        <div class="form-group">
-          <label>Odómetro Actual (km)</label>
-          <input type="number" id="vehKm" class="form-control" placeholder="" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label id="lblVehKm">Odómetro Inicial</label>
+            <input type="number" id="vehKm" class="form-control" placeholder="" required>
+          </div>
+          <div class="form-group">
+            <label>Unidad de Medida</label>
+            <select id="vehUnit" class="form-control" onchange="updateVehicleModalUnitLabel(this.value)">
+              <option value="km">Kilómetros (km)</option>
+              <option value="mi">Millas (mi)</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label>Número de Chasis / VIN (Opcional)</label>
@@ -606,7 +608,7 @@
             <input type="date" id="servDate" class="form-control" required>
           </div>
           <div class="form-group">
-            <label>Kilometraje (km)</label>
+            <label id="lblServKm">Kilometraje (km)</label>
             <input type="number" id="servKm" class="form-control" placeholder="" required>
           </div>
         </div>
@@ -654,7 +656,7 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Kilometraje en Odómetro</label>
+          <label id="lblFuelKm">Kilometraje en Odómetro</label>
           <input type="number" id="fuelKm" class="form-control" placeholder="" required>
         </div>
         <div class="form-group">
