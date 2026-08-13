@@ -1221,10 +1221,28 @@ function renderApp() {
     return;
   }
 
+  const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  let dueCount = 0;
+  reminders.forEach(r => {
+    if (r.targetDate && r.targetDate <= todayStr) {
+      dueCount++;
+    }
+  });
+
+  const healthBadgeHtml = dueCount > 0
+    ? `<span class="hero-health-status warning" title="${dueCount} recordatorio(s) pendiente(s)"><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#ff453a"/></svg>${dueCount} Alerta${dueCount > 1 ? 's' : ''}</span>`
+    : `<span class="hero-health-status success" title="Recordatorios al día"><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#30d158"/></svg>Al día</span>`;
+
   heroEl.innerHTML = `
     <div class="hero-main-info">
       <div class="hero-veh-details">
-        <div class="hero-title">${escapeHtml(veh.name)}</div>
+        <div class="hero-header-row">
+          <div class="hero-title">${escapeHtml(veh.name)}</div>
+          ${healthBadgeHtml}
+        </div>
         <div class="hero-meta-row">
           <span class="hero-plate-badge">${escapeHtml(veh.plate) || 'SIN PLACA'}</span>
           <span class="hero-meta-tag">${escapeHtml(veh.type)}</span>
