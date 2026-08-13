@@ -1740,7 +1740,14 @@ function exportReminderToCalendar(reminder, vehName) {
   const startUTC = formatICSDate(localDate);
   const endUTC = formatICSDate(endDate);
 
-  const icsContent = [
+  const rruleMap = {
+    daily: 'RRULE:FREQ=DAILY',
+    weekly: 'RRULE:FREQ=WEEKLY',
+    monthly: 'RRULE:FREQ=MONTHLY',
+    yearly: 'RRULE:FREQ=YEARLY'
+  };
+
+  const icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//GarageOne//App//ES',
@@ -1751,7 +1758,14 @@ function exportReminderToCalendar(reminder, vehName) {
     `DESCRIPTION:${description.replace(/\n/g, '\\n')}`,
     `DTSTART:${startUTC}`,
     `DTEND:${endUTC}`,
-    'STATUS:CONFIRMED',
+    'STATUS:CONFIRMED'
+  ];
+
+  if (reminder.repeat && rruleMap[reminder.repeat]) {
+    icsLines.push(rruleMap[reminder.repeat]);
+  }
+
+  icsLines.push(
     'BEGIN:VALARM',
     'TRIGGER:-PT0M',
     'ACTION:DISPLAY',
@@ -1759,13 +1773,16 @@ function exportReminderToCalendar(reminder, vehName) {
     'END:VALARM',
     'END:VEVENT',
     'END:VCALENDAR'
-  ].join('\r\n');
+  );
+
+  const icsContent = icsLines.join('\r\n');
 
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `recordatorio.ics`;
+  const fileNameClean = (reminder.title || 'recordatorio').toLowerCase().replace(/[^a-z0-9]/g, '_');
+  a.download = `recordatorio_${fileNameClean}.ics`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {
