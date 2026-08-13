@@ -1719,39 +1719,38 @@ function getReminderStatus(r, veh) {
 
 function exportReminderToCalendar(reminder, vehName) {
   if (!reminder || !reminder.targetDate) {
-    alert('Este recordatorio no tiene una fecha asignada.');
+    alert('Selecciona una fecha para el recordatorio.');
     return;
   }
 
   const title = `GarageOne: ${reminder.title || 'Recordatorio'}`;
   const vehStr = vehName || (getActiveVehicle() ? getActiveVehicle().name : 'Vehículo');
-  const description = `Recordatorio de GarageOne\nVehículo: ${vehStr}\nCategoría: ${reminder.category || 'Mantenimiento'}${reminder.notes ? '\nNotas: ' + reminder.notes : ''}`;
+  const description = `GarageOne - ${vehStr}\nCategoría: ${reminder.category || 'Mantenimiento'}${reminder.notes ? '\nNota: ' + reminder.notes : ''}`;
 
-  const [year, month, day] = reminder.targetDate.split('-').map(s => s.padStart(2, '0'));
-  const timeStr = reminder.time || '09:00';
-  const [hour, minute] = timeStr.split(':').map(s => s.padStart(2, '0'));
+  const [year, month, day] = reminder.targetDate.split('-').map(Number);
+  const [hour, minute] = (reminder.time || '09:00').split(':').map(Number);
 
-  const startISO = `${year}${month}${day}T${hour}${minute}00`;
+  const localDate = new Date(year, month - 1, day, hour, minute, 0);
+  const endDate = new Date(localDate.getTime() + 30 * 60 * 1000);
 
-  let endH = parseInt(hour, 10);
-  let endM = parseInt(minute, 10) + 30;
-  if (endM >= 60) {
-    endH = (endH + 1) % 24;
-    endM = endM % 60;
-  }
-  const endISO = `${year}${month}${day}T${String(endH).padStart(2, '0')}${String(endM).padStart(2, '0')}00`;
+  const formatICSDate = (dateObj) => {
+    return dateObj.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+
+  const startUTC = formatICSDate(localDate);
+  const endUTC = formatICSDate(endDate);
 
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//GarageOne//AutoCare Reminders//ES',
+    'PRODID:-//GarageOne//App//ES',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
     `SUMMARY:${title}`,
     `DESCRIPTION:${description.replace(/\n/g, '\\n')}`,
-    `DTSTART:${startISO}`,
-    `DTEND:${endISO}`,
+    `DTSTART:${startUTC}`,
+    `DTEND:${endUTC}`,
     'STATUS:CONFIRMED',
     'BEGIN:VALARM',
     'TRIGGER:-PT0M',
@@ -1766,7 +1765,7 @@ function exportReminderToCalendar(reminder, vehName) {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `recordatorio_${(reminder.title || 'garageone').replace(/[^a-z0-9]/gi, '_')}.ics`;
+  a.download = `recordatorio.ics`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {
@@ -1949,7 +1948,7 @@ async function saveReminder(e) {
 
   if (targetRem && targetRem.targetDate) {
     setTimeout(() => {
-      if (confirm(`¿Deseas agendar "${targetRem.title}" en el Calendario de tu celular para recibir la alarma nativa (pantalla bloqueada / offline)?`)) {
+      if (confirm(`¿Agendar "${targetRem.title}" en tu calendario?`)) {
         exportReminderToCalendar(targetRem, veh ? veh.name : '');
       }
     }, 200);
