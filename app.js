@@ -1344,14 +1344,21 @@ function renderMiniVehiclesList() {
   container.innerHTML = appState.vehicles.map(v => {
     const isActive = v.id === appState.activeVehicleId;
     return `
-      <div class="vehicle-mini-item ${isActive ? 'active-veh' : ''}" style="background:var(--bg-card); border:1px solid ${isActive ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'}; border-radius:var(--radius-md); padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="selectActiveVehicle('${v.id}')">
-        <div>
-          <strong style="font-size:0.95rem; color:#ffffff;">${escapeHtml(v.name)}</strong>
-          <div class="veh-info-sub">${escapeHtml(v.type)} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${formatVehicleDistance(v.km, v)}</div>
+      <div class="swipe-container" style="margin-bottom:8px;">
+        <div class="swipe-action-bg">
+          <button type="button" class="swipe-action-btn" onclick="deleteVehicleDirect('${v.id}', event)">
+            ${SVG_ICONS.trash}
+            <span>Eliminar</span>
+          </button>
         </div>
-        <div class="veh-actions" onclick="event.stopPropagation()">
-          <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:4px 8px;" onclick="openVehicleModal('${v.id}')">Editar</button>
-          <button class="btn btn-tertiary btn-sm" style="font-size:0.75rem; padding:4px 8px; color:#ff453a;" onclick="deleteVehicleDirect('${v.id}', event)">Eliminar</button>
+        <div class="swipe-content vehicle-mini-item ${isActive ? 'active-veh' : ''}" style="background:var(--bg-card); border:1px solid ${isActive ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'}; border-radius:var(--radius-md); padding:12px 14px; display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <div style="cursor:pointer; flex:1;" onclick="selectActiveVehicle('${v.id}')">
+            <strong style="font-size:0.95rem; color:#ffffff;">${escapeHtml(v.name)} (${v.year}) ${isActive ? '<span style="color:#38bdf8; font-size:0.75rem; margin-left:6px; font-weight:700;">(Activo)</span>' : ''}</strong>
+            <div class="veh-info-sub">${escapeHtml(v.type || '')} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${formatVehicleDistance(v.km, v)}</div>
+          </div>
+          <div class="veh-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:4px 8px;" onclick="openVehicleModal('${v.id}')">${SVG_ICONS.edit || ''} Editar</button>
+          </div>
         </div>
       </div>
     `;
