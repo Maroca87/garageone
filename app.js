@@ -170,25 +170,42 @@ function formatCurrency(amount) {
 
   if (curr === 'CRC') return '₡' + num.toLocaleString('es-CR', opts);
   if (curr === 'USD') return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (curr === 'EUR') return '€' + num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return '₡' + num.toLocaleString('es-CR', opts);
 }
 
+/**
+ * Obtiene la unidad de distancia configurada para el vehículo ('km' o 'mi').
+ * @param {Object} [veh] - Objeto del vehículo. Por defecto usa el vehículo activo.
+ * @returns {string} 'km' o 'mi'
+ */
 function getVehicleUnit(veh = getActiveVehicle()) {
   return (veh && veh.unitDistance) ? veh.unitDistance : 'km';
 }
 
+/**
+ * Formatea un valor numérico de distancia con la unidad correspondiente del vehículo ('km' o 'mi').
+ * @param {number|string} val - Distancia a formatear.
+ * @param {Object} [veh] - Objeto del vehículo. Por defecto usa el vehículo activo.
+ * @returns {string} Cadena formateada (ej. "124,855 km" o "5,000 mi")
+ */
 function formatVehicleDistance(val, veh = getActiveVehicle()) {
   const unit = getVehicleUnit(veh);
   const num = Number(val || 0);
   return `${num.toLocaleString()} ${unit}`;
 }
 
+/**
+ * Actualiza la etiqueta del odómetro en el modal de crear/editar vehículo según la unidad elegida.
+ * @param {string} unit - 'km' o 'mi'
+ */
 function updateVehicleModalUnitLabel(unit) {
   const lbl = document.getElementById('lblVehKm');
   if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje Inicial (mi)' : 'Odómetro Inicial (km)';
 }
 
+/**
+ * Actualiza la etiqueta del kilometraje/millaje en el modal de registrar servicio según el vehículo activo.
+ */
 function updateServiceModalUnitLabel() {
   const veh = getActiveVehicle();
   const unit = getVehicleUnit(veh);
@@ -196,6 +213,9 @@ function updateServiceModalUnitLabel() {
   if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje (mi)' : 'Kilometraje (km)';
 }
 
+/**
+ * Actualiza la etiqueta del kilometraje/millaje en el modal de recarga de gasolina según el vehículo activo.
+ */
 function updateFuelModalUnitLabel() {
   const veh = getActiveVehicle();
   const unit = getVehicleUnit(veh);
@@ -203,6 +223,9 @@ function updateFuelModalUnitLabel() {
   if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje en Odómetro (mi)' : 'Kilometraje en Odómetro (km)';
 }
 
+/**
+ * Actualiza la etiqueta del intervalo en el modal de crear/editar categoría de servicio según la unidad del vehículo activo.
+ */
 function updateNewCategoryModalUnitLabel() {
   const veh = getActiveVehicle();
   const unit = getVehicleUnit(veh);
@@ -1283,7 +1306,7 @@ function renderApp() {
             <span class="spec-value">${yearText}</span>
           </div>
           <div class="hero-spec-item">
-            <span class="spec-label" data-i18n="lblModelType">Modelo / Tipo</span>
+            <span class="spec-label" data-i18n="lblModelType">Tipo</span>
             <span class="spec-value">${typeText}</span>
           </div>
         </div>
@@ -3921,7 +3944,7 @@ function renderUserSettings() {
     }
   }
 
-  const symbol = appState.currency === 'USD' ? '$' : appState.currency === 'EUR' ? '€' : '₡';
+  const symbol = appState.currency === 'USD' ? '$' : '₡';
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 
   applyNavigationPermissions();
@@ -4812,130 +4835,31 @@ const I18N_DICT = {
     dueSoonDoc: 'Por vencer',
     lblPlate: 'Placa',
     lblYear: 'Año',
-    lblModelType: 'Modelo / Tipo',
+    lblModelType: 'Tipo',
     lblOdometer: 'Odómetro',
+    myReminders: 'Mis Recordatorios',
+    myVehicles: 'Mis Vehículos',
+    btnNew: '+ Nuevo',
+    noPlate: 'SIN PLACA',
     myReminders: 'Mis Recordatorios',
     myVehicles: 'Mis Vehículos',
     btnNew: '+ Nuevo',
     noPlate: 'SIN PLACA',
     notAvailable: 'N/A',
     tapToUpdateOdometer: 'Toca para actualizar odómetro'
-  },
-  en: {
-    navGarage: 'Garage',
-    navServices: 'Services',
-    navFuel: 'Fuel',
-    navGlovebox: 'Glovebox',
-    navHealth: 'Health',
-    navAI: 'AI',
-    navReports: 'Reports',
-    subtitleGarage: 'Smart vehicle management and workshop assistant',
-    titleMaintenance: 'Services & Maintenance',
-    subMaintenance: 'Mechanical and preventive service history',
-    btnAddService: '+ Add Service',
-    titleFuel: 'Fuel Log',
-    subFuel: 'Refuel entries and fuel consumption tracking',
-    btnAddFuel: '+ Log Fuel',
-    guanteraTitle: 'Digital Glovebox',
-    guanteraSubtitle: 'Documents, insurance, inspection & assistance directory',
-    contactsTitle: 'Important Numbers',
-    contactsSubtitle: 'Swipe left to delete. Tap to call mechanic, tow or insurance',
-    btnAddContact: '+ Save Number',
-    docsTitle: 'Vehicle Documents',
-    btnAddDoc: '+ Add Document',
-    titleHealth: 'Vehicle Health',
-    subHealth: 'Predictive diagnostics and component status',
-    titleAI: 'AI Mechanic Assistant',
-    subAI: 'Smart diagnostic analysis and mechanic Q&A',
-    aiQueryTitle: 'Ask AI Mechanic',
-    aiQuerySub: 'Quick topics or custom question:',
-    btnAskAI: 'Ask AI Assistant',
-    titleReports: 'Reports & Expenses',
-    subReports: 'Detailed breakdown of maintenance and fuel spend',
-    cardTotalServ: 'Total Maintenance',
-    cardTotalFuel: 'Total Fuel',
-    cardCatBreakdown: 'Expense Breakdown by Category',
-    cardMonthBreakdown: 'Expense Breakdown by Month',
-    reportTitle: 'Maintenance & Service History',
-    reportSubtitle: 'Generate an official certified vehicle report with all mechanical repairs, services, and costs ready to share or print to PDF.',
-    btnViewReport: 'View / Print Report (PDF)',
-    btnShareText: 'Share Text',
-    btnShareEmail: 'Email',
-    titleSettings: 'General Settings',
-    subSettings: 'Account configuration and preferences',
-    profileTitle: 'User Profile',
-    lblUsername: 'Username',
-    secAuthTitle: 'Security & Authentication',
-    lblChangePass: 'Change Password',
-    lblCurrentPass: 'Current Password',
-    lblNewPass: 'New Password',
-    lblConfirmPass: 'Confirm New Password',
-    btnSavePass: 'Save New Password',
-    pinTitle: 'PIN Access',
-    pinSubtitle: 'Unlock the application with a 4-6 digit numeric PIN',
-    btnSavePin: 'Save PIN',
-    prefTitle: 'Preferences',
-    lblLanguage: 'App Language / Idioma de la App',
-    lblCurrency: 'System Currency',
-    lblDistanceUnit: 'Distance Unit / Unidad de Distancia',
-    backupTitle: 'Backup & Security',
-    btnExport: 'Export Data (JSON)',
-    btnImport: 'Import Data (JSON)',
-    btnLogout: 'Lock / Log Out',
-    certifiedModalTitle: 'Vehicle Service Record',
-    btnPrint: 'Print / PDF',
-    noVehicles: 'No vehicles added yet.',
-    noServices: 'No maintenance records found for this vehicle.',
-    noFuels: 'No fuel entries logged yet.',
-    noReminders: 'No pending reminders.',
-    noDocs: 'No documents stored in glovebox.',
-    noContacts: 'No phone numbers saved.',
-    callBtn: 'Call',
-    deleteBtn: 'Delete',
-    urgentBadge: 'Attention needed',
-    okBadge: 'Up to date',
-    validDoc: 'Valid',
-    expiredDoc: 'Expired',
-    dueSoonDoc: 'Expiring soon',
-    lblPlate: 'License Plate',
-    lblYear: 'Year',
-    lblModelType: 'Model / Type',
-    lblOdometer: 'Odometer',
-    myReminders: 'My Reminders',
-    myVehicles: 'My Vehicles',
-    btnNew: '+ New',
-    noPlate: 'NO PLATE',
-    notAvailable: 'N/A',
-    tapToUpdateOdometer: 'Tap to update odometer'
   }
 };
 
 function t(key, fallback = '') {
-  const lang = appState.language || 'es';
-  if (I18N_DICT[lang] && I18N_DICT[lang][key]) return I18N_DICT[lang][key];
   if (I18N_DICT.es && I18N_DICT.es[key]) return I18N_DICT.es[key];
   return fallback || key;
 }
 
-function changeLanguageSetting(lang) {
-  appState.language = lang || 'es';
-  saveState();
-  applyLanguageTranslations();
-  renderUserSettings();
-  renderApp();
-  renderEmergencyContacts();
-  renderDocuments();
-  renderUserReminders();
-  renderRemindersTab();
-}
-
 function applyLanguageTranslations() {
-  const lang = appState.language || 'es';
-  const dict = I18N_DICT[lang] || I18N_DICT.es;
-
+  const dict = I18N_DICT.es;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (dict[key]) {
+    if (dict && dict[key]) {
       el.textContent = dict[key];
     }
   });

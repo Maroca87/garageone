@@ -426,19 +426,11 @@
 
         <div class="settings-card">
           <h3 data-i18n="prefTitle">Preferencias</h3>
-          <div class="form-group" style="margin-bottom:12px;">
-            <label data-i18n="lblLanguage">Idioma de la App / App Language</label>
-            <select id="settingLanguage" class="form-control" onchange="changeLanguageSetting(this.value)">
-              <option value="es">Español (Spanish)</option>
-              <option value="en">English (Inglés)</option>
-            </select>
-          </div>
           <div class="form-group">
-            <label data-i18n="lblCurrency">Moneda del Sistema / Currency</label>
+            <label>Moneda del Sistema</label>
             <select id="settingCurrency" class="form-control" onchange="changeCurrencySetting(this.value)">
               <option value="CRC">Colones costarricenses (₡)</option>
               <option value="USD">Dólares estadounidenses ($)</option>
-              <option value="EUR">Euros (€)</option>
             </select>
           </div>
         </div>
@@ -1145,13 +1137,13 @@
   </div>
 
 
-  <script src="db.js?v=1020"></script>
-  <script src="auth-service.js?v=1020"></script>
-  <script src="sync-service.js?v=1020"></script>
-  <script src="app.js?v=1020"></script>
+  <script src="db.js?v=1040"></script>
+  <script src="auth-service.js?v=1040"></script>
+  <script src="sync-service.js?v=1040"></script>
+  <script src="app.js?v=1040"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=1020').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=1040').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>
