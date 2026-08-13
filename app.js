@@ -1334,7 +1334,7 @@ function renderMiniVehiclesList() {
       <div class="vehicle-mini-item ${isActive ? 'active-veh' : ''}" style="background:var(--bg-card); border:1px solid ${isActive ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'}; border-radius:var(--radius-md); padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="selectActiveVehicle('${v.id}')">
         <div>
           <strong style="font-size:0.95rem; color:#ffffff;">${escapeHtml(v.name)}</strong>
-          <div class="veh-info-sub">${escapeHtml(v.type)} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${formatDistance(v.km)}</div>
+          <div class="veh-info-sub">${escapeHtml(v.type)} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${formatVehicleDistance(v.km, v)}</div>
         </div>
         <div class="veh-actions" onclick="event.stopPropagation()">
           <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:4px 8px;" onclick="openVehicleModal('${v.id}')">Editar</button>
@@ -2617,7 +2617,7 @@ function renderAIDiagnostic() {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
           Diagnóstico y Predicción IA - ${escapeHtml(veh.name)}
         </h3>
-        <span style="font-size:0.78rem; color:var(--text-secondary);">${veh.year} • ${escapeHtml(veh.plate || 'Sin Placa')} • ${(Number(veh.km)||0).toLocaleString()} KM</span>
+        <span style="font-size:0.78rem; color:var(--text-secondary);">${veh.year} • ${escapeHtml(veh.plate || 'Sin Placa')} • ${formatVehicleDistance(veh.km, veh)}</span>
       </div>
       <span class="badge-subtle ${healthBadgeClass}" style="font-size:0.78rem; font-weight:700;">${healthScore}% ${healthStatusText}</span>
     </div>
@@ -2638,9 +2638,9 @@ function renderAIDiagnostic() {
         Predicción Inteligente de Mantenimientos Futuros
       </div>
       <div class="ai-item-body" style="font-size:0.83rem; color:#cbd5e1; line-height:1.4;">
-        • <strong>Próximo Cambio de Aceite Sintético:</strong> Estimado a los <strong style="color:#ffffff;">${nextOilKm.toLocaleString()} KM</strong> (${Math.max(100, nextOilKm - veh.km).toLocaleString()} km restantes).<br>
+        • <strong>Próximo Cambio de Aceite Sintético:</strong> Estimado a los <strong style="color:#ffffff;">${formatVehicleDistance(nextOilKm, veh)}</strong> (${formatVehicleDistance(Math.max(100, nextOilKm - veh.km), veh)} restantes).<br>
         • <strong>Revisión del Sistema de Frenos:</strong> Inspección recomendada de pastillas y discos en <strong style="color:#ffffff;">3 meses</strong>.<br>
-        • <strong>Correa / Cadena de Distribución:</strong> Sustitución o revisión preventiva programada hacia los <strong style="color:#ffffff;">${nextTimingBeltKm.toLocaleString()} KM</strong>.
+        • <strong>Correa / Cadena de Distribución:</strong> Sustitución o revisión preventiva programada hacia los <strong style="color:#ffffff;">${formatVehicleDistance(nextTimingBeltKm, veh)}</strong>.
       </div>
     </div>
   `;
@@ -2824,10 +2824,10 @@ async function askAIAssistantDirect(question) {
     const reminders = veh ? (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed) : [];
 
     const recentServicesText = services.slice(0, 5).map(s => `- ${s.date}: ${s.category} (${s.title}) - ${formatCurrency(s.cost)}`).join('\n') || 'Sin servicios previos registrados';
-    const pendingRemindersText = reminders.map(r => `- ${r.title} (${r.category}) ${r.targetKm ? 'Meta: ' + r.targetKm.toLocaleString() + ' KM' : ''}`).join('\n') || 'Sin recordatorios pendientes';
+    const pendingRemindersText = reminders.map(r => `- ${r.title} (${r.category}) ${r.targetKm ? 'Meta: ' + formatVehicleDistance(r.targetKm, veh) : ''}`).join('\n') || 'Sin recordatorios pendientes';
 
     const vehContext = veh 
-      ? `${veh.name} (Año ${veh.year}, ${veh.type}, ${(Number(veh.km)||0).toLocaleString()} KM en Odómetro, Placa: ${veh.plate || 'N/A'})` 
+      ? `${veh.name} (Año ${veh.year}, ${veh.type}, ${formatVehicleDistance(veh.km, veh)} en Odómetro, Placa: ${veh.plate || 'N/A'})` 
       : 'vehículo no seleccionado';
 
     const formatText = (txt) => {
@@ -2902,7 +2902,7 @@ function getSmartOfflineResponse(question, veh, vehContext, recentServicesText, 
   const qLower = (question || '').toLowerCase().trim();
   const userName = currentUser ? (currentUser.name || currentUser.username).split(' ')[0] : 'amigo';
   const vehName = veh ? veh.name : 'tu vehículo';
-  const vehKm = veh ? (Number(veh.km)||0).toLocaleString() : '0';
+  const vehKm = veh ? formatVehicleDistance(veh.km, veh) : '0';
 
   let response = '';
 
@@ -3008,7 +3008,7 @@ function getSmartOfflineResponse(question, veh, vehContext, recentServicesText, 
   else {
     response = `**[Asistencia Técnica GarageOne - Conocimiento Mecánico]**\n\n` +
       `Procesando tu consulta: *"**${escapeHtml(question)}**"*\n\n` +
-      `• **Estado Vehicular (${escapeHtml(vehName)}):** Con un kilometraje actual de **${vehKm} KM**, se recomienda mantener la rutina preventiva de cambio de aceite y filtro cada 5.000–10.000 KM, así como inspeccionar el líquido de frenos y la suspensión.\n` +
+      `• **Estado Vehicular (${escapeHtml(vehName)}):** Con un kilometraje / millaje actual de **${vehKm}**, se recomienda mantener la rutina preventiva de cambio de aceite y filtro en sus intervalos correspondientes, así como inspeccionar el líquido de frenos y la suspensión.\n` +
       `• **Asesoría:** Si tienes un síntoma específico como ruidos, sobrecalentamiento, luces de advertencia o fugas, descríbelo y te daré un diagnóstico detallado con nivel de riesgo.`;
   }
 
@@ -3571,7 +3571,7 @@ async function runAiDiagnostic() {
 
   const promptText = `Actúa como un Ingeniero Mecánico Experto. Realiza una evaluación exhaustiva del estado de este vehículo basándote en la siguiente información:
 Vehículo: ${veh.name} (Año ${veh.year}, ${veh.type})
-Kilometraje Actual: ${veh.km.toLocaleString()} KM
+Odómetro / Distancia Actual: ${formatVehicleDistance(veh.km, veh)}
 Servicios Previos Registrados: ${appState.services.filter(s => s.vehicleId === veh.id).length}
 
 Estructura tu respuesta exactamente así:
@@ -4519,7 +4519,7 @@ function generateCertifiedReport() {
           ${services.map((s, idx) => `
             <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
               <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${s.km.toLocaleString()} km</td>
+              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
               <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
               <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
               <td style="padding:8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
@@ -4793,7 +4793,7 @@ function shareReportEmail() {
   const body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
     `Vehículo: ${veh.name} (${veh.year})\n` +
     `Placa: ${veh.plate || 'N/A'}\n` +
-    `Odómetro Actual: ${veh.km.toLocaleString()} KM\n\n` +
+    `Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
     `RESUMEN FINANCIERO:\n` +
     `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
     `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
@@ -5799,7 +5799,7 @@ function renderVehicleHealth() {
         <div class="health-hero-title">
           ${escapeHtml(veh.name || 'Vehículo')} (${veh.year || ''})
         </div>
-        <span style="font-size:0.8rem; color:#94a3b8; font-weight:600;">${(veh.km || 0).toLocaleString()} km</span>
+        <span style="font-size:0.8rem; color:#94a3b8; font-weight:600;">${formatVehicleDistance(veh.km, veh)}</span>
       </div>
 
       <div class="health-hero-body">
