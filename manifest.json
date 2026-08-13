@@ -1,21 +1,27 @@
 {
   "name": "GarageOne - Control Vehicular",
   "short_name": "GarageOne",
-  "start_url": "index.html",
+  "id": "app.garageone.pwa",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0a52bd",
+  "background_color": "#0f172a",
+  "theme_color": "#38bdf8",
   "orientation": "portrait",
+  "description": "Gestión de mantenimiento vehicular, recordatorios y gastos de combustible.",
+  "categories": ["utilities", "lifestyle"],
   "icons": [
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
+
