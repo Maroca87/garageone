@@ -1363,6 +1363,8 @@ function renderMiniVehiclesList() {
       </div>
     `;
   }).join('');
+
+  setTimeout(initSwipeListeners, 50);
 }
 
 // Bi-Directional Seamless iOS Swipe Physics Engine
