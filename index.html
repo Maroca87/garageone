@@ -433,12 +433,19 @@
               <option value="en">English (Inglés)</option>
             </select>
           </div>
-          <div class="form-group">
-            <label data-i18n="lblCurrency">Moneda del Sistema</label>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label data-i18n="lblCurrency">Moneda del Sistema / Currency</label>
             <select id="settingCurrency" class="form-control" onchange="changeCurrencySetting(this.value)">
               <option value="CRC">Colones costarricenses (₡)</option>
               <option value="USD">Dólares estadounidenses ($)</option>
               <option value="EUR">Euros (€)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="lblDistanceUnit">Unidad de Distancia / Distance Unit</label>
+            <select id="settingDistanceUnit" class="form-control" onchange="changeDistanceUnitSetting(this.value)">
+              <option value="km">Kilómetros (km)</option>
+              <option value="mi">Millas (mi)</option>
             </select>
           </div>
         </div>

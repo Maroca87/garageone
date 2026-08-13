@@ -123,6 +123,8 @@ function isDefaultCategory(catName) {
 // Default Seed Data
 const DEFAULT_STATE = {
   currency: 'CRC',
+  distanceUnit: 'km',
+  language: 'es',
   geminiApiKey: '',
   vehicles: [],
   activeVehicleId: '',
@@ -170,6 +172,28 @@ function formatCurrency(amount) {
   if (curr === 'USD') return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (curr === 'EUR') return '€' + num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return '₡' + num.toLocaleString('es-CR', opts);
+}
+
+function getDistanceUnit() {
+  return (appState && appState.distanceUnit) ? appState.distanceUnit : 'km';
+}
+
+function formatDistance(kmValue) {
+  const numKm = Number(kmValue || 0);
+  const unit = getDistanceUnit();
+  if (unit === 'mi') {
+    const miles = Math.round(numKm * 0.621371);
+    return `${miles.toLocaleString()} mi`;
+  }
+  return `${numKm.toLocaleString()} km`;
+}
+
+function changeDistanceUnitSetting(unit) {
+  appState.distanceUnit = unit === 'mi' ? 'mi' : 'km';
+  saveState();
+  renderUserSettings();
+  renderApp();
+  if (typeof renderRemindersTab === 'function') renderRemindersTab();
 }
 
 function openModal(modalId) {
@@ -1221,37 +1245,32 @@ function renderApp() {
     return;
   }
 
-  const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  
-  let dueCount = 0;
-  reminders.forEach(r => {
-    if (r.targetDate && r.targetDate <= todayStr) {
-      dueCount++;
-    }
-  });
-
-  const healthBadgeHtml = dueCount > 0
-    ? `<span class="hero-health-status warning" title="${dueCount} recordatorio(s) pendiente(s)"><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#ff453a"/></svg>${dueCount} Alerta${dueCount > 1 ? 's' : ''}</span>`
-    : `<span class="hero-health-status success" title="Recordatorios al día"><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#30d158"/></svg>Al día</span>`;
+  const plateText = escapeHtml(veh.plate) || 'SIN PLACA';
+  const yearText = veh.year || 'N/A';
+  const typeText = escapeHtml(veh.type) || 'N/A';
 
   heroEl.innerHTML = `
     <div class="hero-main-info">
       <div class="hero-veh-details">
-        <div class="hero-header-row">
-          <div class="hero-title">${escapeHtml(veh.name)}</div>
-          ${healthBadgeHtml}
-        </div>
-        <div class="hero-meta-row">
-          <span class="hero-plate-badge">${escapeHtml(veh.plate) || 'SIN PLACA'}</span>
-          <span class="hero-meta-tag">${escapeHtml(veh.type)}</span>
-          <span class="hero-meta-tag">${veh.year}</span>
+        <div class="hero-title">${escapeHtml(veh.name)}</div>
+        <div class="hero-specs-row">
+          <div class="hero-spec-item">
+            <span class="spec-label" data-i18n="lblPlate">Placa</span>
+            <span class="spec-value hero-plate-badge">${plateText}</span>
+          </div>
+          <div class="hero-spec-item">
+            <span class="spec-label" data-i18n="lblYear">Año</span>
+            <span class="spec-value">${yearText}</span>
+          </div>
+          <div class="hero-spec-item">
+            <span class="spec-label" data-i18n="lblModelType">Modelo / Tipo</span>
+            <span class="spec-value">${typeText}</span>
+          </div>
         </div>
       </div>
       <div class="hero-odometer-box" onclick="openOdometerModal()" style="cursor:pointer;" title="Toca para actualizar odómetro">
-        <span class="hero-odometer-lbl">Odómetro ${SVG_ICONS.zap}</span>
-        <span class="hero-odometer-val">${(Number(veh.km)||0).toLocaleString()} <small class="unit">km</small></span>
+        <span class="hero-odometer-lbl"><span data-i18n="lblOdometer">Odómetro</span> ${SVG_ICONS.zap}</span>
+        <span class="hero-odometer-val">${formatDistance(veh.km)}</span>
       </div>
     </div>
     ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo">` : ''}
@@ -1308,7 +1327,7 @@ function renderMiniVehiclesList() {
       <div class="vehicle-mini-item ${isActive ? 'active-veh' : ''}" style="background:var(--bg-card); border:1px solid ${isActive ? 'rgba(56,189,248,0.4)' : 'var(--border-color)'}; border-radius:var(--radius-md); padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="selectActiveVehicle('${v.id}')">
         <div>
           <strong style="font-size:0.95rem; color:#ffffff;">${escapeHtml(v.name)}</strong>
-          <div class="veh-info-sub">${escapeHtml(v.type)} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${(Number(v.km)||0).toLocaleString()} km</div>
+          <div class="veh-info-sub">${escapeHtml(v.type)} • ${escapeHtml(v.plate || 'SIN PLACA')} • ${formatDistance(v.km)}</div>
         </div>
         <div class="veh-actions" onclick="event.stopPropagation()">
           <button class="btn btn-secondary btn-sm" style="font-size:0.75rem; padding:4px 8px;" onclick="openVehicleModal('${v.id}')">Editar</button>
@@ -3943,6 +3962,9 @@ function renderUserSettings() {
   const settingLang = document.getElementById('settingLanguage');
   if (settingLang) settingLang.value = appState.language || 'es';
 
+  const settingDist = document.getElementById('settingDistanceUnit');
+  if (settingDist) settingDist.value = appState.distanceUnit || 'km';
+
   const geminiInput = document.getElementById('geminiApiKeyInput');
   const geminiBadge = document.getElementById('geminiStatusBadge');
   if (geminiInput) geminiInput.value = appState.geminiApiKey || '';
@@ -4774,6 +4796,7 @@ const I18N_DICT = {
     navServices: 'Servicios',
     navFuel: 'Gasolina',
     navGlovebox: 'Guantera',
+    navHealth: 'Salud',
     navAI: 'IA',
     navReports: 'Reportes',
     subtitleGarage: 'Tu taller y control vehicular inteligente',
@@ -4790,6 +4813,8 @@ const I18N_DICT = {
     btnAddContact: '+ Guardar Número',
     docsTitle: 'Documentos del Vehículo',
     btnAddDoc: '+ Agregar Documento',
+    titleHealth: 'Salud del Vehículo',
+    subHealth: 'Diagnóstico predictivo y estado de componentes',
     titleAI: 'Asistente IA Mecánico',
     subAI: 'Análisis inteligente y consultas mecánicas',
     aiQueryTitle: 'Consulta a la IA',
@@ -4811,12 +4836,18 @@ const I18N_DICT = {
     profileTitle: 'Perfil de Usuario',
     lblUsername: 'Usuario',
     secAuthTitle: 'Seguridad y Autenticación',
+    lblChangePass: 'Cambiar Contraseña',
+    lblCurrentPass: 'Contraseña Actual',
+    lblNewPass: 'Nueva Contraseña',
+    lblConfirmPass: 'Confirmar Nueva Contraseña',
+    btnSavePass: 'Guardar Nueva Contraseña',
     pinTitle: 'Acceso con PIN',
     pinSubtitle: 'Permite desbloquear la app con un PIN numérico',
     btnSavePin: 'Guardar PIN',
     prefTitle: 'Preferencias',
     lblLanguage: 'Idioma de la App / App Language',
-    lblCurrency: 'Moneda del Sistema',
+    lblCurrency: 'Moneda del Sistema / Currency',
+    lblDistanceUnit: 'Unidad de Distancia / Distance Unit',
     backupTitle: 'Respaldo y Seguridad',
     btnExport: 'Exportar Datos (JSON)',
     btnImport: 'Importar Datos (JSON)',
@@ -4835,13 +4866,24 @@ const I18N_DICT = {
     okBadge: 'Al día',
     validDoc: 'Vigente',
     expiredDoc: 'Vencido',
-    dueSoonDoc: 'Por vencer'
+    dueSoonDoc: 'Por vencer',
+    lblPlate: 'Placa',
+    lblYear: 'Año',
+    lblModelType: 'Modelo / Tipo',
+    lblOdometer: 'Odómetro',
+    myReminders: 'Mis Recordatorios',
+    myVehicles: 'Mis Vehículos',
+    btnNew: '+ Nuevo',
+    noPlate: 'SIN PLACA',
+    notAvailable: 'N/A',
+    tapToUpdateOdometer: 'Toca para actualizar odómetro'
   },
   en: {
     navGarage: 'Garage',
     navServices: 'Services',
     navFuel: 'Fuel',
     navGlovebox: 'Glovebox',
+    navHealth: 'Health',
     navAI: 'AI',
     navReports: 'Reports',
     subtitleGarage: 'Smart vehicle management and workshop assistant',
@@ -4858,6 +4900,8 @@ const I18N_DICT = {
     btnAddContact: '+ Save Number',
     docsTitle: 'Vehicle Documents',
     btnAddDoc: '+ Add Document',
+    titleHealth: 'Vehicle Health',
+    subHealth: 'Predictive diagnostics and component status',
     titleAI: 'AI Mechanic Assistant',
     subAI: 'Smart diagnostic analysis and mechanic Q&A',
     aiQueryTitle: 'Ask AI Mechanic',
@@ -4879,12 +4923,18 @@ const I18N_DICT = {
     profileTitle: 'User Profile',
     lblUsername: 'Username',
     secAuthTitle: 'Security & Authentication',
+    lblChangePass: 'Change Password',
+    lblCurrentPass: 'Current Password',
+    lblNewPass: 'New Password',
+    lblConfirmPass: 'Confirm New Password',
+    btnSavePass: 'Save New Password',
     pinTitle: 'PIN Access',
     pinSubtitle: 'Unlock the application with a 4-6 digit numeric PIN',
     btnSavePin: 'Save PIN',
     prefTitle: 'Preferences',
     lblLanguage: 'App Language / Idioma de la App',
     lblCurrency: 'System Currency',
+    lblDistanceUnit: 'Distance Unit / Unidad de Distancia',
     backupTitle: 'Backup & Security',
     btnExport: 'Export Data (JSON)',
     btnImport: 'Import Data (JSON)',
@@ -4903,7 +4953,17 @@ const I18N_DICT = {
     okBadge: 'Up to date',
     validDoc: 'Valid',
     expiredDoc: 'Expired',
-    dueSoonDoc: 'Expiring soon'
+    dueSoonDoc: 'Expiring soon',
+    lblPlate: 'License Plate',
+    lblYear: 'Year',
+    lblModelType: 'Model / Type',
+    lblOdometer: 'Odometer',
+    myReminders: 'My Reminders',
+    myVehicles: 'My Vehicles',
+    btnNew: '+ New',
+    noPlate: 'NO PLATE',
+    notAvailable: 'N/A',
+    tapToUpdateOdometer: 'Tap to update odometer'
   }
 };
 
