@@ -45,50 +45,11 @@ self.addEventListener('notificationclick', (e) => {
   );
 });
 
-// Función para programar notificaciones nativas del SO en segundo plano
+// Desactivado: El agendamiento de recordatorios se maneja exclusivamente a través del calendario nativo (.ics)
 function scheduleSWNotification(reminder) {
-  if (!reminder || !reminder.title) return;
-  const notifTitle = `GarageOne - ${reminder.title}`;
-  const notifBody = `${reminder.vehicleName || 'Vehículo'}: Fecha: ${reminder.targetDate}${reminder.time ? ' ' + reminder.time : ''} (${reminder.category || 'Recordatorio'})`;
-  const options = {
-    body: notifBody,
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
-    vibrate: [200, 100, 200],
-    tag: `rem_${reminder.id}`
-  };
-
-  if (reminder.targetTimestamp) {
-    const delayMs = reminder.targetTimestamp - Date.now();
-
-    // Intentar programar la alarma nativa del SO usando TimestampTrigger si la soporta el dispositivo
-    if ('showTrigger' in Notification.prototype && typeof TimestampTrigger !== 'undefined') {
-      try {
-        options.showTrigger = new TimestampTrigger(reminder.targetTimestamp);
-        self.registration.showNotification(notifTitle, options);
-        return;
-      } catch (e) {
-        console.error('Error al configurar TimestampTrigger:', e);
-      }
-    }
-
-    // Programador en segundo plano del Service Worker para garantizar entrega
-    if (delayMs > 0 && delayMs <= 86400000 * 30) {
-      setTimeout(() => {
-        self.registration.showNotification(notifTitle, options);
-      }, delayMs);
-    } else if (delayMs <= 0) {
-      self.registration.showNotification(notifTitle, options);
-    }
-  }
+  // No-op: Notificaciones push emergentes desactivadas por solicitud del usuario
 }
 
-// Receptor de mensajes enviados desde app.js para sincronizar alarmas en segundo plano
 self.addEventListener('message', (e) => {
-  if (!e.data) return;
-  if (e.data.type === 'SCHEDULE_REMINDER') {
-    scheduleSWNotification(e.data.reminder);
-  } else if (e.data.type === 'SYNC_REMINDERS' && Array.isArray(e.data.reminders)) {
-    e.data.reminders.forEach(r => scheduleSWNotification(r));
-  }
+  // No-op: Integración basada 100% en calendario nativo
 });

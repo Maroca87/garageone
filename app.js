@@ -240,10 +240,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setTodayDates();
   await initAsyncStorage();
 
-  // Run initial reminder check and set periodic timer (every 30s)
-  checkAndSendDueNotifications();
-  setInterval(checkAndSendDueNotifications, 30000);
-
   // Close modals when clicking dark backdrop
   document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
     backdrop.addEventListener('click', (e) => {
@@ -1217,6 +1213,9 @@ function selectActiveVehicle(vehId) {
   resetAllSwipeItems();
   appState.activeVehicleId = vehId;
   saveState();
+  updateServiceModalUnitLabel();
+  updateFuelModalUnitLabel();
+  updateNewCategoryModalUnitLabel();
   renderApp();
   renderRemindersTab();
   renderVehicleHealth();
@@ -1581,116 +1580,7 @@ function requestNotificationPermission() {
 }
 
 function checkAndSendDueNotifications() {
-  const veh = getActiveVehicle();
-  if (!veh || !appState.reminders) return;
-
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${y}-${m}-${d}`;
-  const currentHoursMin = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-
-  let notifiedSet = new Set();
-  try {
-    const raw = localStorage.getItem('GARAGEONE_NOTIFIED_REMINDERS');
-    if (raw) notifiedSet = new Set(JSON.parse(raw));
-  } catch (e) {}
-
-  let updatedNotified = false;
-  const reminders = (appState.reminders || []).filter(r => !r.completed && (!r.vehicleId || r.vehicleId === veh.id));
-
-  reminders.forEach(r => {
-    if (!r.targetDate) return;
-
-    // Obtener milisegundos milimétricos del objetivo en hora local
-    const [tYear, tMonth, tDay] = r.targetDate.split('-').map(Number);
-    const [tHour, tMin] = (r.time || '09:00').split(':').map(Number);
-    const targetDateObj = new Date(tYear, tMonth - 1, tDay, tHour, tMin, 0, 0);
-    const targetTimestamp = targetDateObj.getTime();
-
-    // 1. Programación en segundo plano para Service Worker / Sistema Operativo (Pantalla bloqueada / App cerrada)
-    if (targetTimestamp > now.getTime()) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(reg => {
-          const sw = reg.active || navigator.serviceWorker.controller;
-          const reminderPayload = {
-            id: r.id,
-            title: r.title,
-            category: r.category,
-            targetDate: r.targetDate,
-            time: r.time,
-            targetTimestamp: targetTimestamp,
-            vehicleName: veh.name || 'Vehículo'
-          };
-          if (sw) {
-            sw.postMessage({ type: 'SCHEDULE_REMINDER', reminder: reminderPayload });
-          }
-          // Registrar alarma nativa del SO con TimestampTrigger si está disponible
-          if ('showTrigger' in Notification.prototype && typeof TimestampTrigger !== 'undefined') {
-            try {
-              reg.showNotification(`GarageOne - ${r.title}`, {
-                body: `${veh.name || 'Vehículo'}: Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''} (${r.category || 'Recordatorio'})`,
-                icon: 'icons/icon-192.png',
-                badge: 'icons/icon-192.png',
-                vibrate: [200, 100, 200],
-                tag: `rem_${r.id}`,
-                showTrigger: new TimestampTrigger(targetTimestamp)
-              });
-            } catch (e) {}
-          }
-        }).catch(() => {});
-      }
-      return;
-    }
-
-    // 2. Notificación para recordatorios vencidos o cumplidos en el momento actual
-    let shouldNotify = false;
-    let detail = `Fecha: ${r.targetDate}${r.time ? ' ' + r.time : ''}`;
-
-    if (r.targetDate < todayStr || (r.targetDate === todayStr && (!r.time || currentHoursMin >= r.time))) {
-      shouldNotify = true;
-    }
-
-    if (shouldNotify) {
-      const notifKey = `${r.id}_${r.targetDate || ''}_${r.time || ''}`;
-      if (!notifiedSet.has(notifKey)) {
-        notifiedSet.add(notifKey);
-        updatedNotified = true;
-
-        const notifTitle = `GarageOne - ${r.title}`;
-        const notifBody = `${veh.name || 'Vehículo'}: ${detail} (${r.category || 'Recordatorio'})`;
-
-        if ('Notification' in window && Notification.permission === 'granted') {
-          try {
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.ready.then(reg => {
-                reg.showNotification(notifTitle, {
-                  body: notifBody,
-                  icon: 'icons/icon-192.png',
-                  badge: 'icons/icon-192.png',
-                  vibrate: [200, 100, 200],
-                  tag: `rem_${r.id}`
-                });
-              }).catch(() => {
-                new Notification(notifTitle, { body: notifBody, icon: 'icons/icon-192.png' });
-              });
-            } else {
-              new Notification(notifTitle, { body: notifBody, icon: 'icons/icon-192.png' });
-            }
-          } catch (e) {
-            console.error('Error al emitir notificación nativa:', e);
-          }
-        }
-      }
-    }
-  });
-
-  if (updatedNotified) {
-    try {
-      localStorage.setItem('GARAGEONE_NOTIFIED_REMINDERS', JSON.stringify(Array.from(notifiedSet)));
-    } catch (e) {}
-  }
+  // No-op: Notificaciones emergentes push eliminadas. La lógica se gestiona mediante Calendario (.ics)
 }
 
 function getReminderCategoryIcon(category) {
@@ -2202,14 +2092,44 @@ function populateServCategorySelect() {
   }
 }
 
+function openNewCategoryModal() {
+  if (document.getElementById('formNewCategory')) {
+    document.getElementById('formNewCategory').reset();
+  }
+  if (document.getElementById('editCatOldName')) {
+    document.getElementById('editCatOldName').value = '';
+  }
+  if (document.getElementById('newCatName')) {
+    document.getElementById('newCatName').value = '';
+  }
+  if (document.getElementById('modalNewCategoryTitle')) {
+    document.getElementById('modalNewCategoryTitle').textContent = 'Crear Nuevo Servicio';
+  }
+  if (document.getElementById('newCatAffectsHealth')) {
+    document.getElementById('newCatAffectsHealth').checked = false;
+  }
+  if (document.getElementById('newCatHealthFieldsContainer')) {
+    document.getElementById('newCatHealthFieldsContainer').style.display = 'none';
+  }
+  if (document.getElementById('newCatIntervalKm')) {
+    document.getElementById('newCatIntervalKm').value = '';
+  }
+  if (document.getElementById('newCatIntervalMonths')) {
+    document.getElementById('newCatIntervalMonths').value = '';
+  }
+  updateNewCategoryModalUnitLabel();
+  openModal('modalNewCategory');
+}
+
 /**
  * Maneja el cambio de selección en el selector de categoría de servicios.
  * @param {string} val - Valor seleccionado.
  */
 function handleServCategoryChange(val) {
   if (val === '__NEW__') {
-    openModal('modalNewCategory');
-    document.getElementById('servCategory').selectedIndex = 0;
+    openNewCategoryModal();
+    const select = document.getElementById('servCategory');
+    if (select) select.selectedIndex = 0;
   }
 }
 
@@ -3633,36 +3553,7 @@ function saveGeminiKey(key) {
   saveState();
 }
 
-// Mini Vehicle List (iOS Swipe-to-Delete)
-function renderMiniVehiclesList() {
-  const container = document.getElementById('allVehiclesList');
-  if (!container) return;
 
-  if (appState.vehicles.length === 0) {
-    container.innerHTML = '<p class="subtitle">No hay vehículos registrados.</p>';
-    return;
-  }
-
-  container.innerHTML = appState.vehicles.map(v => `
-    <div class="swipe-container">
-      <div class="swipe-action-bg">
-        <button type="button" class="swipe-action-btn" onclick="deleteVehicleDirect('${v.id}', event)">
-          ${SVG_ICONS.trash}
-          <span>Eliminar</span>
-        </button>
-      </div>
-      <div class="swipe-content vehicle-mini-item ${v.id === appState.activeVehicleId ? 'active-veh' : ''}">
-        <div style="cursor:pointer; flex:1;" onclick="selectActiveVehicle('${v.id}')">
-          <strong>${escapeHtml(v.name)} (${v.year}) ${v.id === appState.activeVehicleId ? '<span style="color:#38bdf8; font-size:0.75rem; margin-left:6px; font-weight:700;">(Activo)</span>' : ''}</strong>
-          <div class="veh-info-sub">${escapeHtml(v.plate) || 'Sin Placa'} • ${v.km.toLocaleString()} km</div>
-        </div>
-        <div class="veh-actions">
-          <button class="btn btn-secondary btn-sm" onclick="editVehicle('${v.id}')">${SVG_ICONS.edit} Editar</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
 
 // Vehicle CRUD
 function openVehicleModal(vehId = null) {
