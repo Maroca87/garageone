@@ -3780,7 +3780,20 @@ function renderServiceList(vehId) {
   const container = document.getElementById('serviceLogList');
   if (!container) return;
   const veh = appState.vehicles.find(v => v.id === vehId) || getActiveVehicle();
-  let list = appState.services.filter(s => s.vehicleId === vehId);
+  const targetId = veh ? veh.id : vehId;
+
+  (appState.services || []).forEach(s => {
+    if (!s.vehicleId && veh) {
+      s.vehicleId = veh.id;
+    }
+  });
+
+  let list = (appState.services || []).filter(s => {
+    if (!s.vehicleId) return true;
+    if (targetId && s.vehicleId === targetId) return true;
+    if (appState.vehicles.length <= 1) return true;
+    return false;
+  });
 
   if (currentFilter !== 'all') {
     list = list.filter(s => s.category === currentFilter);
@@ -3863,8 +3876,21 @@ function openServiceModal(servId = null) {
 function renderFuelList(vehId) {
   const container = document.getElementById('fuelLogList');
   if (!container) return;
-  const veh = getActiveVehicle();
-  let list = appState.fuels.filter(f => f.vehicleId === vehId);
+  const veh = appState.vehicles.find(v => v.id === vehId) || getActiveVehicle();
+  const targetId = veh ? veh.id : vehId;
+
+  (appState.fuels || []).forEach(f => {
+    if (!f.vehicleId && veh) {
+      f.vehicleId = veh.id;
+    }
+  });
+
+  let list = (appState.fuels || []).filter(f => {
+    if (!f.vehicleId) return true;
+    if (targetId && f.vehicleId === targetId) return true;
+    if (appState.vehicles.length <= 1) return true;
+    return false;
+  });
   list.sort((a, b) => Number(b.km) - Number(a.km));
 
   const effEl = document.getElementById('fuelEfficiencyVal');
@@ -4134,8 +4160,8 @@ function renderReports() {
   const vehId = appState.activeVehicleId;
   const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
 
-  let services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
-  let fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
+  let services = (appState.services || []).filter(s => s && (!s.vehicleId || s.vehicleId === vehId || appState.vehicles.length <= 1));
+  let fuels = (appState.fuels || []).filter(f => f && (!f.vehicleId || f.vehicleId === vehId || appState.vehicles.length <= 1));
 
   if (selectedMonth !== 'all') {
     services = services.filter(s => s.date && s.date.startsWith(selectedMonth));
@@ -4431,9 +4457,9 @@ function generateCertifiedReport() {
 
   const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
 
-  let services = appState.services.filter(s => s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date));
-  let fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
-  const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id && !r.completed);
+  let services = (appState.services || []).filter(s => !s.vehicleId || s.vehicleId === veh.id || appState.vehicles.length <= 1).sort((a, b) => new Date(b.date) - new Date(a.date));
+  let fuels = (appState.fuels || []).filter(f => !f.vehicleId || f.vehicleId === veh.id || appState.vehicles.length <= 1);
+  const reminders = (appState.reminders || []).filter(r => (!r.vehicleId || r.vehicleId === veh.id || appState.vehicles.length <= 1) && !r.completed);
 
   let periodLabel = 'Histórico Completo';
   if (selectedMonth !== 'all') {
@@ -5240,10 +5266,10 @@ function calculateVehicleHealth(veh) {
   const convertFromKm = (kmVal) => isMiles ? Math.round(kmVal / 1.60934) : Math.round(kmVal);
 
   const currentKm = convertToKm(veh.km);
-  const services = (appState.services || []).filter(s => s.vehicleId === veh.id);
-  const documents = (appState.documents || []).filter(d => d.vehicleId === veh.id);
-  const reminders = (appState.reminders || []).filter(r => r.vehicleId === veh.id);
-  const fuels = (appState.fuels || []).filter(f => f.vehicleId === veh.id);
+  const services = (appState.services || []).filter(s => !s.vehicleId || s.vehicleId === veh.id || appState.vehicles.length <= 1);
+  const documents = (appState.documents || []).filter(d => !d.vehicleId || d.vehicleId === veh.id || appState.vehicles.length <= 1);
+  const reminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id || appState.vehicles.length <= 1);
+  const fuels = (appState.fuels || []).filter(f => !f.vehicleId || f.vehicleId === veh.id || appState.vehicles.length <= 1);
 
   const missingItems = [];
 
