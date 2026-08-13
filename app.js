@@ -203,11 +203,25 @@ function updateFuelModalUnitLabel() {
   if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje en Odómetro (mi)' : 'Kilometraje en Odómetro (km)';
 }
 
+function updateNewCategoryModalUnitLabel() {
+  const veh = getActiveVehicle();
+  const unit = getVehicleUnit(veh);
+  const lbl = document.getElementById('lblNewCatIntervalKm');
+  const input = document.getElementById('newCatIntervalKm');
+  if (lbl) {
+    lbl.textContent = unit === 'mi' ? 'Intervalo recomendado por millas (Opcional)' : 'Intervalo recomendado por kilómetros (Opcional)';
+  }
+  if (input) {
+    input.placeholder = unit === 'mi' ? 'Ej. 3000' : 'Ej. 5000';
+  }
+}
+
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('open');
     if (modalId === 'modalNewCategory') {
+      updateNewCategoryModalUnitLabel();
       renderCustomCategoriesList();
     }
   }
@@ -2162,42 +2176,28 @@ function populateServCategorySelect() {
   const currentVal = select.value;
   let html = '';
 
-  const customCatsSet = new Set();
+  const allCatsSet = new Set(DEFAULT_SYSTEM_CATEGORIES);
 
   (appState.serviceCategories || []).forEach(c => {
     const name = typeof c === 'string' ? c : (c ? c.name : '');
-    if (name && !isDefaultCategory(name)) {
-      customCatsSet.add(name);
-    }
+    if (name) allCatsSet.add(name);
   });
 
   (SERVICE_CATEGORIES || []).forEach(cat => {
-    if (cat && typeof cat === 'string' && !isDefaultCategory(cat)) {
-      customCatsSet.add(cat);
-    }
+    if (cat && typeof cat === 'string') allCatsSet.add(cat);
   });
 
-  const customCategories = Array.from(customCatsSet);
+  const categoriesList = Array.from(allCatsSet);
 
-  if (customCategories.length === 0) {
-    html = `<option value="" disabled selected>No hay servicios creados por el usuario</option>`;
-  } else {
-    customCategories.forEach(cat => {
-      html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
-    });
-  }
+  categoriesList.forEach(cat => {
+    html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+  });
 
   html += `<option value="__NEW__">+ Crear nuevo servicio...</option>`;
 
   select.innerHTML = html;
 
   if (currentVal && select.querySelector(`option[value="${escapeHtml(currentVal)}"]`)) {
-    select.value = currentVal;
-  } else if (currentVal && isDefaultCategory(currentVal)) {
-    const opt = document.createElement('option');
-    opt.value = currentVal;
-    opt.textContent = `${currentVal} (Predefinido)`;
-    select.insertBefore(opt, select.firstChild);
     select.value = currentVal;
   }
 }
@@ -2268,6 +2268,7 @@ function renderCustomCategoriesList() {
  * @param {string} catName - Nombre del servicio a editar.
  */
 function loadCategoryForEdit(catName) {
+  updateNewCategoryModalUnitLabel();
   document.getElementById('editCatOldName').value = catName;
   document.getElementById('newCatName').value = catName;
   document.getElementById('modalNewCategoryTitle').textContent = 'Editar Servicio';
@@ -3777,6 +3778,8 @@ function filterLogs(cat, el) {
 
 function renderServiceList(vehId) {
   const container = document.getElementById('serviceLogList');
+  if (!container) return;
+  const veh = appState.vehicles.find(v => v.id === vehId) || getActiveVehicle();
   let list = appState.services.filter(s => s.vehicleId === vehId);
 
   if (currentFilter !== 'all') {
@@ -4474,7 +4477,7 @@ function generateCertifiedReport() {
         <div><strong style="color:#0f172a;">Placa / Matrícula:</strong> ${escapeHtml(veh.plate) || 'SIN PLACA'}</div>
         <div><strong style="color:#0f172a;">Año:</strong> ${veh.year}</div>
         <div><strong style="color:#0f172a;">Tipo:</strong> ${escapeHtml(veh.type)}</div>
-        <div><strong style="color:#0f172a;">Odómetro Actual:</strong> ${veh.km.toLocaleString()} KM</div>
+        <div><strong style="color:#0f172a;">Odómetro Actual:</strong> ${formatVehicleDistance(veh.km, veh)}</div>
         <div><strong style="color:#0f172a;">Última Revisión:</strong> ${lastService ? lastService.date : 'Sin registro'}</div>
       </div>
     </div>
@@ -4507,7 +4510,7 @@ function generateCertifiedReport() {
         <thead>
           <tr style="background:#0f172a; color:#ffffff; text-align:left;">
             <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">KM</th>
+            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
             <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
             <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
             <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos / Garantía</th>
@@ -4539,7 +4542,7 @@ function generateCertifiedReport() {
           ${reminders.map(r => `
             <li style="margin-bottom:4px;">
               <strong style="color:#78350f;">${escapeHtml(r.title)}</strong> (${escapeHtml(r.category)}) 
-              ${r.targetKm ? ` • Meta: ${r.targetKm.toLocaleString()} KM` : ''}
+              ${r.targetKm ? ` • Meta: ${formatVehicleDistance(r.targetKm, veh)}` : ''}
               ${r.targetDate ? ` • Fecha Meta: ${r.targetDate}` : ''}
               ${r.notes ? ` • <em>${escapeHtml(r.notes)}</em>` : ''}
             </li>
