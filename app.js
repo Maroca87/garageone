@@ -102,7 +102,8 @@ const SVG_ICONS = {
   trash: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
   zap: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
   alertTriangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 1 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  alertCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+  alertCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  calendar: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
 };
 
 const DEFAULT_SYSTEM_CATEGORIES = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
@@ -1716,6 +1717,78 @@ function getReminderStatus(r, veh) {
   };
 }
 
+function exportReminderToCalendar(reminder, vehName) {
+  if (!reminder || !reminder.targetDate) {
+    alert('Este recordatorio no tiene una fecha asignada.');
+    return;
+  }
+
+  const title = `GarageOne: ${reminder.title || 'Recordatorio'}`;
+  const vehStr = vehName || (getActiveVehicle() ? getActiveVehicle().name : 'Vehículo');
+  const description = `Recordatorio de GarageOne\nVehículo: ${vehStr}\nCategoría: ${reminder.category || 'Mantenimiento'}${reminder.notes ? '\nNotas: ' + reminder.notes : ''}`;
+
+  const [year, month, day] = reminder.targetDate.split('-').map(s => s.padStart(2, '0'));
+  const timeStr = reminder.time || '09:00';
+  const [hour, minute] = timeStr.split(':').map(s => s.padStart(2, '0'));
+
+  const startISO = `${year}${month}${day}T${hour}${minute}00`;
+
+  let endH = parseInt(hour, 10);
+  let endM = parseInt(minute, 10) + 30;
+  if (endM >= 60) {
+    endH = (endH + 1) % 24;
+    endM = endM % 60;
+  }
+  const endISO = `${year}${month}${day}T${String(endH).padStart(2, '0')}${String(endM).padStart(2, '0')}00`;
+
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//GarageOne//AutoCare Reminders//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${description.replace(/\n/g, '\\n')}`,
+    `DTSTART:${startISO}`,
+    `DTEND:${endISO}`,
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT0M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${title}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `recordatorio_${(reminder.title || 'garageone').replace(/[^a-z0-9]/gi, '_')}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
+
+function exportReminderToCalendarDirect(remId, event = null) {
+  if (event) {
+    try {
+      event.preventDefault();
+      event.stopPropagation();
+    } catch (e) {}
+  }
+  const rem = (appState.reminders || []).find(r => r.id === remId);
+  const veh = getActiveVehicle();
+  if (rem) {
+    exportReminderToCalendar(rem, veh ? veh.name : '');
+  }
+}
+
 function renderRemindersListHelper(remindersList, veh) {
   if (!remindersList || remindersList.length === 0) {
     return `<p class="subtitle" style="text-align:center; padding:20px;">No hay recordatorios registrados.</p>`;
@@ -1752,13 +1825,21 @@ function renderRemindersListHelper(remindersList, veh) {
           </button>
         </div>
         <div class="swipe-content log-item-card" onclick="openReminderModal('${r.id}')">
-          <div class="log-item-main">
-            <div class="log-icon-badge">${categoryIcon}</div>
-            <div>
-              <div class="log-title">${escapeHtml(r.title)}</div>
-              <div class="log-meta">${metaParts.join(' • ')}</div>
-              ${r.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
+          <div class="log-item-main" style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+              <div class="log-icon-badge">${categoryIcon}</div>
+              <div style="min-width:0; flex:1;">
+                <div class="log-title">${escapeHtml(r.title)}</div>
+                <div class="log-meta">${metaParts.join(' • ')}</div>
+                ${r.notes ? `<div class="log-meta" style="font-style:italic;">Nota: ${escapeHtml(r.notes)}</div>` : ''}
+              </div>
             </div>
+            ${r.targetDate ? `
+              <button type="button" class="btn btn-sm" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; cursor:pointer; flex-shrink:0;" onclick="exportReminderToCalendarDirect('${r.id}', event)" title="Agendar en Calendario Nativo (Alarma Offline / Pantalla Bloqueada)">
+                ${SVG_ICONS.calendar || ''}
+                <span>Agendar</span>
+              </button>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -1865,6 +1946,14 @@ async function saveReminder(e) {
   renderUserReminders();
   renderRemindersTab();
   checkAndSendDueNotifications();
+
+  if (targetRem && targetRem.targetDate) {
+    setTimeout(() => {
+      if (confirm(`¿Deseas agendar "${targetRem.title}" en el Calendario de tu celular para recibir la alarma nativa (pantalla bloqueada / offline)?`)) {
+        exportReminderToCalendar(targetRem, veh ? veh.name : '');
+      }
+    }, 200);
+  }
 }
 
 async function deleteReminderDirect(remId, event = null) {
