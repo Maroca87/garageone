@@ -4263,38 +4263,41 @@ async function forceSyncNow() {
 
 /**
  * Pobla el desplegable de filtro por mes en el módulo de reportes.
- * Extrae los meses únicos (YYYY-MM) de los servicios y recargas de combustible del vehículo activo.
+ * Refleja por defecto el mes en curso (aunque no tenga registros aún),
+ * permitiendo al usuario seleccionar cualquier otro mes o el histórico completo.
  */
 function populateReportMonthFilter() {
   const select = document.getElementById('reportMonthFilter');
   if (!select) return;
 
-  const currentVal = select.value || 'all';
+  const currentVal = select.value;
   const veh = getActiveVehicle();
   const vehId = veh ? veh.id : appState.activeVehicleId;
 
-  if (!vehId) {
-    select.innerHTML = `<option value="all">Todos los meses (Histórico)</option>`;
-    select.value = 'all';
-    return;
-  }
-
-  const services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
-  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
+  // Obtener la clave del mes en curso en formato YYYY-MM (e.g. '2026-08')
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const monthsSet = new Set();
+  // Incluir siempre el mes en curso por defecto
+  monthsSet.add(currentMonthKey);
 
-  services.forEach(s => {
-    if (s.date && typeof s.date === 'string' && s.date.length >= 7) {
-      monthsSet.add(s.date.substring(0, 7));
-    }
-  });
+  if (vehId) {
+    const services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
+    const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
 
-  fuels.forEach(f => {
-    if (f.date && typeof f.date === 'string' && f.date.length >= 7) {
-      monthsSet.add(f.date.substring(0, 7));
-    }
-  });
+    services.forEach(s => {
+      if (s.date && typeof s.date === 'string' && s.date.length >= 7) {
+        monthsSet.add(s.date.substring(0, 7));
+      }
+    });
+
+    fuels.forEach(f => {
+      if (f.date && typeof f.date === 'string' && f.date.length >= 7) {
+        monthsSet.add(f.date.substring(0, 7));
+      }
+    });
+  }
 
   const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
   const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -4304,15 +4307,18 @@ function populateReportMonthFilter() {
     const [year, monthNum] = mKey.split('-');
     const monthIndex = parseInt(monthNum, 10) - 1;
     const monthName = monthNamesEs[monthIndex] || mKey;
-    const label = `${monthName} ${year}`;
+    const isCurrent = mKey === currentMonthKey;
+    const label = isCurrent ? `${monthName} ${year} (Mes en curso)` : `${monthName} ${year}`;
     html += `<option value="${mKey}">${escapeHtml(label)}</option>`;
   });
 
   select.innerHTML = html;
+
+  // Si el usuario ya había seleccionado un valor existente, respetarlo; de lo contrario, predeterminar al mes en curso
   if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
     select.value = currentVal;
   } else {
-    select.value = 'all';
+    select.value = currentMonthKey;
   }
 }
 
@@ -4341,10 +4347,27 @@ function renderReports() {
   const servEl = document.getElementById('totalServiceSpend');
   const fuelEl = document.getElementById('totalFuelSpend');
   const combinedEl = document.getElementById('totalCombinedSpend');
+  const emptyNoticeEl = document.getElementById('reportEmptyMonthNotice');
 
   if (servEl) servEl.textContent = formatCurrency(totalServSpend);
   if (fuelEl) fuelEl.textContent = formatCurrency(totalFuelSpend);
   if (combinedEl) combinedEl.textContent = formatCurrency(totalCombinedSpend);
+
+  if (emptyNoticeEl) {
+    if (totalCombinedSpend === 0) {
+      emptyNoticeEl.style.display = 'block';
+      if (selectedMonth !== 'all') {
+        const [year, monthNum] = selectedMonth.split('-');
+        const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const monthName = monthNamesEs[parseInt(monthNum, 10) - 1] || selectedMonth;
+        emptyNoticeEl.textContent = `Sin movimientos registrados en ${monthName} ${year}`;
+      } else {
+        emptyNoticeEl.textContent = 'Sin movimientos registrados en el garaje';
+      }
+    } else {
+      emptyNoticeEl.style.display = 'none';
+    }
+  }
 
   renderCategoryDonutChart(services);
   renderMonthlyExpensesChart(services, fuels);
