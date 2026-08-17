@@ -963,13 +963,15 @@ function syncServiceCategoriesWithState() {
     appState.services.forEach(s => {
       if (s.category && !SERVICE_CATEGORIES.includes(s.category)) {
         SERVICE_CATEGORIES.push(s.category);
-        if (!appState.serviceCategories.some(c => (c.name || c).toLowerCase() === s.category.toLowerCase())) {
-          appState.serviceCategories.push({
-            id: 'cat_srv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-            name: s.category,
-            affectsHealth: false
-          });
-        }
+      }
+      if (s.category && !appState.serviceCategories.some(c => (c.name || c).toLowerCase() === s.category.toLowerCase())) {
+        appState.serviceCategories.push({
+          id: 'cat_srv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          name: s.category,
+          affectsHealth: true,
+          recommendedIntervalKm: 0,
+          recommendedIntervalMonths: 12
+        });
       }
     });
   }
@@ -1119,12 +1121,13 @@ async function loadAppStateFromDB() {
     const cleanUsername = (currentUser.username || '').toLowerCase();
 
     // Determinar si este usuario es Marcos (marcos_frc@outlook.com) o el usuario principal del dispositivo
+    // Coincidencia exacta para asegurar que marcos2 u otras cuentas mantengan una sesión 100% independiente.
     const isPrimaryOwner = (
-      cleanEmail.includes('marcos') ||
-      cleanUsername.includes('marcos') ||
-      cleanUsername === 'admin' ||
-      appState.users.length <= 1 ||
-      (appState.users.length > 0 && appState.users[0].id === uId)
+      cleanEmail === 'marcos_frc@outlook.com' ||
+      cleanEmail === 'marcos_rc@icloud.com' ||
+      cleanUsername === 'marcos' ||
+      cleanUsername === 'marcos_rc' ||
+      cleanUsername === 'admin'
     );
 
     let needsMigration = false;
@@ -6478,29 +6481,6 @@ function extractArrayFromParsed(container) {
   return [];
 }
 
-/**
- * Elimina todos los usuarios registrados localmente y reinicia el estado de sesión.
- */
-async function resetAllUsersStore() {
-  if (confirm('¿Deseas eliminar todos los usuarios registrados y reiniciar la autenticación?')) {
-    try {
-      await LocalDB.clear(STORES.USERS);
-      if (typeof AuthService !== 'undefined' && AuthService.logout) {
-        await AuthService.logout();
-      }
-      localStorage.removeItem(USERS_KEY);
-      localStorage.removeItem('GARAGEONE_ACTIVE_USER');
-      localStorage.removeItem('GARAGEONE_USER');
-      appState.users = [];
-      alert('Se eliminaron todos los usuarios correctamente. Puedes registrar o iniciar sesión con cualquier usuario.');
-      window.location.reload();
-    } catch (e) {
-      console.error('Error reiniciando usuarios:', e);
-      alert('Error reiniciando usuarios: ' + e.message);
-    }
-  }
-}
-
 function importBackupXml(e) {
   const file = e.target && e.target.files ? e.target.files[0] : null;
   if (!file) return;
@@ -6529,6 +6509,7 @@ function importBackupXml(e) {
         let serviceCategories = extractArrayFromParsed(dataRoot.serviceCategories);
         let backupHistory = extractArrayFromParsed(dataRoot.backupHistory);
         let usersInXml = extractArrayFromParsed(dataRoot.users);
+        let healthSettingsInXml = dataRoot.healthSettings;
 
         // Si la lista de vehículos viene vacía a nivel superior, inspeccionar xmlData en backupHistory
         if (vehicles.length === 0 && backupHistory.length > 0) {
@@ -6544,6 +6525,8 @@ function importBackupXml(e) {
                   if (fuels.length === 0) fuels = extractArrayFromParsed(subRoot.fuels);
                   if (documents.length === 0) documents = extractArrayFromParsed(subRoot.documents);
                   if (reminders.length === 0) reminders = extractArrayFromParsed(subRoot.reminders);
+                  if (serviceCategories.length === 0) serviceCategories = extractArrayFromParsed(subRoot.serviceCategories);
+                  if (!healthSettingsInXml && subRoot.healthSettings) healthSettingsInXml = subRoot.healthSettings;
                   break;
                 }
               } catch (errSub) {
@@ -6605,6 +6588,38 @@ function importBackupXml(e) {
           await LocalDB.putMany(STORES.USERS, usersInXml);
         }
 
+        // Importar y preservar categorías personalizadas de servicio y parámetros de salud
+        if (serviceCategories.length > 0) {
+          if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
+            appState.serviceCategories = [];
+          }
+          serviceCategories.forEach(importedCat => {
+            if (!importedCat || !importedCat.name) return;
+            const isAff = importedCat.affectsHealth === true || String(importedCat.affectsHealth) === 'true';
+            const idx = appState.serviceCategories.findIndex(c => (c.name || '').toLowerCase() === importedCat.name.toLowerCase());
+            if (idx >= 0) {
+              appState.serviceCategories[idx] = {
+                ...appState.serviceCategories[idx],
+                ...importedCat,
+                affectsHealth: isAff,
+                recommendedIntervalKm: Number(importedCat.recommendedIntervalKm || 0),
+                recommendedIntervalMonths: Number(importedCat.recommendedIntervalMonths || 12)
+              };
+            } else {
+              appState.serviceCategories.push({
+                ...importedCat,
+                affectsHealth: isAff,
+                recommendedIntervalKm: Number(importedCat.recommendedIntervalKm || 0),
+                recommendedIntervalMonths: Number(importedCat.recommendedIntervalMonths || 12)
+              });
+            }
+          });
+        }
+
+        if (healthSettingsInXml) {
+          appState.healthSettings = healthSettingsInXml;
+        }
+
         // Guardar en la base de datos local IndexedDB
         if (vehicles.length > 0) await LocalDB.putMany(STORES.VEHICLES, vehicles);
         if (services.length > 0) await LocalDB.putMany(STORES.SERVICES, services);
@@ -6618,13 +6633,13 @@ function importBackupXml(e) {
         if (fuels.length > 0) appState.fuels = fuels;
         if (documents.length > 0) appState.documents = documents;
         if (reminders.length > 0) appState.reminders = reminders;
-        if (serviceCategories.length > 0) appState.serviceCategories = serviceCategories;
         if (backupHistory.length > 0) appState.backupHistory = backupHistory;
 
         if (vehicles.length > 0) {
           appState.activeVehicleId = vehicles[0].id;
         }
 
+        syncServiceCategoriesWithState();
         saveState();
         await loadAppStateFromDB();
         renderApp();
