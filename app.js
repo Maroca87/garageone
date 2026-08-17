@@ -1001,32 +1001,23 @@ function saveState() {
     syncServiceCategoriesWithState();
     const uId = currentUser ? currentUser.id : null;
     const key = getUserStorageKey(currentUser);
-    if (uId) {
-      if (Array.isArray(appState.vehicles)) appState.vehicles.forEach(v => { if (v && !v.userId) v.userId = uId; });
-      if (Array.isArray(appState.services)) appState.services.forEach(s => { if (s && !s.userId) s.userId = uId; });
-      if (Array.isArray(appState.fuels)) appState.fuels.forEach(f => { if (f && !f.userId) f.userId = uId; });
-      if (Array.isArray(appState.documents)) appState.documents.forEach(d => { if (d && !d.userId) d.userId = uId; });
-      if (Array.isArray(appState.reminders)) appState.reminders.forEach(r => { if (r && !r.userId) r.userId = uId; });
-      if (Array.isArray(appState.emergencyContacts)) appState.emergencyContacts.forEach(c => { if (c && !c.userId) c.userId = uId; });
-      if (Array.isArray(appState.backupHistory)) appState.backupHistory.forEach(b => { if (b && !b.userId) b.userId = uId; });
-    }
     localStorage.setItem(key, JSON.stringify(appState));
-  } catch (e) {}
 
-  if (appState.vehicles && Array.isArray(appState.vehicles)) {
-    LocalDB.putMany(STORES.VEHICLES, appState.vehicles);
-  }
-  if (appState.documents && Array.isArray(appState.documents)) {
-    LocalDB.putMany(STORES.DOCUMENTS, appState.documents);
-  }
-  if (appState.reminders && Array.isArray(appState.reminders)) {
-    LocalDB.putMany(STORES.REMINDERS, appState.reminders);
-  }
-  if (appState.services && Array.isArray(appState.services)) {
-    LocalDB.putMany(STORES.SERVICES, appState.services);
-  }
-  if (appState.fuels && Array.isArray(appState.fuels)) {
-    LocalDB.putMany(STORES.FUELS, appState.fuels);
+    if (uId) {
+      const userVehicles = (appState.vehicles || []).filter(v => v && v.userId === uId);
+      const userServices = (appState.services || []).filter(s => s && s.userId === uId);
+      const userFuels = (appState.fuels || []).filter(f => f && f.userId === uId);
+      const userDocs = (appState.documents || []).filter(d => d && d.userId === uId);
+      const userReminders = (appState.reminders || []).filter(r => r && r.userId === uId);
+
+      if (userVehicles.length > 0) LocalDB.putMany(STORES.VEHICLES, userVehicles);
+      if (userServices.length > 0) LocalDB.putMany(STORES.SERVICES, userServices);
+      if (userFuels.length > 0) LocalDB.putMany(STORES.FUELS, userFuels);
+      if (userDocs.length > 0) LocalDB.putMany(STORES.DOCUMENTS, userDocs);
+      if (userReminders.length > 0) LocalDB.putMany(STORES.REMINDERS, userReminders);
+    }
+  } catch (e) {
+    console.error('Error guardando estado local:', e);
   }
 }
 
@@ -1108,6 +1099,13 @@ function isLegacyOrUnassignedUserId(userId, currentUserId) {
 
 async function loadAppStateFromDB() {
   currentUser = AuthService.getCurrentUser();
+  appState.vehicles = [];
+  appState.services = [];
+  appState.fuels = [];
+  appState.documents = [];
+  appState.reminders = [];
+  appState.activeVehicleId = null;
+
   const allVehicles = await LocalDB.getAll(STORES.VEHICLES);
   const allServices = await LocalDB.getAll(STORES.SERVICES);
   const allFuels = await LocalDB.getAll(STORES.FUELS);
