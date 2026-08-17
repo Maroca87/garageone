@@ -562,7 +562,7 @@ async function handleForgotPassword(e) {
   }
 }
 
-function checkAuth() {
+async function checkAuth() {
   const authScreen = document.getElementById('authScreen');
   const appShell = document.getElementById('appShell');
   const splash = document.getElementById('splashScreen');
@@ -570,17 +570,16 @@ function checkAuth() {
   currentUser = AuthService.getCurrentUser();
   isAuthenticated = AuthService.isAuthenticated();
 
-  if (isAuthenticated) {
+  if (isAuthenticated && currentUser && currentUser.id) {
     if (authScreen) authScreen.style.display = 'none';
     if (appShell) appShell.style.display = 'block';
 
     try {
-      loadAppStateFromDB().then(() => {
-        switchTab('tabGarage');
-        renderApp();
-        renderUserSettings();
-        triggerGarageEntryAnimation();
-      });
+      await loadAppStateFromDB();
+      switchTab('tabGarage');
+      renderApp();
+      renderUserSettings();
+      triggerGarageEntryAnimation();
     } catch (err) {
       console.error('Error al renderizar la app:', err);
     }
@@ -643,10 +642,10 @@ async function handleRegister(e) {
     await AuthService.register(email, password, { username, name: username });
     currentUser = AuthService.getCurrentUser();
     isAuthenticated = AuthService.isAuthenticated();
-    checkAuth();
+    await checkAuth();
   } catch (err) {
     if (passError) {
-      passError.textContent = err.message || 'Error registrando la cuenta en Supabase.';
+      passError.textContent = err.message || 'Error registrando la cuenta.';
       passError.style.display = 'block';
     }
   }
@@ -675,7 +674,7 @@ async function handleLogin(e) {
     currentUser = AuthService.getCurrentUser();
     isAuthenticated = AuthService.isAuthenticated();
     if (pinInput) pinInput.value = '';
-    checkAuth();
+    await checkAuth();
   } catch (err) {
     if (loginError) {
       loginError.textContent = err.message || 'Credenciales incorrectas o error de autenticación.';
@@ -698,7 +697,20 @@ async function handleLogout() {
   appState.emergencyContacts = [];
   appState.backupHistory = [];
   appState.activeVehicleId = null;
-  checkAuth();
+
+  const listContainers = [
+    'serviceLogList', 'fuelLogList', 'maintenanceFilterPills',
+    'vehicleSelectorPills', 'miniVehiclesList', 'documentsContainer',
+    'customCategoriesList', 'userRemindersContainer', 'remindersList',
+    'activeVehicleHero'
+  ];
+  listContainers.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+
+  saveState();
+  await checkAuth();
 }
 
 function resetUserPin(e) {
@@ -1106,6 +1118,15 @@ async function loadAppStateFromDB() {
   appState.reminders = [];
   appState.activeVehicleId = null;
 
+  const listContainers = [
+    'serviceLogList', 'fuelLogList', 'documentsContainer',
+    'vehicleSelectorPills', 'miniVehiclesList', 'maintenanceFilterPills'
+  ];
+  listContainers.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+
   const allVehicles = await LocalDB.getAll(STORES.VEHICLES);
   const allServices = await LocalDB.getAll(STORES.SERVICES);
   const allFuels = await LocalDB.getAll(STORES.FUELS);
@@ -1367,6 +1388,9 @@ function switchTab(tabId, el) {
     logBox.innerHTML = '';
   }
 
+  if (tabId === 'tabGarage') renderApp();
+  if (tabId === 'tabMaintenance') renderServiceList(appState.activeVehicleId);
+  if (tabId === 'tabFuel') renderFuelList(appState.activeVehicleId);
   if (tabId === 'tabReminders') renderRemindersTab();
   if (tabId === 'tabHealth' || tabId === 'tabAI') renderVehicleHealth();
   if (tabId === 'tabReports') renderReports();
@@ -1421,6 +1445,9 @@ function renderApp() {
   if (!heroEl) return;
 
   const veh = getActiveVehicle();
+  const serviceContainer = document.getElementById('serviceLogList');
+  const fuelContainer = document.getElementById('fuelLogList');
+
   if (!veh) {
     heroEl.innerHTML = `
       <div style="text-align:center; padding:20px;">
@@ -1429,6 +1456,12 @@ function renderApp() {
         <button class="btn btn-primary" onclick="openVehicleModal()">+ Agregar Vehículo</button>
       </div>
     `;
+    if (serviceContainer) {
+      serviceContainer.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros en esta categoría.</p>`;
+    }
+    if (fuelContainer) {
+      fuelContainer.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros de gasolina.</p>`;
+    }
     return;
   }
 
@@ -3938,20 +3971,14 @@ function renderFuelList(vehId) {
   const container = document.getElementById('fuelLogList');
   if (!container) return;
   const veh = appState.vehicles.find(v => v.id === vehId) || getActiveVehicle();
-  const targetId = veh ? veh.id : vehId;
+  const targetId = veh ? veh.id : null;
 
-  (appState.fuels || []).forEach(f => {
-    if (!f.vehicleId && veh) {
-      f.vehicleId = veh.id;
-    }
-  });
+  if (!targetId || !appState.vehicles || appState.vehicles.length === 0) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros de gasolina.</p>`;
+    return;
+  }
 
-  let list = (appState.fuels || []).filter(f => {
-    if (!f.vehicleId) return true;
-    if (targetId && f.vehicleId === targetId) return true;
-    if (appState.vehicles.length <= 1) return true;
-    return false;
-  });
+  let list = (appState.fuels || []).filter(f => f && f.vehicleId === targetId);
   list.sort((a, b) => Number(b.km) - Number(a.km));
 
   const effEl = document.getElementById('fuelEfficiencyVal');
