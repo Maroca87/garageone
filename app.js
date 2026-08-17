@@ -1090,15 +1090,17 @@ function loadUsersListFromIDB() {
 }
 
 /**
- * Evalúa si un userId es nulo, no asignado o corresponde a un identificador heredado local.
+ * Evalúa si un userId es nulo, no asignado o corresponde a un identificador heredado local o predeterminado.
  */
 function isLegacyOrUnassignedUserId(userId, currentUserId) {
   if (!userId) return true;
   if (currentUserId && userId === currentUserId) return true;
   const raw = String(userId).trim().toLowerCase();
-  if (raw === '' || raw === 'null' || raw === 'undefined' || raw === 'local_user' || raw === 'default_user' || raw === 'local' || raw === 'default') {
-    return true;
-  }
+  const legacyStrings = [
+    '', 'null', 'undefined', 'local_user', 'default_user', 'local', 'default',
+    '00000000-0000-4000-a000-000000000001', 'admin'
+  ];
+  if (legacyStrings.includes(raw)) return true;
   return false;
 }
 
@@ -1168,6 +1170,9 @@ async function loadAppStateFromDB() {
     if (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId)) {
       appState.activeVehicleId = appState.vehicles[0].id;
     }
+    const mainVehId = appState.activeVehicleId;
+    (appState.services || []).forEach(s => { if (!s.vehicleId || s.vehicleId === 'v1' || s.vehicleId === 'default') s.vehicleId = mainVehId; });
+    (appState.fuels || []).forEach(f => { if (!f.vehicleId || f.vehicleId === 'v1' || f.vehicleId === 'default') f.vehicleId = mainVehId; });
   } else {
     appState.activeVehicleId = null;
   }
@@ -3844,8 +3849,8 @@ function renderServiceList(vehId) {
   const targetId = veh ? veh.id : vehId;
 
   (appState.services || []).forEach(s => {
-    if (!s.vehicleId && veh) {
-      s.vehicleId = veh.id;
+    if (!s.vehicleId || (veh && appState.vehicles.length === 1)) {
+      s.vehicleId = veh ? veh.id : s.vehicleId;
     }
   });
 
@@ -4243,9 +4248,11 @@ function populateReportMonthFilter() {
   if (!select) return;
 
   const currentVal = select.value || 'all';
-  const vehId = appState.activeVehicleId;
-  const services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
-  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
+  const veh = getActiveVehicle();
+  const vehId = veh ? veh.id : appState.activeVehicleId;
+
+  const services = (appState.services || []).filter(s => s && (!s.vehicleId || s.vehicleId === vehId || appState.vehicles.length <= 1));
+  const fuels = (appState.fuels || []).filter(f => f && (!f.vehicleId || f.vehicleId === vehId || appState.vehicles.length <= 1));
 
   const monthsSet = new Set();
 
@@ -6499,13 +6506,35 @@ function importBackupXml(e) {
         const serviceCategories = extractArrayFromParsed(dataRoot.serviceCategories);
         const backupHistory = extractArrayFromParsed(dataRoot.backupHistory);
 
-        // Estampar userId del usuario activo en cada elemento importado
+        let targetVehId = vehicles.length > 0 ? vehicles[0].id : null;
+
+        // Estampar userId del usuario activo y vincular vehicleId
         if (uId) {
           vehicles.forEach(v => { if (v && typeof v === 'object') v.userId = uId; });
-          services.forEach(s => { if (s && typeof s === 'object') s.userId = uId; });
-          fuels.forEach(f => { if (f && typeof f === 'object') f.userId = uId; });
-          documents.forEach(d => { if (d && typeof d === 'object') d.userId = uId; });
-          reminders.forEach(r => { if (r && typeof r === 'object') r.userId = uId; });
+          services.forEach(s => {
+            if (s && typeof s === 'object') {
+              s.userId = uId;
+              if (targetVehId && (!s.vehicleId || vehicles.length === 1)) s.vehicleId = targetVehId;
+            }
+          });
+          fuels.forEach(f => {
+            if (f && typeof f === 'object') {
+              f.userId = uId;
+              if (targetVehId && (!f.vehicleId || vehicles.length === 1)) f.vehicleId = targetVehId;
+            }
+          });
+          documents.forEach(d => {
+            if (d && typeof d === 'object') {
+              d.userId = uId;
+              if (targetVehId && (!d.vehicleId || vehicles.length === 1)) d.vehicleId = targetVehId;
+            }
+          });
+          reminders.forEach(r => {
+            if (r && typeof r === 'object') {
+              r.userId = uId;
+              if (targetVehId && (!r.vehicleId || vehicles.length === 1)) r.vehicleId = targetVehId;
+            }
+          });
         }
 
         // Guardar en la base de datos local IndexedDB
@@ -6533,6 +6562,7 @@ function importBackupXml(e) {
         renderApp();
         renderGuantera();
         renderRemindersTab();
+        renderReports();
         renderBackupHistory();
 
         alert(`¡Respaldo XML restaurado con éxito!\nSe importaron:\n• ${vehicles.length} vehículo(s)\n• ${services.length} mantenimiento(s)\n• ${fuels.length} recarga(s) de combustible\n• ${documents.length} documento(s)`);
