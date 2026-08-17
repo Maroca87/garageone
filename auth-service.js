@@ -28,22 +28,17 @@ class AuthServiceEngine {
   async init() {
     try {
       await LocalDB.init();
-      let storedUserRaw = localStorage.getItem('GARAGEONE_ACTIVE_USER') || localStorage.getItem('GARAGEONE_USER');
-      if (storedUserRaw) {
-        try {
-          this.currentUser = JSON.parse(storedUserRaw);
-        } catch (e) {
-          this.currentUser = null;
-        }
-      }
-
-      if (!this.currentUser) {
-        const users = await LocalDB.getAll(STORES.USERS);
-        if (users && users.length > 0) {
-          this.currentUser = users[0];
-          localStorage.setItem('GARAGEONE_ACTIVE_USER', JSON.stringify(this.currentUser));
-        }
-      }
+      // Eliminar todos los usuarios de la base de datos local e IndexedDB como fue solicitado
+      await LocalDB.clear(STORES.USERS);
+      this.currentUser = null;
+      this.setSessionAuthenticated(false);
+      try {
+        localStorage.removeItem('GARAGEONE_ACTIVE_USER');
+        localStorage.removeItem('GARAGEONE_USER');
+        localStorage.removeItem('GARAGEONE_USERS_LIST');
+        localStorage.removeItem('GARAGEONE_SESSION_AUTHENTICATED');
+        sessionStorage.removeItem('GARAGEONE_SESSION_AUTHENTICATED');
+      } catch (e) {}
     } catch (e) {
       console.error('[AuthService] Error inicializando sesión local:', e);
     }
