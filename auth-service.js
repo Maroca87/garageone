@@ -116,6 +116,7 @@ class AuthServiceEngine {
       throw new Error('La contraseña ingresada no es correcta.');
     }
 
+    if (typeof resetAppStateInMemory === 'function') resetAppStateInMemory();
     this.currentUser = matchedUser;
     this.setSessionAuthenticated(true);
     try {
@@ -159,6 +160,7 @@ class AuthServiceEngine {
     };
 
     await LocalDB.put(STORES.USERS, newUser);
+    if (typeof resetAppStateInMemory === 'function') resetAppStateInMemory();
     this.currentUser = newUser;
     this.setSessionAuthenticated(true);
     try {
@@ -170,6 +172,7 @@ class AuthServiceEngine {
   }
 
   async logout() {
+    if (typeof resetAppStateInMemory === 'function') resetAppStateInMemory();
     this.currentUser = null;
     this.setSessionAuthenticated(false);
     try {

@@ -3851,18 +3851,12 @@ function renderServiceList(vehId) {
   const veh = appState.vehicles.find(v => v.id === vehId) || getActiveVehicle();
   const targetId = veh ? veh.id : vehId;
 
-  (appState.services || []).forEach(s => {
-    if (!s.vehicleId || (veh && appState.vehicles.length === 1)) {
-      s.vehicleId = veh ? veh.id : s.vehicleId;
-    }
-  });
+  if (!targetId) {
+    container.innerHTML = `<p class="subtitle" style="text-align:center; padding:20px;">Sin registros en esta categoría.</p>`;
+    return;
+  }
 
-  let list = (appState.services || []).filter(s => {
-    if (!s.vehicleId) return true;
-    if (targetId && s.vehicleId === targetId) return true;
-    if (appState.vehicles.length <= 1) return true;
-    return false;
-  });
+  let list = (appState.services || []).filter(s => s && s.vehicleId === targetId);
 
   if (currentFilter !== 'all') {
     list = list.filter(s => s.category === currentFilter);
@@ -4254,8 +4248,14 @@ function populateReportMonthFilter() {
   const veh = getActiveVehicle();
   const vehId = veh ? veh.id : appState.activeVehicleId;
 
-  const services = (appState.services || []).filter(s => s && (!s.vehicleId || s.vehicleId === vehId || appState.vehicles.length <= 1));
-  const fuels = (appState.fuels || []).filter(f => f && (!f.vehicleId || f.vehicleId === vehId || appState.vehicles.length <= 1));
+  if (!vehId) {
+    select.innerHTML = `<option value="all">Todos los meses (Histórico)</option>`;
+    select.value = 'all';
+    return;
+  }
+
+  const services = (appState.services || []).filter(s => s && s.vehicleId === vehId);
+  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
 
   const monthsSet = new Set();
 
@@ -4297,11 +4297,12 @@ function populateReportMonthFilter() {
 function renderReports() {
   populateReportMonthFilter();
 
-  const vehId = appState.activeVehicleId;
+  const veh = getActiveVehicle();
+  const vehId = veh ? veh.id : appState.activeVehicleId;
   const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
 
-  let services = (appState.services || []).filter(s => s && (!s.vehicleId || s.vehicleId === vehId || appState.vehicles.length <= 1));
-  let fuels = (appState.fuels || []).filter(f => f && (!f.vehicleId || f.vehicleId === vehId || appState.vehicles.length <= 1));
+  let services = vehId ? (appState.services || []).filter(s => s && s.vehicleId === vehId) : [];
+  let fuels = vehId ? (appState.fuels || []).filter(f => f && f.vehicleId === vehId) : [];
 
   if (selectedMonth !== 'all') {
     services = services.filter(s => s.date && s.date.startsWith(selectedMonth));
@@ -4597,9 +4598,9 @@ function generateCertifiedReport() {
 
   const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
 
-  let services = (appState.services || []).filter(s => !s.vehicleId || s.vehicleId === veh.id || appState.vehicles.length <= 1).sort((a, b) => new Date(b.date) - new Date(a.date));
-  let fuels = (appState.fuels || []).filter(f => !f.vehicleId || f.vehicleId === veh.id || appState.vehicles.length <= 1);
-  const reminders = (appState.reminders || []).filter(r => (!r.vehicleId || r.vehicleId === veh.id || appState.vehicles.length <= 1) && !r.completed);
+  let services = (appState.services || []).filter(s => s && s.vehicleId === veh.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+  let fuels = (appState.fuels || []).filter(f => f && f.vehicleId === veh.id);
+  const reminders = (appState.reminders || []).filter(r => r && r.vehicleId === veh.id && !r.completed);
 
   let periodLabel = 'Histórico Completo';
   if (selectedMonth !== 'all') {
@@ -5307,10 +5308,10 @@ function calculateVehicleHealth(veh) {
   const convertFromKm = (kmVal) => isMiles ? Math.round(kmVal / 1.60934) : Math.round(kmVal);
 
   const currentKm = convertToKm(veh.km);
-  const services = (appState.services || []).filter(s => !s.vehicleId || s.vehicleId === veh.id || appState.vehicles.length <= 1);
-  const documents = (appState.documents || []).filter(d => !d.vehicleId || d.vehicleId === veh.id || appState.vehicles.length <= 1);
-  const reminders = (appState.reminders || []).filter(r => !r.vehicleId || r.vehicleId === veh.id || appState.vehicles.length <= 1);
-  const fuels = (appState.fuels || []).filter(f => !f.vehicleId || f.vehicleId === veh.id || appState.vehicles.length <= 1);
+  const services = (appState.services || []).filter(s => s && s.vehicleId === veh.id);
+  const documents = (appState.documents || []).filter(d => d && d.vehicleId === veh.id);
+  const reminders = (appState.reminders || []).filter(r => r && r.vehicleId === veh.id);
+  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === veh.id);
 
   const missingItems = [];
 
