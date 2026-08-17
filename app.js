@@ -1109,6 +1109,7 @@ async function loadAppStateFromDB() {
       cleanEmail.includes('marcos') ||
       cleanUsername.includes('marcos') ||
       cleanUsername === 'admin' ||
+      appState.users.length <= 1 ||
       (appState.users.length > 0 && appState.users[0].id === uId)
     );
 
@@ -1137,11 +1138,11 @@ async function loadAppStateFromDB() {
       }
     }
 
-    appState.vehicles = (allVehicles || []).filter(v => v && v.userId === uId);
-    appState.services = (allServices || []).filter(s => s && s.userId === uId);
-    appState.fuels = (allFuels || []).filter(f => f && f.userId === uId);
-    appState.documents = (allDocuments || []).filter(d => d && d.userId === uId);
-    appState.reminders = (allReminders || []).filter(r => r && r.userId === uId);
+    appState.vehicles = (allVehicles || []).filter(v => v && (v.userId === uId || (!v.userId && isPrimaryOwner)));
+    appState.services = (allServices || []).filter(s => s && (s.userId === uId || (!s.userId && isPrimaryOwner)));
+    appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (!f.userId && isPrimaryOwner)));
+    appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (!d.userId && isPrimaryOwner)));
+    appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (!r.userId && isPrimaryOwner)));
   } else {
     appState.vehicles = [];
     appState.services = [];
@@ -6436,6 +6437,29 @@ function checkAndTriggerAutoBackup(forceCheck = false) {
   }
 }
 
+/**
+ * Extrae de forma flexible arreglos de cualquier estructura de objeto XML parseada.
+ */
+function extractArrayFromParsed(container) {
+  if (!container) return [];
+  if (Array.isArray(container)) return container;
+  if (typeof container === 'object') {
+    if (Array.isArray(container.item)) return container.item;
+    if (container.item && typeof container.item === 'object') return [container.item];
+
+    for (let k in container) {
+      if (Array.isArray(container[k])) return container[k];
+    }
+    for (let k in container) {
+      if (container[k] && typeof container[k] === 'object' && container[k].id) {
+        return Object.values(container);
+      }
+    }
+    if (container.id) return [container];
+  }
+  return [];
+}
+
 function importBackupXml(e) {
   const file = e.target && e.target.files ? e.target.files[0] : null;
   if (!file) return;
@@ -6445,24 +6469,60 @@ function importBackupXml(e) {
       const xmlStr = evt.target.result;
       const parsedData = xmlToObject(xmlStr);
       if (!parsedData || typeof parsedData !== 'object') {
-        throw new Error('Archivo XML no válido');
+        throw new Error('El archivo XML no posee una estructura válida.');
       }
-      if (confirm('¿Deseas restaurar los datos desde este archivo XML? Se actualizará la información del sistema.')) {
-        if (parsedData.vehicles && Array.isArray(parsedData.vehicles)) appState.vehicles = parsedData.vehicles;
-        if (parsedData.services && Array.isArray(parsedData.services)) appState.services = parsedData.services;
-        if (parsedData.fuels && Array.isArray(parsedData.fuels)) appState.fuels = parsedData.fuels;
-        if (parsedData.documents && Array.isArray(parsedData.documents)) appState.documents = parsedData.documents;
-        if (parsedData.reminders && Array.isArray(parsedData.reminders)) appState.reminders = parsedData.reminders;
-        if (parsedData.serviceCategories && Array.isArray(parsedData.serviceCategories)) appState.serviceCategories = parsedData.serviceCategories;
-        if (parsedData.backupHistory && Array.isArray(parsedData.backupHistory)) appState.backupHistory = parsedData.backupHistory;
-        if (parsedData.activeVehicleId) appState.activeVehicleId = parsedData.activeVehicleId;
+
+      if (confirm('¿Deseas restaurar los datos desde este archivo XML? Se integrará la información a tu garaje.')) {
+        const uId = currentUser ? currentUser.id : null;
+
+        const vehicles = extractArrayFromParsed(parsedData.vehicles);
+        const services = extractArrayFromParsed(parsedData.services);
+        const fuels = extractArrayFromParsed(parsedData.fuels);
+        const documents = extractArrayFromParsed(parsedData.documents);
+        const reminders = extractArrayFromParsed(parsedData.reminders);
+        const serviceCategories = extractArrayFromParsed(parsedData.serviceCategories);
+        const backupHistory = extractArrayFromParsed(parsedData.backupHistory);
+
+        // Estampar userId del usuario activo en cada elemento importado
+        if (uId) {
+          vehicles.forEach(v => { if (v) v.userId = uId; });
+          services.forEach(s => { if (s) s.userId = uId; });
+          fuels.forEach(f => { if (f) f.userId = uId; });
+          documents.forEach(d => { if (d) d.userId = uId; });
+          reminders.forEach(r => { if (r) r.userId = uId; });
+        }
+
+        // Guardar en la base de datos local IndexedDB
+        if (vehicles.length > 0) await LocalDB.putMany(STORES.VEHICLES, vehicles);
+        if (services.length > 0) await LocalDB.putMany(STORES.SERVICES, services);
+        if (fuels.length > 0) await LocalDB.putMany(STORES.FUELS, fuels);
+        if (documents.length > 0) await LocalDB.putMany(STORES.DOCUMENTS, documents);
+        if (reminders.length > 0) await LocalDB.putMany(STORES.REMINDERS, reminders);
+
+        // Actualizar appState en memoria
+        if (vehicles.length > 0) appState.vehicles = vehicles;
+        if (services.length > 0) appState.services = services;
+        if (fuels.length > 0) appState.fuels = fuels;
+        if (documents.length > 0) appState.documents = documents;
+        if (reminders.length > 0) appState.reminders = reminders;
+        if (serviceCategories.length > 0) appState.serviceCategories = serviceCategories;
+        if (backupHistory.length > 0) appState.backupHistory = backupHistory;
+
+        if (parsedData.activeVehicleId || (appState.vehicles.length > 0)) {
+          appState.activeVehicleId = parsedData.activeVehicleId || appState.vehicles[0].id;
+        }
+
         saveState();
         await loadAppStateFromDB();
         renderApp();
+        renderGuantera();
+        renderRemindersTab();
         renderBackupHistory();
-        alert('Respaldo XML restaurado con éxito.');
+
+        alert(`¡Respaldo XML restaurado con éxito!\nSe importaron:\n• ${vehicles.length} vehículo(s)\n• ${services.length} mantenimiento(s)\n• ${fuels.length} recarga(s) de combustible\n• ${documents.length} documento(s)`);
       }
     } catch (err) {
+      console.error('Error al importar el respaldo XML:', err);
       alert('Error al importar el respaldo XML: ' + err.message);
     }
   };
