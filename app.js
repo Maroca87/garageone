@@ -259,8 +259,23 @@ function closeModal(modalId) {
 
 // App Initialization
 document.addEventListener('DOMContentLoaded', async () => {
-  checkAuth();
   setTodayDates();
+
+  // Si hay una sesión previa en este navegador, activar inmediatamente el splash screen
+  // y mantener la pantalla de autenticación oculta para evitar parpadeos visuales al arrancar.
+  const hasSavedSession = (sessionStorage.getItem('GARAGEONE_SESSION_AUTHENTICATED') === 'true') ||
+                          (localStorage.getItem('GARAGEONE_SESSION_AUTHENTICATED') === 'true');
+  const splash = document.getElementById('splashScreen');
+  const authScreen = document.getElementById('authScreen');
+  const appShell = document.getElementById('appShell');
+
+  if (hasSavedSession && splash) {
+    splash.classList.remove('fade-out');
+    splash.style.display = 'flex';
+    if (authScreen) authScreen.style.display = 'none';
+    if (appShell) appShell.style.display = 'block';
+  }
+
   await initAsyncStorage();
 
   // Close modals when clicking dark backdrop
@@ -550,25 +565,27 @@ async function handleForgotPassword(e) {
 function checkAuth() {
   const authScreen = document.getElementById('authScreen');
   const appShell = document.getElementById('appShell');
+  const splash = document.getElementById('splashScreen');
 
   currentUser = AuthService.getCurrentUser();
   isAuthenticated = AuthService.isAuthenticated();
 
   if (isAuthenticated) {
-    triggerGarageEntryAnimation(() => {
-      if (authScreen) authScreen.style.display = 'none';
-      if (appShell) appShell.style.display = 'block';
-      try {
-        loadAppStateFromDB().then(() => {
-          switchTab('tabGarage');
-          renderApp();
-          renderUserSettings();
-        });
-      } catch (err) {
-        console.error('Error al renderizar la app:', err);
-      }
-    });
+    if (authScreen) authScreen.style.display = 'none';
+    if (appShell) appShell.style.display = 'block';
+
+    try {
+      loadAppStateFromDB().then(() => {
+        switchTab('tabGarage');
+        renderApp();
+        renderUserSettings();
+        triggerGarageEntryAnimation();
+      });
+    } catch (err) {
+      console.error('Error al renderizar la app:', err);
+    }
   } else {
+    if (splash) splash.style.display = 'none';
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
     showLoginForm();
@@ -1083,13 +1100,48 @@ async function loadAppStateFromDB() {
 
   if (currentUser && currentUser.id) {
     const uId = currentUser.id;
-    const isLegacyAdmin = (currentUser.username && currentUser.username.toLowerCase() === 'admin');
+    const cleanEmail = (currentUser.email || '').toLowerCase();
+    const cleanUsername = (currentUser.username || '').toLowerCase();
 
-    appState.vehicles = (allVehicles || []).filter(v => v && (v.userId === uId || (!v.userId && isLegacyAdmin)));
-    appState.services = (allServices || []).filter(s => s && (s.userId === uId || (!s.userId && isLegacyAdmin)));
-    appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (!f.userId && isLegacyAdmin)));
-    appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (!d.userId && isLegacyAdmin)));
-    appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (!r.userId && isLegacyAdmin)));
+    // Determinar si este usuario es Marcos (marcos_frc@outlook.com) o el usuario principal del dispositivo
+    // que creó los registros heredados sin userId o con userId === 'local_user'.
+    const isPrimaryOwner = (
+      cleanEmail.includes('marcos') ||
+      cleanUsername.includes('marcos') ||
+      cleanUsername === 'admin' ||
+      (appState.users.length > 0 && appState.users[0].id === uId)
+    );
+
+    // Auto-migrar y estampar el userId de Marcos en todos los elementos heredados que no tenían userId asignado
+    if (isPrimaryOwner) {
+      let needsMigration = false;
+      const migrateItem = (item) => {
+        if (item && (!item.userId || item.userId === 'local_user')) {
+          item.userId = uId;
+          needsMigration = true;
+        }
+      };
+
+      (allVehicles || []).forEach(migrateItem);
+      (allServices || []).forEach(migrateItem);
+      (allFuels || []).forEach(migrateItem);
+      (allDocuments || []).forEach(migrateItem);
+      (allReminders || []).forEach(migrateItem);
+
+      if (needsMigration) {
+        if (allVehicles.length > 0) await LocalDB.putMany(STORES.VEHICLES, allVehicles);
+        if (allServices.length > 0) await LocalDB.putMany(STORES.SERVICES, allServices);
+        if (allFuels.length > 0) await LocalDB.putMany(STORES.FUELS, allFuels);
+        if (allDocuments.length > 0) await LocalDB.putMany(STORES.DOCUMENTS, allDocuments);
+        if (allReminders.length > 0) await LocalDB.putMany(STORES.REMINDERS, allReminders);
+      }
+    }
+
+    appState.vehicles = (allVehicles || []).filter(v => v && v.userId === uId);
+    appState.services = (allServices || []).filter(s => s && s.userId === uId);
+    appState.fuels = (allFuels || []).filter(f => f && f.userId === uId);
+    appState.documents = (allDocuments || []).filter(d => d && d.userId === uId);
+    appState.reminders = (allReminders || []).filter(r => r && r.userId === uId);
   } else {
     appState.vehicles = [];
     appState.services = [];
