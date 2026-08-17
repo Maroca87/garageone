@@ -413,6 +413,30 @@ function showRegisterForm() {
   if (authSubtitle) authSubtitle.textContent = 'Crea tu usuario único de acceso';
 }
 
+/**
+ * Muestra una animación fluida con el logo oficial de GarageOne
+ * antes de ingresar al garaje o cambiar de sesión.
+ */
+function triggerGarageEntryAnimation(callback) {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) {
+    if (typeof callback === 'function') callback();
+    return;
+  }
+
+  splash.classList.remove('fade-out');
+  splash.style.display = 'flex';
+
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    setTimeout(() => {
+      splash.style.display = 'none';
+      splash.classList.remove('fade-out');
+      if (typeof callback === 'function') callback();
+    }, 400);
+  }, 1200);
+}
+
 function showForgotPasswordForm() {
   const formLogin = document.getElementById('formLogin');
   const formRegister = document.getElementById('formRegister');
@@ -422,6 +446,14 @@ function showForgotPasswordForm() {
 
   const step1 = document.getElementById('forgotStep1');
   const step2 = document.getElementById('forgotStep2');
+  const forgotInput = document.getElementById('forgotUserOrEmail');
+  const forgotUserError = document.getElementById('forgotUserError');
+  const forgotPassError = document.getElementById('forgotPassError');
+
+  if (forgotInput) forgotInput.value = '';
+  if (forgotUserError) forgotUserError.style.display = 'none';
+  if (forgotPassError) forgotPassError.style.display = 'none';
+
   if (step1) step1.style.display = 'block';
   if (step2) step2.style.display = 'none';
 
@@ -429,66 +461,57 @@ function showForgotPasswordForm() {
   if (formRegister) formRegister.style.display = 'none';
   if (formForgotPass) formForgotPass.style.display = 'block';
   if (authTitle) authTitle.textContent = 'Recuperar Contraseña';
-  if (authSubtitle) authSubtitle.textContent = 'Verificación por correo electrónico registrado';
+  if (authSubtitle) authSubtitle.textContent = 'Ingresa tu nombre de usuario o correo registrado';
 }
 
-async function sendRecoveryVerificationCode() {
-  const inputEl = document.getElementById('forgotUserOrEmail');
-  const errorEl = document.getElementById('forgotUserError');
-  if (errorEl) errorEl.style.display = 'none';
+let localRecoveryTargetUser = null;
 
-  const val = inputEl ? inputEl.value.trim().toLowerCase() : '';
+async function verifyRecoveryUser() {
+  const input = document.getElementById('forgotUserOrEmail');
+  const err = document.getElementById('forgotUserError');
+  if (err) err.style.display = 'none';
+
+  const val = input ? input.value.trim().toLowerCase() : '';
   if (!val) {
-    if (errorEl) {
-      errorEl.textContent = 'Por favor ingresa tu correo electrónico registrado.';
-      errorEl.style.display = 'block';
-    }
+    if (err) { err.textContent = 'Por favor ingresa tu usuario o correo electrónico registrado.'; err.style.display = 'block'; }
     return;
   }
 
-  try {
-    await AuthService.resetPassword(val);
-    alert(`Se ha enviado un correo con instrucciones para restablecer tu contraseña a "${val}".`);
-    showLoginForm();
-  } catch (err) {
-    if (errorEl) {
-      errorEl.textContent = err.message || 'No se pudo enviar el correo de recuperación. Revisa la dirección de correo.';
-      errorEl.style.display = 'block';
-    }
+  const users = await LocalDB.getAll(STORES.USERS);
+  const matched = users.find(u => 
+    (u.username && u.username.trim().toLowerCase() === val) || 
+    (u.email && u.email.trim().toLowerCase() === val)
+  );
+
+  if (matched) {
+    localRecoveryTargetUser = matched;
+    const targetLabel = document.getElementById('forgotEmailSentTarget');
+    if (targetLabel) targetLabel.textContent = `${matched.name || matched.username} (${matched.email || matched.username})`;
+    const step1 = document.getElementById('forgotStep1');
+    const step2 = document.getElementById('forgotStep2');
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'block';
+  } else {
+    if (err) { err.textContent = 'No se encontró ningún usuario registrado con esos datos.'; err.style.display = 'block'; }
   }
 }
 
-
-
-function handleForgotPassword(e) {
+async function handleForgotPassword(e) {
   if (e) e.preventDefault();
 
-  const codeInput = document.getElementById('forgotCodeInput');
   const newPassInput = document.getElementById('forgotNewPassword');
   const confirmPassInput = document.getElementById('forgotConfirmPassword');
-
-  const codeError = document.getElementById('forgotCodeError');
   const passError = document.getElementById('forgotPassError');
 
-  if (codeError) codeError.style.display = 'none';
   if (passError) passError.style.display = 'none';
 
-  const enteredCode = codeInput ? codeInput.value.trim() : '';
   const newPassword = newPassInput ? newPassInput.value.trim() : '';
   const confirmPassword = confirmPassInput ? confirmPassInput.value.trim() : '';
 
-  if (!currentRecoveryOTP || !currentRecoveryTargetUser) {
-    if (codeError) {
-      codeError.textContent = 'Debes solicitar primero un código de verificación.';
-      codeError.style.display = 'block';
-    }
-    return;
-  }
-
-  if (enteredCode !== currentRecoveryOTP) {
-    if (codeError) {
-      codeError.textContent = 'El código de verificación es incorrecto. Revisa el código enviado.';
-      codeError.style.display = 'block';
+  if (!localRecoveryTargetUser) {
+    if (passError) {
+      passError.textContent = 'Debes verificar primero tu cuenta de usuario.';
+      passError.style.display = 'block';
     }
     return;
   }
@@ -509,20 +532,19 @@ function handleForgotPassword(e) {
     return;
   }
 
-  currentRecoveryTargetUser.password = newPassword;
-  if (currentRecoveryTargetUser.pinEnabled) {
-    currentRecoveryTargetUser.pin = newPassword.length <= 6 && !isNaN(newPassword) ? newPassword : currentRecoveryTargetUser.pin;
+  try {
+    await AuthService.resetPasswordLocal(localRecoveryTargetUser.email || localRecoveryTargetUser.username, newPassword);
+    localRecoveryTargetUser = null;
+    if (newPassInput) newPassInput.value = '';
+    if (confirmPassInput) confirmPassInput.value = '';
+    alert('Contraseña restablecida con éxito. Ya puedes iniciar sesión con tu nueva contraseña.');
+    showLoginForm();
+  } catch (err) {
+    if (passError) {
+      passError.textContent = err.message || 'No se pudo restablecer la contraseña.';
+      passError.style.display = 'block';
+    }
   }
-
-  saveUser(currentRecoveryTargetUser);
-  isAuthenticated = true;
-  failedLoginAttempts = 0;
-  lockoutUntil = 0;
-  currentRecoveryOTP = null;
-  currentRecoveryTargetUser = null;
-
-  alert('¡Verificación por correo exitosa! Tu contraseña ha sido cambiada de forma segura.');
-  checkAuth();
 }
 
 function checkAuth() {
@@ -533,17 +555,19 @@ function checkAuth() {
   isAuthenticated = AuthService.isAuthenticated();
 
   if (isAuthenticated) {
-    if (authScreen) authScreen.style.display = 'none';
-    if (appShell) appShell.style.display = 'block';
-    try {
-      loadAppStateFromDB().then(() => {
-        switchTab('tabGarage');
-        renderApp();
-        renderUserSettings();
-      });
-    } catch (err) {
-      console.error('Error al renderizar la app:', err);
-    }
+    triggerGarageEntryAnimation(() => {
+      if (authScreen) authScreen.style.display = 'none';
+      if (appShell) appShell.style.display = 'block';
+      try {
+        loadAppStateFromDB().then(() => {
+          switchTab('tabGarage');
+          renderApp();
+          renderUserSettings();
+        });
+      } catch (err) {
+        console.error('Error al renderizar la app:', err);
+      }
+    });
   } else {
     if (authScreen) authScreen.style.display = 'flex';
     if (appShell) appShell.style.display = 'none';
@@ -641,6 +665,23 @@ async function handleLogin(e) {
       loginError.style.display = 'block';
     }
   }
+}
+
+async function handleLogout() {
+  await AuthService.logout();
+  currentUser = null;
+  isAuthenticated = false;
+  // Reiniciar estado en memoria para aislamiento total entre usuarios
+  appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  appState.vehicles = [];
+  appState.services = [];
+  appState.fuels = [];
+  appState.documents = [];
+  appState.reminders = [];
+  appState.emergencyContacts = [];
+  appState.backupHistory = [];
+  appState.activeVehicleId = null;
+  checkAuth();
 }
 
 function resetUserPin(e) {
@@ -921,7 +962,7 @@ function loadState() {
   let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   try {
     const key = getUserStorageKey(currentUser);
-    const saved = localStorage.getItem(key) || localStorage.getItem('GARAGEONE_UNIFIED_MASTER_STATE_V100');
+    const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
       state = sanitizeState(parsed);
@@ -939,9 +980,18 @@ function loadState() {
 function saveState() {
   try {
     syncServiceCategoriesWithState();
+    const uId = currentUser ? currentUser.id : null;
     const key = getUserStorageKey(currentUser);
+    if (uId) {
+      if (Array.isArray(appState.vehicles)) appState.vehicles.forEach(v => { if (v && !v.userId) v.userId = uId; });
+      if (Array.isArray(appState.services)) appState.services.forEach(s => { if (s && !s.userId) s.userId = uId; });
+      if (Array.isArray(appState.fuels)) appState.fuels.forEach(f => { if (f && !f.userId) f.userId = uId; });
+      if (Array.isArray(appState.documents)) appState.documents.forEach(d => { if (d && !d.userId) d.userId = uId; });
+      if (Array.isArray(appState.reminders)) appState.reminders.forEach(r => { if (r && !r.userId) r.userId = uId; });
+      if (Array.isArray(appState.emergencyContacts)) appState.emergencyContacts.forEach(c => { if (c && !c.userId) c.userId = uId; });
+      if (Array.isArray(appState.backupHistory)) appState.backupHistory.forEach(b => { if (b && !b.userId) b.userId = uId; });
+    }
     localStorage.setItem(key, JSON.stringify(appState));
-    localStorage.setItem('GARAGEONE_UNIFIED_MASTER_STATE_V100', JSON.stringify(appState));
   } catch (e) {}
 
   if (appState.vehicles && Array.isArray(appState.vehicles)) {
@@ -1023,15 +1073,37 @@ function loadUsersListFromIDB() {
 }
 
 async function loadAppStateFromDB() {
-  appState.vehicles = await LocalDB.getAll(STORES.VEHICLES);
-  appState.services = await LocalDB.getAll(STORES.SERVICES);
-  appState.fuels = await LocalDB.getAll(STORES.FUELS);
-  appState.documents = await LocalDB.getAll(STORES.DOCUMENTS);
-  appState.reminders = await LocalDB.getAll(STORES.REMINDERS);
+  currentUser = AuthService.getCurrentUser();
+  const allVehicles = await LocalDB.getAll(STORES.VEHICLES);
+  const allServices = await LocalDB.getAll(STORES.SERVICES);
+  const allFuels = await LocalDB.getAll(STORES.FUELS);
+  const allDocuments = await LocalDB.getAll(STORES.DOCUMENTS);
+  const allReminders = await LocalDB.getAll(STORES.REMINDERS);
   appState.users = await LocalDB.getAll(STORES.USERS);
 
-  if (appState.vehicles.length > 0 && (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId))) {
-    appState.activeVehicleId = appState.vehicles[0].id;
+  if (currentUser && currentUser.id) {
+    const uId = currentUser.id;
+    const isLegacyAdmin = (currentUser.username && currentUser.username.toLowerCase() === 'admin');
+
+    appState.vehicles = (allVehicles || []).filter(v => v && (v.userId === uId || (!v.userId && isLegacyAdmin)));
+    appState.services = (allServices || []).filter(s => s && (s.userId === uId || (!s.userId && isLegacyAdmin)));
+    appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (!f.userId && isLegacyAdmin)));
+    appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (!d.userId && isLegacyAdmin)));
+    appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (!r.userId && isLegacyAdmin)));
+  } else {
+    appState.vehicles = [];
+    appState.services = [];
+    appState.fuels = [];
+    appState.documents = [];
+    appState.reminders = [];
+  }
+
+  if (appState.vehicles.length > 0) {
+    if (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId)) {
+      appState.activeVehicleId = appState.vehicles[0].id;
+    }
+  } else {
+    appState.activeVehicleId = null;
   }
   syncServiceCategoriesWithState();
 }
@@ -3951,10 +4023,79 @@ function renderUserSettings() {
   renderStorageStats();
 
   const backupFreqEl = document.getElementById('backupFrequency');
+  const backupTimeEl = document.getElementById('backupTime');
   if (backupFreqEl) backupFreqEl.value = appState.backupFrequency || 'off';
+  if (backupTimeEl && appState.backupTime) backupTimeEl.value = appState.backupTime;
+  updateBackupScheduleSettings();
   renderBackupHistory();
 
   applyLanguageTranslations();
+}
+
+/**
+ * Calcula e informa la fecha y hora exactas del próximo respaldo automático.
+ */
+function calculateNextBackupSchedule(frequency, timeStr = '03:00') {
+  if (!frequency || frequency === 'off') return '';
+
+  const parts = (timeStr || '03:00').split(':');
+  const targetHour = parseInt(parts[0], 10) || 0;
+  const targetMinute = parseInt(parts[1], 10) || 0;
+
+  const now = new Date();
+  let nextDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetHour, targetMinute, 0, 0);
+
+  if (frequency === 'daily') {
+    if (nextDate <= now) {
+      nextDate.setDate(nextDate.getDate() + 1);
+    }
+  } else if (frequency === 'weekly') {
+    if (nextDate <= now) {
+      nextDate.setDate(nextDate.getDate() + 7);
+    }
+  } else if (frequency === 'monthly') {
+    if (nextDate <= now) {
+      nextDate.setMonth(nextDate.getMonth() + 1);
+    }
+  }
+
+  const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  const dateFormatted = nextDate.toLocaleDateString('es-ES', optionsDate);
+  const timeFormatted = nextDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  return `Próximo respaldo automático programado: <br><strong>${dateFormatted}</strong> a las <strong>${timeFormatted}</strong>`;
+}
+
+function updateBackupScheduleSettings() {
+  const freqEl = document.getElementById('backupFrequency');
+  const timeEl = document.getElementById('backupTime');
+  const timeGroup = document.getElementById('backupTimeGroup');
+  const previewEl = document.getElementById('backupNextSchedule');
+
+  const freq = freqEl ? freqEl.value : 'off';
+  const timeStr = timeEl ? timeEl.value : '03:00';
+
+  appState.backupFrequency = freq;
+  appState.backupTime = timeStr;
+  saveState();
+
+  if (freq === 'off') {
+    if (timeGroup) timeGroup.style.display = 'none';
+    if (previewEl) {
+      previewEl.style.display = 'none';
+      previewEl.innerHTML = '';
+    }
+  } else {
+    if (timeGroup) timeGroup.style.display = 'block';
+    if (previewEl) {
+      previewEl.style.display = 'block';
+      previewEl.innerHTML = calculateNextBackupSchedule(freq, timeStr);
+    }
+  }
+}
+
+function saveBackupFrequency(val) {
+  updateBackupScheduleSettings();
 }
 
 function changeCurrencySetting(val) {
@@ -6119,37 +6260,7 @@ function saveServiceCategory(e) {
 }
 
 
-// Additional UI Helper Aliases
-function showForgotPasswordForm() {
-  if (typeof showForgotPasswordModal === 'function') {
-    showForgotPasswordModal();
-  } else {
-    openModal('modalForgotPass');
-  }
-}
 
-function verifyRecoveryUser() {
-  const input = document.getElementById('forgotUserOrEmail');
-  const err = document.getElementById('forgotUserError');
-  const val = input ? input.value.trim().toLowerCase() : '';
-  if (!val) {
-    if (err) { err.textContent = 'Por favor ingresa tu usuario o correo.'; err.style.display = 'block'; }
-    return;
-  }
-  const users = getUsersList();
-  const matched = users.find(u => (u.username && u.username.toLowerCase() === val) || (u.email && u.email.toLowerCase() === val));
-  if (matched) {
-    localRecoveryTargetUser = matched;
-    const targetLabel = document.getElementById('forgotEmailSentTarget');
-    if (targetLabel) targetLabel.textContent = matched.username || matched.email;
-    const step1 = document.getElementById('forgotStep1');
-    const step2 = document.getElementById('forgotStep2');
-    if (step1) step1.style.display = 'none';
-    if (step2) step2.style.display = 'block';
-  } else {
-    if (err) { err.textContent = 'No se encontro ningun usuario registrado con esos datos.'; err.style.display = 'block'; }
-  }
-}
 
 /**
  * Genera el reporte técnico con la selección de filtro de mes actual

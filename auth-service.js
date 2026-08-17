@@ -104,25 +104,15 @@ class AuthServiceEngine {
     const cleanQuery = String(emailOrUser).trim().toLowerCase();
     
     let matchedUser = users.find(u => 
-      (u.email && u.email.toLowerCase() === cleanQuery) ||
-      (u.username && u.username.toLowerCase() === cleanQuery)
+      (u.email && u.email.trim().toLowerCase() === cleanQuery) ||
+      (u.username && u.username.trim().toLowerCase() === cleanQuery)
     );
 
     if (!matchedUser) {
-      // Auto-create local user profile on first login for instant access
-      matchedUser = {
-        id: LocalDB.generateUUID(),
-        email: cleanQuery.includes('@') ? cleanQuery : `${cleanQuery}@garageone.local`,
-        username: cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery,
-        name: cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery,
-        password: password || '',
-        role: 'estandar',
-        permissions: DEFAULT_PERMISSIONS,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      await LocalDB.put(STORES.USERS, matchedUser);
-    } else if (password && matchedUser.password && matchedUser.password !== password) {
+      throw new Error('El usuario o correo ingresado no está registrado.');
+    }
+
+    if (password && matchedUser.password && matchedUser.password !== password) {
       throw new Error('La contraseña ingresada no es correcta.');
     }
 
@@ -140,21 +130,27 @@ class AuthServiceEngine {
     if (!emailOrUser) throw new Error('Ingresa un nombre de usuario o correo válido.');
 
     const users = await LocalDB.getAll(STORES.USERS);
-    const cleanQuery = String(emailOrUser).trim().toLowerCase();
+    const rawInput = String(emailOrUser).trim().toLowerCase();
 
-    const existing = users.find(u => 
-      (u.email && u.email.toLowerCase() === cleanQuery) ||
-      (u.username && u.username.toLowerCase() === cleanQuery)
-    );
-    if (existing) {
-      throw new Error('Ya existe una cuenta con este nombre o correo en este dispositivo.');
+    const targetEmail = (userData.email || (rawInput.includes('@') ? rawInput : `${rawInput}@garageone.local`)).trim().toLowerCase();
+    const targetUsername = (userData.username || (rawInput.includes('@') ? rawInput.split('@')[0] : rawInput)).trim().toLowerCase();
+
+    // Validar duplicidad estricta de correo y nombre de usuario
+    const existingEmail = users.find(u => u.email && u.email.trim().toLowerCase() === targetEmail);
+    if (existingEmail) {
+      throw new Error('El correo electrónico ya está registrado. Utiliza un correo diferente.');
+    }
+
+    const existingUsername = users.find(u => u.username && u.username.trim().toLowerCase() === targetUsername);
+    if (existingUsername) {
+      throw new Error('El nombre de usuario ya está registrado. Elige un nombre de usuario diferente.');
     }
 
     const newUser = {
       id: LocalDB.generateUUID(),
-      email: cleanQuery.includes('@') ? cleanQuery : `${cleanQuery}@garageone.local`,
-      username: userData.username || (cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery),
-      name: userData.name || (cleanQuery.includes('@') ? cleanQuery.split('@')[0] : cleanQuery),
+      email: targetEmail,
+      username: targetUsername,
+      name: userData.name || targetUsername,
       password: password || '',
       role: userData.role || 'estandar',
       permissions: DEFAULT_PERMISSIONS,
@@ -186,14 +182,14 @@ class AuthServiceEngine {
 
   async resetPasswordLocal(emailOrUser, newPassword) {
     if (!emailOrUser) throw new Error('Ingresa un usuario o correo válido.');
-    if (!newPassword) throw new Error('Ingresa tu nueva contraseña.');
+    if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres.');
     
     const users = await LocalDB.getAll(STORES.USERS);
     const cleanQuery = String(emailOrUser).trim().toLowerCase();
 
     let matchedUser = users.find(u => 
-      (u.email && u.email.toLowerCase() === cleanQuery) ||
-      (u.username && u.username.toLowerCase() === cleanQuery)
+      (u.email && u.email.trim().toLowerCase() === cleanQuery) ||
+      (u.username && u.username.trim().toLowerCase() === cleanQuery)
     );
 
     if (!matchedUser) {

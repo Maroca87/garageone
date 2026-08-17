@@ -27,6 +27,20 @@
 </head>
 <body>
 
+  <!-- SPLASH SCREEN ENTRANCE ANIMATION -->
+  <div id="splashScreen" class="splash-screen-overlay" style="display:none;">
+    <div class="splash-content">
+      <div class="splash-logo-container">
+        <img src="icons/icon-512.png?v=108" alt="GarageOne Logo" class="splash-logo-img">
+      </div>
+      <h2 class="splash-title">GarageOne</h2>
+      <p class="splash-subtitle" id="splashSubtitle">Cargando tu garaje...</p>
+      <div class="splash-loader-bar">
+        <div class="splash-loader-progress"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- AUTH SCREEN (LOGIN / REGISTER) -->
   <div id="authScreen" class="auth-screen" style="display:none;">
     <div class="auth-card">
@@ -41,8 +55,8 @@
       <!-- Login Form -->
       <form id="formLogin" onsubmit="handleLogin(event)">
         <div class="form-group">
-          <label>Correo electrónico</label>
-          <input type="email" id="loginUser" class="form-control" placeholder="correo@ejemplo.com" autocomplete="email">
+          <label>Correo electrónico o Usuario</label>
+          <input type="text" id="loginUser" class="form-control" placeholder="correo@ejemplo.com o usuario" autocomplete="username">
         </div>
         <div class="form-group">
           <label id="loginPassLabel">Contraseña</label>
@@ -93,13 +107,13 @@
             <div id="forgotUserError" class="error-text"></div>
           </div>
           <button type="button" class="btn btn-primary btn-block" onclick="verifyRecoveryUser()">
-            Buscar Cuenta y Restablecer
+            Buscar Cuenta y Continuar
           </button>
         </div>
 
         <div id="forgotStep2" style="display:none;">
           <div style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); padding:10px 12px; border-radius:10px; font-size:0.83rem; margin-bottom:12px; color:#38bdf8; text-align:center;">
-            Cuenta verificada localmente para:<br>
+            Cuenta verificada para:<br>
             <strong id="forgotEmailSentTarget" style="color:#ffffff; font-size:0.9rem;">-</strong>
           </div>
           <div class="form-group">
@@ -117,18 +131,6 @@
         <div style="margin-top:14px; text-align:center;">
           <button type="button" class="btn btn-tertiary btn-block" onclick="showLoginForm()" style="font-size:0.8rem; color:var(--text-secondary);">Volver al Inicio de Sesión</button>
         </div>
-      </form>
-      <form id="formResetPassword" onsubmit="completePasswordRecovery(event)" style="display:none;">
-        <div class="form-group">
-          <label>Nueva Contraseña</label>
-          <input type="password" id="recoveryNewPassword" class="form-control" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required>
-        </div>
-        <div class="form-group">
-          <label>Confirmar Nueva Contraseña</label>
-          <input type="password" id="recoveryConfirmPassword" class="form-control" placeholder="Repite la nueva contraseña" autocomplete="new-password" required>
-          <div id="recoveryPasswordError" class="error-text"></div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Guardar Nueva Contraseña</button>
       </form>
     </div>
   </div>
@@ -443,14 +445,24 @@
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('backupImportInput').click()">Importar XML</button>
             <input id="backupImportInput" type="file" accept=".xml,text/xml,application/xml" style="display:none" onchange="importBackupXml(event)">
           </div>
-          <div class="form-group" style="margin:14px 0 6px;">
-            <label style="font-size:0.8rem;">Respaldo automático</label>
-            <select id="backupFrequency" class="form-control" onchange="saveBackupFrequency(this.value)">
-              <option value="off">Desactivado</option><option value="daily">Diario</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option>
-            </select>
+          <div style="margin:14px 0 6px; display:flex; flex-direction:column; gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label style="font-size:0.8rem;">Respaldo automático</label>
+              <select id="backupFrequency" class="form-control" onchange="updateBackupScheduleSettings()">
+                <option value="off">Desactivado</option>
+                <option value="daily">Diario</option>
+                <option value="weekly">Semanal</option>
+                <option value="monthly">Mensual</option>
+              </select>
+            </div>
+            <div class="form-group" id="backupTimeGroup" style="margin:0; display:none;">
+              <label style="font-size:0.8rem;">Hora programada del respaldo</label>
+              <input type="time" id="backupTime" class="form-control" value="03:00" onchange="updateBackupScheduleSettings()">
+            </div>
+            <div id="backupNextSchedule" style="font-size:0.82rem; color:#38bdf8; background:rgba(56,189,248,0.1); padding:8px 12px; border-radius:10px; border:1px solid rgba(56,189,248,0.25); display:none;"></div>
           </div>
           <button type="button" class="btn btn-secondary btn-sm btn-block" onclick="createManualBackup()" style="margin-top:8px;">Respaldar ahora</button>
-          <div id="backupStatus" style="font-size:0.78rem; color:var(--text-secondary);"></div>
+          <div id="backupStatus" style="font-size:0.78rem; color:var(--text-secondary); margin-top:4px;"></div>
           <div id="backupHistory" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
         </div>
       </section>

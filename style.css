@@ -1993,6 +1993,114 @@ input:checked + .slider:before {
   }
 }
 
+/* ==========================================================================
+   Splash Screen Entrance Animation System
+   ========================================================================== */
+.splash-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: #09090b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
 
+.splash-screen-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
 
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
 
+.splash-logo-container {
+  width: 110px;
+  height: 110px;
+  border-radius: 28px;
+  background: #ffffff;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.4), 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: splashPulse 1.8s ease-in-out infinite alternate;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.splash-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 18px;
+}
+
+.splash-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.03em;
+  margin: 0 0 6px 0;
+}
+
+.splash-subtitle {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin: 0 0 24px 0;
+}
+
+.splash-loader-bar {
+  width: 180px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.splash-loader-progress {
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  border-radius: 10px;
+  position: absolute;
+  animation: progressIndeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes splashPulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.2), 0 5px 15px rgba(0, 0, 0, 0.5);
+  }
+  100% {
+    transform: scale(1.05);
+    box-shadow: 0 0 50px rgba(56, 189, 248, 0.5), 0 15px 35px rgba(0, 0, 0, 0.7);
+  }
+}
+
+@keyframes progressIndeterminate {
+  0% {
+    left: -50%;
+    width: 30%;
+  }
+  50% {
+    left: 30%;
+    width: 60%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
+}
