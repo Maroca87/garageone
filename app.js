@@ -1089,6 +1089,19 @@ function loadUsersListFromIDB() {
   });
 }
 
+/**
+ * Evalúa si un userId es nulo, no asignado o corresponde a un identificador heredado local.
+ */
+function isLegacyOrUnassignedUserId(userId, currentUserId) {
+  if (!userId) return true;
+  if (currentUserId && userId === currentUserId) return true;
+  const raw = String(userId).trim().toLowerCase();
+  if (raw === '' || raw === 'null' || raw === 'undefined' || raw === 'local_user' || raw === 'default_user' || raw === 'local' || raw === 'default') {
+    return true;
+  }
+  return false;
+}
+
 async function loadAppStateFromDB() {
   currentUser = AuthService.getCurrentUser();
   const allVehicles = await LocalDB.getAll(STORES.VEHICLES);
@@ -1104,7 +1117,6 @@ async function loadAppStateFromDB() {
     const cleanUsername = (currentUser.username || '').toLowerCase();
 
     // Determinar si este usuario es Marcos (marcos_frc@outlook.com) o el usuario principal del dispositivo
-    // que creó los registros heredados sin userId o con userId === 'local_user'.
     const isPrimaryOwner = (
       cleanEmail.includes('marcos') ||
       cleanUsername.includes('marcos') ||
@@ -1113,16 +1125,17 @@ async function loadAppStateFromDB() {
       (appState.users.length > 0 && appState.users[0].id === uId)
     );
 
-    // Auto-migrar y estampar el userId de Marcos en todos los elementos heredados que no tenían userId asignado
-    if (isPrimaryOwner) {
-      let needsMigration = false;
-      const migrateItem = (item) => {
-        if (item && (!item.userId || item.userId === 'local_user')) {
+    let needsMigration = false;
+    const migrateItem = (item) => {
+      if (item && isLegacyOrUnassignedUserId(item.userId, uId)) {
+        if (item.userId !== uId) {
           item.userId = uId;
           needsMigration = true;
         }
-      };
+      }
+    };
 
+    if (isPrimaryOwner) {
       (allVehicles || []).forEach(migrateItem);
       (allServices || []).forEach(migrateItem);
       (allFuels || []).forEach(migrateItem);
@@ -1138,11 +1151,11 @@ async function loadAppStateFromDB() {
       }
     }
 
-    appState.vehicles = (allVehicles || []).filter(v => v && (v.userId === uId || (!v.userId && isPrimaryOwner)));
-    appState.services = (allServices || []).filter(s => s && (s.userId === uId || (!s.userId && isPrimaryOwner)));
-    appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (!f.userId && isPrimaryOwner)));
-    appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (!d.userId && isPrimaryOwner)));
-    appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (!r.userId && isPrimaryOwner)));
+    appState.vehicles = (allVehicles || []).filter(v => v && (v.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(v.userId, uId))));
+    appState.services = (allServices || []).filter(s => s && (s.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(s.userId, uId))));
+    appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(f.userId, uId))));
+    appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(d.userId, uId))));
+    appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(r.userId, uId))));
   } else {
     appState.vehicles = [];
     appState.services = [];
@@ -6450,12 +6463,10 @@ function extractArrayFromParsed(container) {
     for (let k in container) {
       if (Array.isArray(container[k])) return container[k];
     }
-    for (let k in container) {
-      if (container[k] && typeof container[k] === 'object' && container[k].id) {
-        return Object.values(container);
-      }
-    }
-    if (container.id) return [container];
+    const vals = Object.values(container).filter(v => v && typeof v === 'object' && (v.id || v.brand || v.name || v.date));
+    if (vals.length > 0) return vals;
+
+    if (container.id || container.brand || container.name || container.date) return [container];
   }
   return [];
 }
@@ -6472,24 +6483,29 @@ function importBackupXml(e) {
         throw new Error('El archivo XML no posee una estructura válida.');
       }
 
+      let dataRoot = parsedData;
+      if (parsedData.GarageOneBackup) dataRoot = parsedData.GarageOneBackup;
+      else if (parsedData.AutoCareBackup) dataRoot = parsedData.AutoCareBackup;
+      else if (parsedData.backup) dataRoot = parsedData.backup;
+
       if (confirm('¿Deseas restaurar los datos desde este archivo XML? Se integrará la información a tu garaje.')) {
         const uId = currentUser ? currentUser.id : null;
 
-        const vehicles = extractArrayFromParsed(parsedData.vehicles);
-        const services = extractArrayFromParsed(parsedData.services);
-        const fuels = extractArrayFromParsed(parsedData.fuels);
-        const documents = extractArrayFromParsed(parsedData.documents);
-        const reminders = extractArrayFromParsed(parsedData.reminders);
-        const serviceCategories = extractArrayFromParsed(parsedData.serviceCategories);
-        const backupHistory = extractArrayFromParsed(parsedData.backupHistory);
+        const vehicles = extractArrayFromParsed(dataRoot.vehicles);
+        const services = extractArrayFromParsed(dataRoot.services);
+        const fuels = extractArrayFromParsed(dataRoot.fuels);
+        const documents = extractArrayFromParsed(dataRoot.documents);
+        const reminders = extractArrayFromParsed(dataRoot.reminders);
+        const serviceCategories = extractArrayFromParsed(dataRoot.serviceCategories);
+        const backupHistory = extractArrayFromParsed(dataRoot.backupHistory);
 
         // Estampar userId del usuario activo en cada elemento importado
         if (uId) {
-          vehicles.forEach(v => { if (v) v.userId = uId; });
-          services.forEach(s => { if (s) s.userId = uId; });
-          fuels.forEach(f => { if (f) f.userId = uId; });
-          documents.forEach(d => { if (d) d.userId = uId; });
-          reminders.forEach(r => { if (r) r.userId = uId; });
+          vehicles.forEach(v => { if (v && typeof v === 'object') v.userId = uId; });
+          services.forEach(s => { if (s && typeof s === 'object') s.userId = uId; });
+          fuels.forEach(f => { if (f && typeof f === 'object') f.userId = uId; });
+          documents.forEach(d => { if (d && typeof d === 'object') d.userId = uId; });
+          reminders.forEach(r => { if (r && typeof r === 'object') r.userId = uId; });
         }
 
         // Guardar en la base de datos local IndexedDB
@@ -6508,8 +6524,8 @@ function importBackupXml(e) {
         if (serviceCategories.length > 0) appState.serviceCategories = serviceCategories;
         if (backupHistory.length > 0) appState.backupHistory = backupHistory;
 
-        if (parsedData.activeVehicleId || (appState.vehicles.length > 0)) {
-          appState.activeVehicleId = parsedData.activeVehicleId || appState.vehicles[0].id;
+        if (dataRoot.activeVehicleId || (appState.vehicles.length > 0)) {
+          appState.activeVehicleId = dataRoot.activeVehicleId || appState.vehicles[0].id;
         }
 
         saveState();
