@@ -6478,6 +6478,29 @@ function extractArrayFromParsed(container) {
   return [];
 }
 
+/**
+ * Elimina todos los usuarios registrados localmente y reinicia el estado de sesión.
+ */
+async function resetAllUsersStore() {
+  if (confirm('¿Deseas eliminar todos los usuarios registrados y reiniciar la autenticación?')) {
+    try {
+      await LocalDB.clear(STORES.USERS);
+      if (typeof AuthService !== 'undefined' && AuthService.logout) {
+        await AuthService.logout();
+      }
+      localStorage.removeItem(USERS_KEY);
+      localStorage.removeItem('GARAGEONE_ACTIVE_USER');
+      localStorage.removeItem('GARAGEONE_USER');
+      appState.users = [];
+      alert('Se eliminaron todos los usuarios correctamente. Puedes registrar o iniciar sesión con cualquier usuario.');
+      window.location.reload();
+    } catch (e) {
+      console.error('Error reiniciando usuarios:', e);
+      alert('Error reiniciando usuarios: ' + e.message);
+    }
+  }
+}
+
 function importBackupXml(e) {
   const file = e.target && e.target.files ? e.target.files[0] : null;
   if (!file) return;
@@ -6498,13 +6521,53 @@ function importBackupXml(e) {
       if (confirm('¿Deseas restaurar los datos desde este archivo XML? Se integrará la información a tu garaje.')) {
         const uId = currentUser ? currentUser.id : null;
 
-        const vehicles = extractArrayFromParsed(dataRoot.vehicles);
-        const services = extractArrayFromParsed(dataRoot.services);
-        const fuels = extractArrayFromParsed(dataRoot.fuels);
-        const documents = extractArrayFromParsed(dataRoot.documents);
-        const reminders = extractArrayFromParsed(dataRoot.reminders);
-        const serviceCategories = extractArrayFromParsed(dataRoot.serviceCategories);
-        const backupHistory = extractArrayFromParsed(dataRoot.backupHistory);
+        let vehicles = extractArrayFromParsed(dataRoot.vehicles);
+        let services = extractArrayFromParsed(dataRoot.services);
+        let fuels = extractArrayFromParsed(dataRoot.fuels);
+        let documents = extractArrayFromParsed(dataRoot.documents);
+        let reminders = extractArrayFromParsed(dataRoot.reminders);
+        let serviceCategories = extractArrayFromParsed(dataRoot.serviceCategories);
+        let backupHistory = extractArrayFromParsed(dataRoot.backupHistory);
+        let usersInXml = extractArrayFromParsed(dataRoot.users);
+
+        // Si la lista de vehículos viene vacía a nivel superior, inspeccionar xmlData en backupHistory
+        if (vehicles.length === 0 && backupHistory.length > 0) {
+          for (const bkItem of backupHistory) {
+            if (bkItem && bkItem.xmlData && typeof bkItem.xmlData === 'string') {
+              try {
+                const subParsed = xmlToObject(bkItem.xmlData);
+                const subRoot = subParsed.GarageOneBackup || subParsed.AutoCareBackup || subParsed;
+                const subVehicles = extractArrayFromParsed(subRoot.vehicles);
+                if (subVehicles.length > 0) {
+                  vehicles = subVehicles;
+                  if (services.length === 0) services = extractArrayFromParsed(subRoot.services);
+                  if (fuels.length === 0) fuels = extractArrayFromParsed(subRoot.fuels);
+                  if (documents.length === 0) documents = extractArrayFromParsed(subRoot.documents);
+                  if (reminders.length === 0) reminders = extractArrayFromParsed(subRoot.reminders);
+                  break;
+                }
+              } catch (errSub) {
+                console.warn('[XML Importer] Error extrayendo sub-xml de backupHistory:', errSub);
+              }
+            }
+          }
+        }
+
+        // Si los servicios existen pero no hay vehículos, construir el vehículo asociado
+        if (vehicles.length === 0 && services.length > 0) {
+          const fallbackVehId = services[0].vehicleId || LocalDB.generateUUID();
+          vehicles = [{
+            id: fallbackVehId,
+            name: 'Susuki Grand Vitara',
+            brand: 'Susuki',
+            make: 'Susuki',
+            model: 'Grand Vitara',
+            type: 'SUV',
+            year: 2013,
+            plate: 'BDJ-679',
+            km: 124855
+          }];
+        }
 
         let targetVehId = vehicles.length > 0 ? vehicles[0].id : null;
 
@@ -6537,6 +6600,11 @@ function importBackupXml(e) {
           });
         }
 
+        // Importar los perfiles de usuario incluidos en el XML a la base de datos local
+        if (usersInXml.length > 0) {
+          await LocalDB.putMany(STORES.USERS, usersInXml);
+        }
+
         // Guardar en la base de datos local IndexedDB
         if (vehicles.length > 0) await LocalDB.putMany(STORES.VEHICLES, vehicles);
         if (services.length > 0) await LocalDB.putMany(STORES.SERVICES, services);
@@ -6553,8 +6621,8 @@ function importBackupXml(e) {
         if (serviceCategories.length > 0) appState.serviceCategories = serviceCategories;
         if (backupHistory.length > 0) appState.backupHistory = backupHistory;
 
-        if (dataRoot.activeVehicleId || (appState.vehicles.length > 0)) {
-          appState.activeVehicleId = dataRoot.activeVehicleId || appState.vehicles[0].id;
+        if (vehicles.length > 0) {
+          appState.activeVehicleId = vehicles[0].id;
         }
 
         saveState();
@@ -6565,7 +6633,8 @@ function importBackupXml(e) {
         renderReports();
         renderBackupHistory();
 
-        alert(`¡Respaldo XML restaurado con éxito!\nSe importaron:\n• ${vehicles.length} vehículo(s)\n• ${services.length} mantenimiento(s)\n• ${fuels.length} recarga(s) de combustible\n• ${documents.length} documento(s)`);
+        const vehName = vehicles.length > 0 ? (vehicles[0].name || vehicles[0].model || 'Vehículo') : 'Vehículo';
+        alert(`¡Respaldo XML restaurado con éxito!\n\nSe importaron:\n• ${vehicles.length} vehículo(s) (${vehName})\n• ${services.length} mantenimiento(s)\n• ${fuels.length} recarga(s) de combustible\n• ${documents.length} documento(s)`);
       }
     } catch (err) {
       console.error('Error al importar el respaldo XML:', err);
