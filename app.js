@@ -945,18 +945,25 @@ function sanitizeState(parsed) {
   return state;
 }
 
+/**
+ * Sincroniza y mantiene las categorías de servicio personalizadas asociadas a cada vehículo.
+ * Asegura que cualquier servicio manual histórico (ej. del vehículo principal/Grand Vitara)
+ * quede vinculado a su respectivo vehicleId y no se pierda, mientras aísla completamente
+ * los servicios para cualquier vehículo nuevo.
+ */
 function syncServiceCategoriesWithState() {
   if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
     appState.serviceCategories = [];
   }
 
-  // Migración para categorías heredadas sin vehicleId: asignar al vehículo activo o principal
-  const fallbackVehId = appState.activeVehicleId || (appState.vehicles && appState.vehicles[0] ? appState.vehicles[0].id : null);
+  const primaryVeh = (appState.vehicles && appState.vehicles.length > 0) ? appState.vehicles[0] : null;
+  const primaryVehId = primaryVeh ? primaryVeh.id : null;
 
+  // 1. Migración y normalización: Categorías personalizadas sin vehicleId se asignan al vehículo principal
   appState.serviceCategories.forEach(c => {
     if (typeof c === 'object' && c !== null) {
-      if (!c.vehicleId && fallbackVehId && !isDefaultCategory(c.name)) {
-        c.vehicleId = fallbackVehId;
+      if (!c.vehicleId && primaryVehId && !isDefaultCategory(c.name)) {
+        c.vehicleId = primaryVehId;
       }
       if (c.isCustom === undefined) {
         c.isCustom = !isDefaultCategory(c.name);
@@ -964,7 +971,32 @@ function syncServiceCategoriesWithState() {
     }
   });
 
-  // Reconstruir SERVICE_CATEGORIES dinámicamente según el vehículo activo
+  // 2. Auto-descubrimiento para servicios históricos: Si un vehículo tiene servicios registrados
+  // con una categoría personalizada que no está en appState.serviceCategories para ese vehículo,
+  // la incorpora preservando sus datos para ese vehículo específico.
+  if (appState.services && Array.isArray(appState.services)) {
+    appState.services.forEach(s => {
+      if (s && s.category && s.vehicleId && !isDefaultCategory(s.category)) {
+        const catNameTrim = s.category.trim();
+        const existsForVeh = appState.serviceCategories.some(c => 
+          c && typeof c === 'object' && c.vehicleId === s.vehicleId && c.name && c.name.toLowerCase() === catNameTrim.toLowerCase()
+        );
+        if (!existsForVeh) {
+          appState.serviceCategories.push({
+            id: 'cat_srv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            name: catNameTrim,
+            vehicleId: s.vehicleId,
+            affectsHealth: true,
+            recommendedIntervalKm: 0,
+            recommendedIntervalMonths: 12,
+            isCustom: true
+          });
+        }
+      }
+    });
+  }
+
+  // 3. Reconstruir SERVICE_CATEGORIES dinámicamente según el vehículo activo
   const activeVeh = getActiveVehicle();
   const activeVehId = activeVeh ? activeVeh.id : null;
 
@@ -1572,7 +1604,27 @@ function initSwipeListeners() {
       if (e.touches && e.touches[0]) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
+      if (e.changedTouches && e.changedTouches[0]) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      }
       return { x: e.clientX, y: e.clientY };
+    };
+
+    const getOffsetX = () => {
+      const transformVal = window.getComputedStyle(el).transform;
+      if (!transformVal || transformVal === 'none') return 0;
+      try {
+        if (window.DOMMatrixReadOnly) {
+          const matrix = new DOMMatrixReadOnly(transformVal);
+          return matrix.m41 || 0;
+        } else if (window.WebKitCSSMatrix) {
+          const matrix = new WebKitCSSMatrix(transformVal);
+          return matrix.m41 || 0;
+        }
+      } catch (err) {
+        return 0;
+      }
+      return 0;
     };
 
     const handleStart = (e) => {
@@ -1581,13 +1633,7 @@ function initSwipeListeners() {
       startY = coords.y;
       isPressed = true;
       isSwiping = false;
-      const transformVal = window.getComputedStyle(el).transform;
-      if (transformVal !== 'none') {
-        const matrix = new WebKitCSSMatrix(transformVal);
-        initialOffset = matrix.m41 || 0;
-      } else {
-        initialOffset = 0;
-      }
+      initialOffset = getOffsetX();
     };
 
     const handleMove = (e) => {
@@ -1597,58 +1643,67 @@ function initSwipeListeners() {
       const deltaY = coords.y - startY;
 
       if (!isSwiping) {
-        if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
           isSwiping = true;
           el.classList.add('swiping');
-        } else {
+          document.querySelectorAll('.swipe-content').forEach(other => {
+            if (other !== el) other.style.transform = 'translateX(0px)';
+          });
+        } else if (Math.abs(deltaY) > 8) {
+          isPressed = false;
           return;
         }
       }
 
-      let newX = initialOffset + deltaX;
-      if (newX > 0) newX = 0;
-      if (newX < -90) newX = -90;
+      if (isSwiping) {
+        let newX = initialOffset + deltaX;
+        if (newX > 0) newX = 0;
+        if (newX < -100) newX = -100;
 
-      currentX = newX;
-      el.style.transform = `translateX(${newX}px)`;
+        currentX = newX;
+        el.style.transform = `translateX(${newX}px)`;
+      }
     };
 
     const handleEnd = () => {
-      if (!isPressed) return;
+      if (!isPressed && !isSwiping) return;
       isPressed = false;
 
       if (isSwiping) {
         el.classList.remove('swiping');
-        if (currentX < -40) {
-          el.style.transform = `translateX(-80px)`;
+        if (currentX < -35) {
+          el.style.transform = 'translateX(-90px)';
         } else {
-          el.style.transform = `translateX(0px)`;
+          el.style.transform = 'translateX(0px)';
         }
+        setTimeout(() => { isSwiping = false; }, 250);
       }
     };
 
     el.addEventListener('touchstart', handleStart, { passive: true });
     el.addEventListener('touchmove', handleMove, { passive: true });
     el.addEventListener('touchend', handleEnd, { passive: true });
+    el.addEventListener('touchcancel', handleEnd, { passive: true });
 
     el.addEventListener('mousedown', handleStart);
     el.addEventListener('mousemove', handleMove);
     el.addEventListener('mouseup', handleEnd);
     el.addEventListener('mouseleave', handleEnd);
 
-    // Auto-close when clicking on the open item body
+    // Auto-close when clicking on the open item body without triggering modal
     el.addEventListener('click', (evt) => {
       if (isSwiping) {
+        evt.preventDefault();
         evt.stopPropagation();
         return;
       }
-      const transformVal = window.getComputedStyle(el).transform;
-      const matrix = new WebKitCSSMatrix(transformVal);
-      if (matrix.m41 < -10) {
+      const offsetX = getOffsetX();
+      if (offsetX < -10) {
+        evt.preventDefault();
         evt.stopPropagation();
-        el.style.transform = `translateX(0px)`;
+        el.style.transform = 'translateX(0px)';
       }
-    });
+    }, true);
   });
 }
 
@@ -1718,6 +1773,8 @@ async function deleteServiceDirect(servId, event = null) {
   await SyncService.executeCrud('DELETE', STORES.SERVICES, { id: servId });
   await loadAppStateFromDB();
   renderApp();
+  if (typeof renderServiceList === 'function') renderServiceList(appState.activeVehicleId);
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 async function deleteFuelDirect(fuelId, event = null) {
@@ -1732,6 +1789,8 @@ async function deleteFuelDirect(fuelId, event = null) {
   await SyncService.executeCrud('DELETE', STORES.FUELS, { id: fuelId });
   await loadAppStateFromDB();
   renderApp();
+  if (typeof renderFuelList === 'function') renderFuelList(appState.activeVehicleId);
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 // User Configured Reminders Engine (100% User-Managed)
@@ -2603,6 +2662,8 @@ function renderGuantera() {
       </div>
     `;
   }).join('');
+
+  setTimeout(initSwipeListeners, 50);
 }
 
 function openDocumentModal(docId = null) {
@@ -3955,6 +4016,8 @@ function renderServiceList(vehId) {
       </div>
     </div>
   `).join('');
+
+  setTimeout(initSwipeListeners, 50);
 }
 
 function openServiceModal(servId = null) {
@@ -4059,6 +4122,8 @@ function renderFuelList(vehId) {
       </div>
     </div>
   `).join('');
+
+  setTimeout(initSwipeListeners, 50);
 }
 
 function openFuelModal(fuelId = null) {
