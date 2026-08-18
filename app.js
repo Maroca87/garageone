@@ -949,44 +949,31 @@ function syncServiceCategoriesWithState() {
   if (!appState.serviceCategories || !Array.isArray(appState.serviceCategories)) {
     appState.serviceCategories = [];
   }
-  const defaultCats = ['Aceite', 'Frenos', 'Llantas', 'Filtros', 'Bujías', 'Batería', 'Transmisión', 'Correa', 'Trámite', 'Otro'];
-  
-  defaultCats.forEach(defName => {
-    if (!SERVICE_CATEGORIES.includes(defName)) {
-      SERVICE_CATEGORIES.push(defName);
-    }
-    if (!appState.serviceCategories.some(c => (c.name || c).toLowerCase() === defName.toLowerCase())) {
-      appState.serviceCategories.push({
-        id: 'cat_def_' + defName.toLowerCase(),
-        name: defName,
-        affectsHealth: false
-      });
-    }
-  });
+
+  // Migración para categorías heredadas sin vehicleId: asignar al vehículo activo o principal
+  const fallbackVehId = appState.activeVehicleId || (appState.vehicles && appState.vehicles[0] ? appState.vehicles[0].id : null);
 
   appState.serviceCategories.forEach(c => {
-    const catName = typeof c === 'string' ? c : (c.name || '');
-    if (catName && !SERVICE_CATEGORIES.includes(catName)) {
-      SERVICE_CATEGORIES.push(catName);
+    if (typeof c === 'object' && c !== null) {
+      if (!c.vehicleId && fallbackVehId && !isDefaultCategory(c.name)) {
+        c.vehicleId = fallbackVehId;
+      }
+      if (c.isCustom === undefined) {
+        c.isCustom = !isDefaultCategory(c.name);
+      }
     }
   });
 
-  if (appState.services && Array.isArray(appState.services)) {
-    appState.services.forEach(s => {
-      if (s.category && !SERVICE_CATEGORIES.includes(s.category)) {
-        SERVICE_CATEGORIES.push(s.category);
-      }
-      if (s.category && !appState.serviceCategories.some(c => (c.name || c).toLowerCase() === s.category.toLowerCase())) {
-        appState.serviceCategories.push({
-          id: 'cat_srv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-          name: s.category,
-          affectsHealth: true,
-          recommendedIntervalKm: 0,
-          recommendedIntervalMonths: 12
-        });
-      }
-    });
-  }
+  // Reconstruir SERVICE_CATEGORIES dinámicamente según el vehículo activo
+  const activeVeh = getActiveVehicle();
+  const activeVehId = activeVeh ? activeVeh.id : null;
+
+  const currentVehicleCustoms = (appState.serviceCategories || [])
+    .filter(c => c && typeof c === 'object' && c.vehicleId === activeVehId && c.isCustom && c.name)
+    .map(c => c.name.trim())
+    .filter(Boolean);
+
+  SERVICE_CATEGORIES = Array.from(new Set([...DEFAULT_SYSTEM_CATEGORIES, ...currentVehicleCustoms]));
 }
 
 function loadState() {
@@ -1699,11 +1686,12 @@ async function deleteVehicleDirect(vehId, event = null) {
     console.error('Error al eliminar vehículo y registros en IndexedDB:', e);
   }
 
-  // 2. Remove from in-memory appState immediately (keep documents, emergencyContacts, serviceCategories intact)
+  // 2. Remove from in-memory appState immediately (keep documents and emergencyContacts intact)
   appState.vehicles = (appState.vehicles || []).filter(v => v.id !== vehId);
   appState.services = (appState.services || []).filter(s => s.vehicleId !== vehId);
   appState.fuels = (appState.fuels || []).filter(f => f.vehicleId !== vehId);
   appState.reminders = (appState.reminders || []).filter(r => r.vehicleId !== vehId);
+  appState.serviceCategories = (appState.serviceCategories || []).filter(c => c && c.vehicleId !== vehId);
 
   if (appState.activeVehicleId === vehId) {
     appState.activeVehicleId = appState.vehicles.length > 0 ? appState.vehicles[0].id : '';
@@ -2254,10 +2242,29 @@ function renderMaintenanceFilterPills() {
   const container = document.getElementById('maintenanceFilterPills');
   if (!container) return;
 
+  const veh = getActiveVehicle();
+  const vehId = veh ? veh.id : null;
+
+  const vehicleCatsSet = new Set(DEFAULT_SYSTEM_CATEGORIES);
+
+  if (vehId) {
+    (appState.serviceCategories || []).forEach(c => {
+      if (c && typeof c === 'object' && c.vehicleId === vehId && c.isCustom && c.name) {
+        vehicleCatsSet.add(c.name.trim());
+      }
+    });
+
+    (appState.services || []).forEach(s => {
+      if (s && s.vehicleId === vehId && s.category) {
+        vehicleCatsSet.add(s.category.trim());
+      }
+    });
+  }
+
   let html = `<button class="pill ${currentFilter === 'all' ? 'active' : ''}" onclick="filterLogs('all', this)">Todos</button>`;
   
-  SERVICE_CATEGORIES.forEach(cat => {
-    html += `<button class="pill ${currentFilter === cat ? 'active' : ''}" onclick="filterLogs('${cat}', this)">${escapeHtml(cat)}</button>`;
+  vehicleCatsSet.forEach(cat => {
+    html += `<button class="pill ${currentFilter === cat ? 'active' : ''}" onclick="filterLogs('${escapeHtml(cat)}', this)">${escapeHtml(cat)}</button>`;
   });
   
   container.innerHTML = html;
@@ -2265,8 +2272,8 @@ function renderMaintenanceFilterPills() {
 
 /**
  * Pobla el selector de categorías al crear o editar un servicio.
- * Excluye los servicios predefinidos del sistema para mostrar únicamente
- * los creados manualmente por el usuario.
+ * Muestra únicamente los servicios predefinidos del sistema y los personalizados creados
+ * exclusivamente para el vehículo activo.
  */
 function populateServCategorySelect() {
   const select = document.getElementById('servCategory');
@@ -2275,16 +2282,18 @@ function populateServCategorySelect() {
   const currentVal = select.value;
   let html = '';
 
+  const veh = getActiveVehicle();
+  const vehId = veh ? veh.id : null;
+
   const allCatsSet = new Set(DEFAULT_SYSTEM_CATEGORIES);
 
-  (appState.serviceCategories || []).forEach(c => {
-    const name = typeof c === 'string' ? c : (c ? c.name : '');
-    if (name) allCatsSet.add(name);
-  });
-
-  (SERVICE_CATEGORIES || []).forEach(cat => {
-    if (cat && typeof cat === 'string') allCatsSet.add(cat);
-  });
+  if (vehId) {
+    (appState.serviceCategories || []).forEach(c => {
+      if (c && typeof c === 'object' && c.vehicleId === vehId && c.isCustom && c.name) {
+        allCatsSet.add(c.name.trim());
+      }
+    });
+  }
 
   const categoriesList = Array.from(allCatsSet);
 
@@ -2343,49 +2352,40 @@ function handleServCategoryChange(val) {
 }
 
 /**
- * Renderiza la lista de servicios personalizados disponibles creados por el usuario.
- * Omite los servicios predefinidos por el sistema.
+ * Renderiza la lista de servicios personalizados disponibles creados por el usuario
+ * para el vehículo actualmente seleccionado.
  */
 function renderCustomCategoriesList() {
   const container = document.getElementById('customCategoriesListContainer');
   if (!container) return;
 
-  syncServiceCategoriesWithState();
-
-  const customCatsSet = new Set();
-  (appState.serviceCategories || []).forEach(c => {
-    const name = typeof c === 'string' ? c : (c ? c.name : '');
-    if (name && !isDefaultCategory(name)) {
-      customCatsSet.add(name);
-    }
-  });
-
-  (SERVICE_CATEGORIES || []).forEach(c => {
-    if (c && typeof c === 'string' && !isDefaultCategory(c)) {
-      customCatsSet.add(c);
-    }
-  });
-
-  const cats = Array.from(customCatsSet);
-  const healthCats = appState.serviceCategories || [];
-
-  if (cats.length === 0) {
-    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">No hay servicios personalizados creados por el usuario.</div>`;
+  const veh = getActiveVehicle();
+  if (!veh) {
+    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">Selecciona o registra un vehículo para gestionar sus servicios personalizados.</div>`;
     return;
   }
 
-  container.innerHTML = cats.map(cat => {
-    const hInfo = healthCats.find(c => (typeof c === 'object' && c && c.name ? c.name.toLowerCase() : String(c).toLowerCase()) === cat.toLowerCase());
-    const isHealth = hInfo && (hInfo.affectsHealth === true || String(hInfo.affectsHealth) === 'true');
+  const customCats = (appState.serviceCategories || []).filter(c => 
+    c && typeof c === 'object' && c.vehicleId === veh.id && c.isCustom && c.name && !isDefaultCategory(c.name)
+  );
+
+  if (customCats.length === 0) {
+    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:10px;">No hay servicios personalizados creados para este vehículo.</div>`;
+    return;
+  }
+
+  container.innerHTML = customCats.map(catObj => {
+    const isHealth = catObj.affectsHealth === true || String(catObj.affectsHealth) === 'true';
+    const catName = catObj.name;
     return `
       <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:8px; font-size:0.83rem; border:1px solid rgba(255,255,255,0.1);">
         <div style="display:flex; align-items:center; gap:6px;">
-          <span style="color:var(--text-primary); font-weight:600;">${escapeHtml(cat)}</span>
-          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 6px; font-weight:600;">Salud</span>' : ''}
+          <span style="color:var(--text-primary); font-weight:600;">${escapeHtml(catName)}</span>
+          ${isHealth ? '<span style="font-size:0.7rem; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 6px; font-weight:600; border-radius:4px;">Salud</span>' : ''}
         </div>
         <div style="display:flex; gap:6px;">
-          <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:3px 8px;" onclick="loadCategoryForEdit('${escapeHtml(cat)}')">Editar</button>
-          <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.72rem; padding:3px 8px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(cat)}')">Eliminar</button>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:3px 8px;" onclick="loadCategoryForEdit('${escapeHtml(catName)}')">Editar</button>
+          <button type="button" class="btn btn-tertiary btn-sm" style="font-size:0.72rem; padding:3px 8px; color:#ff453a;" onclick="deleteCategory('${escapeHtml(catName)}')">Eliminar</button>
         </div>
       </div>
     `;
@@ -2397,18 +2397,22 @@ function renderCustomCategoriesList() {
  * @param {string} catName - Nombre del servicio a editar.
  */
 function loadCategoryForEdit(catName) {
+  const veh = getActiveVehicle();
+  if (!veh) return;
+
   updateNewCategoryModalUnitLabel();
   document.getElementById('editCatOldName').value = catName;
   document.getElementById('newCatName').value = catName;
   document.getElementById('modalNewCategoryTitle').textContent = 'Editar Servicio';
 
-  const healthCats = appState.serviceCategories || [];
-  const hInfo = healthCats.find(c => c.name && c.name.toLowerCase() === catName.toLowerCase());
+  const hInfo = (appState.serviceCategories || []).find(c => 
+    c && typeof c === 'object' && c.vehicleId === veh.id && c.name && c.name.toLowerCase() === catName.toLowerCase()
+  );
 
   const affectsCheck = document.getElementById('newCatAffectsHealth');
   const container = document.getElementById('newCatHealthFieldsContainer');
 
-  if (hInfo && hInfo.affectsHealth === true) {
+  if (hInfo && (hInfo.affectsHealth === true || String(hInfo.affectsHealth) === 'true')) {
     if (affectsCheck) affectsCheck.checked = true;
     if (container) container.style.display = 'block';
     if (document.getElementById('newCatIntervalKm')) document.getElementById('newCatIntervalKm').value = hInfo.recommendedIntervalKm || '';
@@ -2430,7 +2434,7 @@ function editCategoryName(oldName) {
 }
 
 /**
- * Elimina una categoría personalizada creada por el usuario.
+ * Elimina una categoría personalizada creada por el usuario para el vehículo activo.
  * @param {string} catName - Nombre del servicio a eliminar.
  */
 function deleteCategory(catName) {
@@ -2438,20 +2442,21 @@ function deleteCategory(catName) {
     alert('Los servicios predefinidos por el sistema no se pueden eliminar.');
     return;
   }
-  if (!confirm(`¿Eliminar el servicio "${catName}"?`)) return;
 
-  const idx = SERVICE_CATEGORIES.indexOf(catName);
-  if (idx !== -1) {
-    SERVICE_CATEGORIES.splice(idx, 1);
-  }
+  const veh = getActiveVehicle();
+  if (!veh) return;
+
+  if (!confirm(`¿Eliminar el servicio "${catName}" de este vehículo?`)) return;
 
   if (appState.serviceCategories && Array.isArray(appState.serviceCategories)) {
     appState.serviceCategories = appState.serviceCategories.filter(c => {
-      const cName = typeof c === 'string' ? c : (c.name || '');
-      return cName.toLowerCase() !== catName.toLowerCase();
+      if (!c || typeof c !== 'object') return false;
+      const cName = c.name || '';
+      return !(c.vehicleId === veh.id && cName.toLowerCase() === catName.toLowerCase());
     });
   }
 
+  syncServiceCategoriesWithState();
   saveState();
   populateServCategorySelect();
   renderMaintenanceFilterPills();
@@ -2460,24 +2465,32 @@ function deleteCategory(catName) {
 }
 
 /**
- * Guarda o actualiza un servicio personalizado creado manualmente por el usuario.
+ * Guarda o actualiza un servicio personalizado creado manualmente por el usuario
+ * para el vehículo activo.
  * @param {Event} e - Evento de envío del formulario.
  */
 function saveNewCategory(e) {
   e.preventDefault();
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo.');
+    return;
+  }
+
   const name = document.getElementById('newCatName').value.trim();
   if (!name) return;
+
+  if (isDefaultCategory(name)) {
+    alert('Ya existe un servicio base del sistema con ese nombre.');
+    return;
+  }
 
   const oldName = document.getElementById('editCatOldName')?.value || '';
 
   if (oldName && oldName !== name) {
-    const idx = SERVICE_CATEGORIES.indexOf(oldName);
-    if (idx !== -1) SERVICE_CATEGORIES[idx] = name;
     (appState.services || []).forEach(s => {
-      if (s.category === oldName) s.category = name;
+      if (s.vehicleId === veh.id && s.category === oldName) s.category = name;
     });
-  } else if (!SERVICE_CATEGORIES.includes(name)) {
-    SERVICE_CATEGORIES.push(name);
   }
 
   const affectsHealth = document.getElementById('newCatAffectsHealth')?.checked || false;
@@ -2485,12 +2498,15 @@ function saveNewCategory(e) {
   const intervalMonths = Number(document.getElementById('newCatIntervalMonths')?.value) || 0;
 
   if (!appState.serviceCategories) appState.serviceCategories = [];
-  const existingIdx = appState.serviceCategories.findIndex(c => c.name && c.name.toLowerCase() === (oldName || name).toLowerCase());
+  const existingIdx = appState.serviceCategories.findIndex(c => 
+    c && typeof c === 'object' && c.vehicleId === veh.id && c.name && c.name.toLowerCase() === (oldName || name).toLowerCase()
+  );
 
   if (existingIdx !== -1) {
     appState.serviceCategories[existingIdx] = {
       ...appState.serviceCategories[existingIdx],
       name,
+      vehicleId: veh.id,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
       recommendedIntervalMonths: intervalMonths,
@@ -2498,8 +2514,9 @@ function saveNewCategory(e) {
     };
   } else {
     appState.serviceCategories.push({
-      id: 'cat_custom_' + Date.now(),
+      id: 'cat_custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       name,
+      vehicleId: veh.id,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
       recommendedIntervalMonths: intervalMonths,
@@ -2507,6 +2524,7 @@ function saveNewCategory(e) {
     });
   }
 
+  syncServiceCategoriesWithState();
   saveState();
   closeModal('modalNewCategory');
   document.getElementById('formNewCategory').reset();
@@ -5192,32 +5210,62 @@ const DEFAULT_HEALTH_SETTINGS = {
   }
 };
 
-function getHealthSettings() {
-  if (appState.healthSettings && typeof appState.healthSettings === 'object') {
+/**
+ * Obtiene la configuración de salud correspondiente al vehículo especificado o activo.
+ * Si el vehículo tiene ajustes personalizados en veh.healthSettings, los retorna.
+ * De lo contrario, retorna una copia aislada de los ajustes por defecto.
+ * @param {Object} [veh] - Objeto del vehículo a evaluar.
+ * @returns {Object} Configuración completa con vidas útiles y ponderaciones.
+ */
+function getHealthSettings(veh = getActiveVehicle()) {
+  if (veh && veh.healthSettings && typeof veh.healthSettings === 'object') {
+    return {
+      ...DEFAULT_HEALTH_SETTINGS,
+      ...veh.healthSettings,
+      weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(veh.healthSettings.weights || {}) }
+    };
+  }
+
+  // Migración para perfiles existentes con appState.healthSettings global
+  if (appState.healthSettings && typeof appState.healthSettings === 'object' && (!appState.vehicles || appState.vehicles.length <= 1)) {
     return {
       ...DEFAULT_HEALTH_SETTINGS,
       ...appState.healthSettings,
       weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(appState.healthSettings.weights || {}) }
     };
   }
-  try {
-    const stored = localStorage.getItem('GARAGEONE_HEALTH_SETTINGS');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      appState.healthSettings = parsed;
-      return {
-        ...DEFAULT_HEALTH_SETTINGS,
-        ...parsed,
-        weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(parsed.weights || {}) }
-      };
-    }
-  } catch (e) {}
-  appState.healthSettings = DEFAULT_HEALTH_SETTINGS;
-  return DEFAULT_HEALTH_SETTINGS;
+
+  return JSON.parse(JSON.stringify(DEFAULT_HEALTH_SETTINGS));
 }
 
+/**
+ * Abre el modal de configuración de parámetros y ponderaciones de salud
+ * cargando exclusivamente la configuración del vehículo activo.
+ */
 function openHealthSettingsModal() {
-  const cfg = getHealthSettings();
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo en el Garaje.');
+    return;
+  }
+
+  const cfg = getHealthSettings(veh);
+  const unit = getVehicleUnit(veh);
+
+  // Actualizar etiquetas de unidad de medida según el vehículo
+  const lblOil = document.getElementById('lblHsOil');
+  const lblTires = document.getElementById('lblHsTires');
+  const lblPads = document.getElementById('lblHsBrakePads');
+  const lblDiscs = document.getElementById('lblHsBrakeDiscs');
+  const lblFilt = document.getElementById('lblHsFilters');
+  const lblBelt = document.getElementById('lblHsBelt');
+
+  if (lblOil) lblOil.textContent = `Aceite (${unit})`;
+  if (lblTires) lblTires.textContent = `Llantas (${unit})`;
+  if (lblPads) lblPads.textContent = `Pastillas Freno (${unit})`;
+  if (lblDiscs) lblDiscs.textContent = `Discos Freno (${unit})`;
+  if (lblFilt) lblFilt.textContent = `Filtros Promedio (${unit})`;
+  if (lblBelt) lblBelt.textContent = `Correas (${unit})`;
 
   const elOil = document.getElementById('hsOilKm');
   const elTires = document.getElementById('hsTiresKm');
@@ -5256,8 +5304,18 @@ function openHealthSettingsModal() {
   openModal('modalHealthSettings');
 }
 
-function saveHealthSettings(e) {
+/**
+ * Guarda los ajustes de salud individualmente para el vehículo activo.
+ * @param {Event} e - Evento de formulario.
+ */
+async function saveHealthSettings(e) {
   if (e) e.preventDefault();
+
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo.');
+    return;
+  }
 
   const cfg = {
     oilKm: Number(document.getElementById('hsOilKm').value) || 5000,
@@ -5279,10 +5337,8 @@ function saveHealthSettings(e) {
     }
   };
 
-  appState.healthSettings = cfg;
-  try {
-    localStorage.setItem('GARAGEONE_HEALTH_SETTINGS', JSON.stringify(cfg));
-  } catch (err) {}
+  veh.healthSettings = cfg;
+  await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
   saveState();
   closeModal('modalHealthSettings');
   renderVehicleHealth();
@@ -5327,28 +5383,41 @@ function getRelativeTimeString(timestamp) {
   return `Hace ${diffDays} d`;
 }
 
+/**
+ * Calcula de forma precisa los meses transcurridos entre dos fechas.
+ * @param {string} d1Str - Fecha inicial (ISO / YYYY-MM-DD).
+ * @param {string} [d2Str] - Fecha final (por defecto hoy).
+ * @returns {number} Número entero de meses transcurridos.
+ */
 function calculateMonthsDiff(d1Str, d2Str) {
   if (!d1Str) return 0;
   const d1 = new Date(d1Str);
   const d2 = d2Str ? new Date(d2Str) : new Date();
   if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0;
-  let months = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
-  return Math.max(0, months);
+  const diffMs = Math.max(0, d2.getTime() - d1.getTime());
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return Math.floor(diffDays / 30.4375);
 }
 
+/**
+ * Calcula la diferencia en días restantes hasta una fecha meta o de vencimiento.
+ * @param {string} d1Str - Fecha objetivo.
+ * @returns {number} Días restantes (positivo: futuro, cero: hoy, negativo: vencido).
+ */
 function calculateDaysDiff(d1Str) {
   if (!d1Str) return 999;
   const target = new Date(d1Str);
   const today = new Date();
   today.setHours(0,0,0,0);
   target.setHours(0,0,0,0);
+  if (isNaN(target.getTime())) return 999;
   const diffTime = target.getTime() - today.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 function calculateVehicleHealth(veh) {
-  const cfg = getHealthSettings();
   if (!veh) return null;
+  const cfg = getHealthSettings(veh);
 
   const isMiles = veh.unitDistance === 'mi';
   const unitLabel = isMiles ? 'mi' : 'km';
@@ -5393,15 +5462,15 @@ function calculateVehicleHealth(veh) {
       detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (remKm <= 1000) {
-      oilData.alert = `Proximo cambio de aceite en ${dispRem.toLocaleString()} ${unitLabel}.`;
+      oilData.alert = `Próximo cambio de aceite en ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
-    missingItems.push({ name: 'Ultimo cambio de aceite', key: 'aceite' });
+    missingItems.push({ name: 'Último cambio de aceite', key: 'aceite' });
   }
 
   // 2. Llantas
   const tireServices = services.filter(s =>
-    (s.category && (s.category.toLowerCase() === 'llantas' || s.category.toLowerCase() === 'neumaticos')) ||
+    (s.category && (s.category.toLowerCase() === 'llantas' || s.category.toLowerCase() === 'neumaticos' || s.category.toLowerCase() === 'neumáticos')) ||
     (s.title && (s.title.toLowerCase().includes('llanta') || s.title.toLowerCase().includes('neumatic'))) ||
     (s.description && s.description.toLowerCase().includes('llanta'))
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -5427,7 +5496,7 @@ function calculateVehicleHealth(veh) {
       detail: `${condText} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      tireData.alert = `La vida util de llantas es inferior al 25% (restan ${dispRem.toLocaleString()} ${unitLabel}).`;
+      tireData.alert = `La vida útil de llantas es inferior al 25% (restan ${dispRem.toLocaleString()} ${unitLabel}).`;
     }
   } else {
     missingItems.push({ name: 'Cambio de llantas', key: 'llantas' });
@@ -5460,19 +5529,19 @@ function calculateVehicleHealth(veh) {
       detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      brakeData.alert = `Desgaste de frenos critico. Restan solo ${dispRem.toLocaleString()} ${unitLabel}.`;
+      brakeData.alert = `Desgaste de frenos crítico. Restan solo ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
     missingItems.push({ name: 'Cambio de frenos', key: 'frenos' });
   }
 
-  // 4. Bateria
+  // 4. Batería
   const batServices = services.filter(s =>
-    (s.category && (s.category.toLowerCase() === 'bateria' || s.category.toLowerCase() === 'bateria')) ||
-    (s.title && (s.title.toLowerCase().includes('bateria') || s.title.toLowerCase().includes('bateria')))
+    (s.category && (s.category.toLowerCase() === 'bateria' || s.category.toLowerCase() === 'batería')) ||
+    (s.title && (s.title.toLowerCase().includes('bateria') || s.title.toLowerCase().includes('batería')))
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  let batteryData = { hasData: false, score: 0, categoryKey: 'bateria', remainingMonths: cfg.batteryMonths, detail: 'Sin historial de bateria', alert: null };
+  let batteryData = { hasData: false, score: 0, categoryKey: 'bateria', remainingMonths: cfg.batteryMonths, detail: 'Sin historial de batería', alert: null };
   if (batServices.length > 0) {
     const lastBat = batServices[0];
     const monthsElapsed = calculateMonthsDiff(lastBat.date);
@@ -5489,10 +5558,10 @@ function calculateVehicleHealth(veh) {
       detail: `Instalada hace ${monthsElapsed} meses • Restan ${remMonths} meses`
     };
     if (monthsElapsed >= Math.floor(lifespanM * 0.8)) {
-      batteryData.alert = `La bateria supera el 80% de su vida util (instalada hace ${monthsElapsed} meses).`;
+      batteryData.alert = `La batería supera el 80% de su vida útil (instalada hace ${monthsElapsed} meses).`;
     }
   } else {
-    missingItems.push({ name: 'Ultimo cambio de bateria', key: 'bateria' });
+    missingItems.push({ name: 'Último cambio de batería', key: 'bateria' });
   }
 
   // 5. Filtros
@@ -5527,7 +5596,7 @@ function calculateVehicleHealth(veh) {
   // 6. Correas
   const beltServices = services.filter(s =>
     (s.category && (s.category.toLowerCase() === 'correa' || s.category.toLowerCase() === 'correas')) ||
-    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('banda')))
+    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('distribución') || s.title.toLowerCase().includes('banda')))
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   let beltData = { hasData: false, score: 0, categoryKey: 'correa', detail: 'Sin historial de correas', alert: null };
@@ -5552,43 +5621,45 @@ function calculateVehicleHealth(veh) {
       detail: `Uso: ${Math.round(worstWear)}% • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      beltData.alert = `Correa de distribucion supera el 75% de desgaste estimado.`;
+      beltData.alert = `Correa de distribución supera el 75% de desgaste estimado.`;
     }
   } else {
-    missingItems.push({ name: 'Revision de correas', key: 'correa' });
+    missingItems.push({ name: 'Revisión de correas', key: 'correa' });
   }
 
-  // 7. Documentacion
+  // 7. Documentación
   let docScores = [];
   let docAlerts = [];
   let docDetails = [];
 
   if (documents.length > 0) {
     documents.forEach(doc => {
-      const days = calculateDaysDiff(doc.expiryDate || doc.expirationDate || doc.fechaVencimiento);
+      const expDate = doc.expDate || doc.expiryDate || doc.expirationDate || doc.fechaVencimiento;
+      const days = calculateDaysDiff(expDate);
+      const docName = doc.title || doc.name || doc.type || 'Documento';
       let statusText = 'Vigente';
       let docScore = 100;
 
       if (days <= 0) {
         statusText = 'Vencido';
         docScore = 0;
-        docAlerts.push(`${doc.name || doc.type || 'Documento'} se encuentra VENCIDO.`);
+        docAlerts.push(`${docName} se encuentra VENCIDO.`);
       } else if (days <= 30) {
-        statusText = `Vence en ${days} dias`;
+        statusText = `Vence en ${days} días`;
         docScore = 50;
-        docAlerts.push(`${doc.name || doc.type || 'Documento'} vence en ${days} dias.`);
+        docAlerts.push(`${docName} vence en ${days} días.`);
       } else {
         statusText = 'Vigente';
         docScore = 100;
       }
       docScores.push(docScore);
-      docDetails.push(`${doc.name || doc.type}: ${statusText}`);
+      docDetails.push(`${docName}: ${statusText}`);
     });
   }
 
   const hasDocsData = documents.length > 0;
   const docAvgScore = hasDocsData ? Math.round(docScores.reduce((a, b) => a + b, 0) / docScores.length) : 0;
-  if (!hasDocsData) missingItems.push({ name: 'Documentacion del vehiculo', key: 'guantera' });
+  if (!hasDocsData) missingItems.push({ name: 'Documentación del vehículo', key: 'guantera' });
 
   const docData = {
     hasData: hasDocsData,
@@ -5601,7 +5672,8 @@ function calculateVehicleHealth(veh) {
   // 8. Recordatorios
   let dueRem = 0, upcomingRem = 0, pendingRem = 0;
   reminders.forEach(r => {
-    const days = calculateDaysDiff(r.dueDate || r.date);
+    const targetDate = r.targetDate || r.dueDate || r.date;
+    const days = calculateDaysDiff(targetDate);
     if (r.status === 'completed' || r.completed) return;
     if (days < 0) dueRem++;
     else if (days <= 7) upcomingRem++;
@@ -5636,10 +5708,10 @@ function calculateVehicleHealth(veh) {
     { name: 'Aceite', data: oilData, weight: cfg.weights.oil },
     { name: 'Llantas', data: tireData, weight: cfg.weights.tires },
     { name: 'Frenos', data: brakeData, weight: cfg.weights.brakes },
-    { name: 'Bateria', data: batteryData, weight: cfg.weights.battery },
+    { name: 'Batería', data: batteryData, weight: cfg.weights.battery },
     { name: 'Filtros', data: filterData, weight: cfg.weights.filters },
     { name: 'Correas', data: beltData, weight: cfg.weights.belts },
-    { name: 'Documentacion', data: docData, weight: cfg.weights.docs }
+    { name: 'Documentación', data: docData, weight: cfg.weights.docs }
   ];
 
   const presentComponents = componentsList.filter(c => c.data.hasData);
@@ -5676,7 +5748,7 @@ function calculateVehicleHealth(veh) {
   if (confidencePct >= 70) {
     overallHealthPct = rawHealthPct;
     confidenceColor = '#10b981';
-    confidenceMsg = 'El analisis es altamente confiable porque existe suficiente historial del vehiculo.';
+    confidenceMsg = 'El análisis es altamente confiable porque existe suficiente historial del vehículo.';
     if (rawHealthPct >= 95) {
       ratingLabel = 'EXCELENTE';
       ratingClass = 'health-status-excellent';
@@ -5704,7 +5776,7 @@ function calculateVehicleHealth(veh) {
     ratingClass = 'health-status-warning';
     ratingColor = '#f97316';
     confidenceColor = '#f97316';
-    confidenceMsg = 'El analisis es una estimacion. Agregue mas datos para mayor precision.';
+    confidenceMsg = 'El análisis es una estimación. Agregue más datos para mayor precisión.';
   }
 
   // Aggregate Smart Alerts
@@ -5733,9 +5805,9 @@ function calculateVehicleHealth(veh) {
   if (dueRem > 0) {
     firstAction = `Atender ${dueRem} recordatorio(s) vencido(s).`;
   } else if (lowestComp && lowestComp.data.score < 70) {
-    firstAction = `Revisar ${lowestComp.name} (${lowestComp.data.score}% de vida util).`;
+    firstAction = `Revisar ${lowestComp.name} (${lowestComp.data.score}% de vida útil).`;
   } else if (oilData.hasData && oilData.remainingKm <= 1000) {
-    firstAction = `Cambiar aceite pronto (restan ${oilData.remainingKm.toLocaleString()} km).`;
+    firstAction = `Cambiar aceite pronto (restan ${oilData.remainingKm.toLocaleString()} ${unitLabel}).`;
   } else if (missingItems.length > 0) {
     firstAction = `Registrar ${missingItems[0].name.toLowerCase()} para aumentar la confiabilidad.`;
   }
@@ -5743,7 +5815,7 @@ function calculateVehicleHealth(veh) {
   let worstWearText = lowestComp ? `${lowestComp.name} (${lowestComp.data.score}%)` : 'Sin datos suficientes';
   let nextServiceText = 'No hay servicios inmediatos pendientes.';
   if (oilData.hasData && oilData.remainingKm > 0) {
-    nextServiceText = `Cambio de aceite (${oilData.remainingKm.toLocaleString()} km restantes)`;
+    nextServiceText = `Cambio de aceite (${oilData.remainingKm.toLocaleString()} ${unitLabel} restantes)`;
   } else if (dueRem > 0) {
     nextServiceText = `${dueRem} servicio(s) vencido(s) en Recordatorios`;
   }
@@ -5751,8 +5823,10 @@ function calculateVehicleHealth(veh) {
   let docStatusSummary = docData.hasData ? (docData.alerts.length > 0 ? `${docData.alerts.length} por vencer/vencidos` : 'Todos vigentes') : 'Sin documentos registrados';
   const lastEvaluationText = getRelativeTimeString(veh.lastHealthUpdate || Date.now());
 
-  // 10. Componentes Adicionales / Mantenimientos Específicos
-  const customCategories = (appState.serviceCategories || []).filter(c => typeof c === 'object' && c !== null && (c.affectsHealth === true || String(c.affectsHealth) === 'true'));
+  // 10. Componentes Adicionales / Mantenimientos Específicos del Vehículo
+  const customCategories = (appState.serviceCategories || []).filter(c => 
+    typeof c === 'object' && c !== null && c.vehicleId === veh.id && (c.affectsHealth === true || String(c.affectsHealth) === 'true')
+  );
   const customComponentsData = [];
 
   customCategories.forEach(cat => {
@@ -5766,22 +5840,26 @@ function calculateVehicleHealth(veh) {
       return sCat === catNameLower || (sCat && catNameLower.includes(sCat)) || (sCat && sCat.includes(catNameLower)) || (sTitle && sTitle.includes(catNameLower)) || (sNotes && sNotes.includes(catNameLower));
     }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
+    const recIntervalKm = convertToKm(cat.recommendedIntervalKm);
+    const recIntervalMonths = Number(cat.recommendedIntervalMonths) || 0;
+
     if (catServices.length > 0) {
       const lastS = catServices[0];
-      const lastKm = Number(lastS.mileage || lastS.km || currentKm);
+      const lastKm = convertToKm(lastS.mileage || lastS.km || veh.km);
       const kmUsed = Math.max(0, currentKm - lastKm);
       const monthsElapsed = calculateMonthsDiff(lastS.date);
 
-      let wearKmPct = cat.recommendedIntervalKm > 0 ? (kmUsed / cat.recommendedIntervalKm) * 100 : 0;
-      let wearMonthsPct = cat.recommendedIntervalMonths > 0 ? (monthsElapsed / cat.recommendedIntervalMonths) * 100 : 0;
+      let wearKmPct = recIntervalKm > 0 ? (kmUsed / recIntervalKm) * 100 : 0;
+      let wearMonthsPct = recIntervalMonths > 0 ? (monthsElapsed / recIntervalMonths) * 100 : 0;
       let wearPct = Math.max(wearKmPct, wearMonthsPct);
       let score = Math.max(0, Math.min(100, Math.round(100 - wearPct)));
 
-      let remKm = cat.recommendedIntervalKm > 0 ? Math.max(0, cat.recommendedIntervalKm - kmUsed) : null;
-      let remMonths = cat.recommendedIntervalMonths > 0 ? Math.max(0, cat.recommendedIntervalMonths - monthsElapsed) : null;
+      let remKm = recIntervalKm > 0 ? Math.max(0, recIntervalKm - kmUsed) : null;
+      let dispRem = remKm !== null ? convertFromKm(remKm) : null;
+      let remMonths = recIntervalMonths > 0 ? Math.max(0, recIntervalMonths - monthsElapsed) : null;
 
       let detailParts = [];
-      if (remKm !== null) detailParts.push(`Restan ${remKm.toLocaleString()} km`);
+      if (dispRem !== null) detailParts.push(`Restan ${dispRem.toLocaleString()} ${unitLabel}`);
       if (remMonths !== null) detailParts.push(`Restan ${remMonths} meses`);
       let detail = detailParts.length > 0 ? detailParts.join(' • ') : `Último: ${lastS.date || 'Reciente'}`;
 
@@ -5795,8 +5873,12 @@ function calculateVehicleHealth(veh) {
       });
     } else {
       let detailParts = [];
-      if (cat.recommendedIntervalKm) detailParts.push(`Intervalo: ${cat.recommendedIntervalKm.toLocaleString()} km`);
-      if (cat.recommendedIntervalMonths) detailParts.push(`Intervalo: ${cat.recommendedIntervalMonths} meses`);
+      if (cat.recommendedIntervalKm) {
+        detailParts.push(`Intervalo: ${Number(cat.recommendedIntervalKm).toLocaleString()} ${unitLabel}`);
+      }
+      if (recIntervalMonths > 0) {
+        detailParts.push(`Intervalo: ${recIntervalMonths} meses`);
+      }
       let detail = detailParts.length > 0 ? detailParts.join(' • ') : 'Sin historial registrado';
 
       customComponentsData.push({
@@ -6297,6 +6379,12 @@ function renderVehicleHealth() {
 
 // Category Editor Helper Functions
 function openServiceCategoryModal(catId = null) {
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo.');
+    return;
+  }
+
   const form = document.getElementById('formServiceCategory');
   if (form) form.reset();
 
@@ -6308,14 +6396,14 @@ function openServiceCategoryModal(catId = null) {
   toggleHealthCategoryInputs(false);
 
   if (catId) {
-    const categories = appState.serviceCategories || [];
+    const categories = (appState.serviceCategories || []).filter(c => c && c.vehicleId === veh.id);
     const cat = categories.find(c => c.id === catId);
     if (cat) {
       document.getElementById('modalCategoryTitle').textContent = 'Editar Tipo de Servicio';
       document.getElementById('catId').value = cat.id;
       document.getElementById('catName').value = cat.name || '';
       
-      const affects = cat.affectsHealth === true;
+      const affects = cat.affectsHealth === true || String(cat.affectsHealth) === 'true';
       if (affectsCheck) affectsCheck.checked = affects;
       toggleHealthCategoryInputs(affects);
 
@@ -6333,15 +6421,26 @@ function toggleHealthCategoryInputs(checked) {
 }
 
 /**
- * Guarda o actualiza un tipo de servicio desde el modal de configuración de salud/categorías.
- * Marca explícitamente el servicio como manual (isCustom: true).
+ * Guarda o actualiza un tipo de servicio desde el modal de configuración de salud/categorías
+ * vinculándolo exclusivamente al vehículo activo.
  * @param {Event} e - Evento de envío de formulario.
  */
 function saveServiceCategory(e) {
   if (e) e.preventDefault();
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo.');
+    return;
+  }
+
   const catId = document.getElementById('catId')?.value;
   const name = (document.getElementById('catName')?.value || '').trim();
   if (!name) return;
+
+  if (isDefaultCategory(name)) {
+    alert('Ya existe un servicio base del sistema con ese nombre.');
+    return;
+  }
 
   const affectsHealth = document.getElementById('catAffectsHealth')?.checked || false;
   const intervalKm = Number(document.getElementById('catIntervalKm')?.value) || 0;
@@ -6349,16 +6448,13 @@ function saveServiceCategory(e) {
 
   if (!appState.serviceCategories) appState.serviceCategories = [];
 
-  if (!SERVICE_CATEGORIES.includes(name)) {
-    SERVICE_CATEGORIES.push(name);
-  }
-
   if (catId) {
-    const idx = appState.serviceCategories.findIndex(c => c.id === catId);
+    const idx = appState.serviceCategories.findIndex(c => c && c.id === catId && c.vehicleId === veh.id);
     if (idx !== -1) {
       appState.serviceCategories[idx] = {
         ...appState.serviceCategories[idx],
         name,
+        vehicleId: veh.id,
         affectsHealth,
         recommendedIntervalKm: intervalKm,
         recommendedIntervalMonths: intervalMonths,
@@ -6367,8 +6463,9 @@ function saveServiceCategory(e) {
     }
   } else {
     const newCat = {
-      id: 'cat_custom_' + Date.now(),
+      id: 'cat_custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       name,
+      vehicleId: veh.id,
       affectsHealth,
       recommendedIntervalKm: intervalKm,
       recommendedIntervalMonths: intervalMonths,
@@ -6377,6 +6474,7 @@ function saveServiceCategory(e) {
     appState.serviceCategories.push(newCat);
   }
 
+  syncServiceCategoriesWithState();
   saveState();
   closeModal('modalServiceCategory');
   populateServCategorySelect();
@@ -6645,11 +6743,16 @@ function importBackupXml(e) {
           serviceCategories.forEach(importedCat => {
             if (!importedCat || !importedCat.name) return;
             const isAff = importedCat.affectsHealth === true || String(importedCat.affectsHealth) === 'true';
-            const idx = appState.serviceCategories.findIndex(c => (c.name || '').toLowerCase() === importedCat.name.toLowerCase());
+            const catVehId = importedCat.vehicleId || targetVehId;
+            const idx = appState.serviceCategories.findIndex(c => 
+              (c.name || '').toLowerCase() === importedCat.name.toLowerCase() && (!c.vehicleId || c.vehicleId === catVehId)
+            );
             if (idx >= 0) {
               appState.serviceCategories[idx] = {
                 ...appState.serviceCategories[idx],
                 ...importedCat,
+                vehicleId: catVehId,
+                isCustom: true,
                 affectsHealth: isAff,
                 recommendedIntervalKm: Number(importedCat.recommendedIntervalKm || 0),
                 recommendedIntervalMonths: Number(importedCat.recommendedIntervalMonths || 12)
@@ -6657,6 +6760,8 @@ function importBackupXml(e) {
             } else {
               appState.serviceCategories.push({
                 ...importedCat,
+                vehicleId: catVehId,
+                isCustom: true,
                 affectsHealth: isAff,
                 recommendedIntervalKm: Number(importedCat.recommendedIntervalKm || 0),
                 recommendedIntervalMonths: Number(importedCat.recommendedIntervalMonths || 12)
@@ -6667,6 +6772,9 @@ function importBackupXml(e) {
 
         if (healthSettingsInXml) {
           appState.healthSettings = healthSettingsInXml;
+          if (vehicles.length > 0 && !vehicles[0].healthSettings) {
+            vehicles[0].healthSettings = healthSettingsInXml;
+          }
         }
 
         // Guardar en la base de datos local IndexedDB
