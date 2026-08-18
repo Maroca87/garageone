@@ -1130,12 +1130,13 @@ function isLegacyOrUnassignedUserId(userId, currentUserId) {
 
 async function loadAppStateFromDB() {
   currentUser = AuthService.getCurrentUser();
+  const currentActiveVehId = appState.activeVehicleId;
+
   appState.vehicles = [];
   appState.services = [];
   appState.fuels = [];
   appState.documents = [];
   appState.reminders = [];
-  appState.activeVehicleId = null;
 
   const listContainers = [
     'serviceLogList', 'fuelLogList', 'documentsContainer',
@@ -1199,6 +1200,44 @@ async function loadAppStateFromDB() {
     appState.fuels = (allFuels || []).filter(f => f && (f.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(f.userId, uId))));
     appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(d.userId, uId))));
     appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(r.userId, uId))));
+
+    // Fusión de seguridad: integrar registros válidos en memoria o caché para evitar cualquier pérdida accidental
+    try {
+      const key = getUserStorageKey(currentUser);
+      const cachedRaw = localStorage.getItem(key);
+      if (cachedRaw) {
+        const cachedState = JSON.parse(cachedRaw);
+        if (cachedState.services && Array.isArray(cachedState.services)) {
+          let hasNewServs = false;
+          cachedState.services.forEach(cs => {
+            if (cs && cs.id && !appState.services.some(s => s.id === cs.id)) {
+              cs.userId = uId;
+              appState.services.push(cs);
+              LocalDB.put(STORES.SERVICES, cs);
+              hasNewServs = true;
+            }
+          });
+        }
+        if (cachedState.fuels && Array.isArray(cachedState.fuels)) {
+          cachedState.fuels.forEach(cf => {
+            if (cf && cf.id && !appState.fuels.some(f => f.id === cf.id)) {
+              cf.userId = uId;
+              appState.fuels.push(cf);
+              LocalDB.put(STORES.FUELS, cf);
+            }
+          });
+        }
+        if (cachedState.serviceCategories && Array.isArray(cachedState.serviceCategories)) {
+          cachedState.serviceCategories.forEach(cc => {
+            if (cc && typeof cc === 'object' && cc.name && !appState.serviceCategories.some(c => c && c.id === cc.id)) {
+              appState.serviceCategories.push(cc);
+            }
+          });
+        }
+      }
+    } catch (errCache) {
+      console.warn('[loadAppStateFromDB] Error fusionando caché:', errCache);
+    }
   } else {
     appState.vehicles = [];
     appState.services = [];
@@ -1208,12 +1247,14 @@ async function loadAppStateFromDB() {
   }
 
   if (appState.vehicles.length > 0) {
-    if (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId)) {
+    if (currentActiveVehId && appState.vehicles.some(v => v.id === currentActiveVehId)) {
+      appState.activeVehicleId = currentActiveVehId;
+    } else if (!appState.activeVehicleId || !appState.vehicles.some(v => v.id === appState.activeVehicleId)) {
       appState.activeVehicleId = appState.vehicles[0].id;
     }
-    const mainVehId = appState.activeVehicleId;
-    (appState.services || []).forEach(s => { if (!s.vehicleId || s.vehicleId === 'v1' || s.vehicleId === 'default') s.vehicleId = mainVehId; });
-    (appState.fuels || []).forEach(f => { if (!f.vehicleId || f.vehicleId === 'v1' || f.vehicleId === 'default') f.vehicleId = mainVehId; });
+    const primaryVehId = appState.vehicles[0].id;
+    (appState.services || []).forEach(s => { if (!s.vehicleId || s.vehicleId === 'v1' || s.vehicleId === 'default') s.vehicleId = primaryVehId; });
+    (appState.fuels || []).forEach(f => { if (!f.vehicleId || f.vehicleId === 'v1' || f.vehicleId === 'default') f.vehicleId = primaryVehId; });
   } else {
     appState.activeVehicleId = null;
   }
@@ -1770,9 +1811,33 @@ async function deleteServiceDirect(servId, event = null) {
   }
   if (!servId) return;
   if (!confirm('¿Eliminar este registro de mantenimiento?')) return;
-  await SyncService.executeCrud('DELETE', STORES.SERVICES, { id: servId });
-  await loadAppStateFromDB();
+
+  // 1. Eliminar exclusivamente el registro objetivo de IndexedDB
+  try {
+    await LocalDB.delete(STORES.SERVICES, servId);
+  } catch (err) {
+    console.error('[deleteServiceDirect] Error eliminando en LocalDB:', err);
+  }
+
+  // 2. Eliminar exclusivamente el registro objetivo del estado en memoria
+  appState.services = (appState.services || []).filter(s => s && s.id !== servId);
+
+  // 3. Resetear filtro si la categoría filtrada quedó sin registros
+  if (currentFilter !== 'all') {
+    const veh = getActiveVehicle();
+    const vehId = veh ? veh.id : appState.activeVehicleId;
+    const remainingInFilter = (appState.services || []).filter(s => s && s.vehicleId === vehId && s.category === currentFilter);
+    if (remainingInFilter.length === 0) {
+      currentFilter = 'all';
+    }
+  }
+
+  // 4. Guardar estado sincronizado
+  saveState();
+
+  // 5. Renderizar vistas inmediatamente
   renderApp();
+  if (typeof renderMaintenanceFilterPills === 'function') renderMaintenanceFilterPills();
   if (typeof renderServiceList === 'function') renderServiceList(appState.activeVehicleId);
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
@@ -1786,8 +1851,21 @@ async function deleteFuelDirect(fuelId, event = null) {
   }
   if (!fuelId) return;
   if (!confirm('¿Eliminar esta recarga de combustible?')) return;
-  await SyncService.executeCrud('DELETE', STORES.FUELS, { id: fuelId });
-  await loadAppStateFromDB();
+
+  // 1. Eliminar exclusivamente el registro objetivo de IndexedDB
+  try {
+    await LocalDB.delete(STORES.FUELS, fuelId);
+  } catch (err) {
+    console.error('[deleteFuelDirect] Error eliminando en LocalDB:', err);
+  }
+
+  // 2. Eliminar exclusivamente el registro objetivo del estado en memoria
+  appState.fuels = (appState.fuels || []).filter(f => f && f.id !== fuelId);
+
+  // 3. Guardar estado sincronizado
+  saveState();
+
+  // 4. Renderizar vistas inmediatamente
   renderApp();
   if (typeof renderFuelList === 'function') renderFuelList(appState.activeVehicleId);
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
@@ -2185,10 +2263,24 @@ async function deleteReminderDirect(remId, event = null) {
   }
   if (!remId) return;
   if (!confirm('¿Eliminar este recordatorio?')) return;
-  await SyncService.executeCrud('DELETE', STORES.REMINDERS, { id: remId });
-  await loadAppStateFromDB();
+
+  // 1. Eliminar exclusivamente de IndexedDB
+  try {
+    await LocalDB.delete(STORES.REMINDERS, remId);
+  } catch (err) {
+    console.error('[deleteReminderDirect] Error en LocalDB:', err);
+  }
+
+  // 2. Eliminar exclusivamente de memoria
+  appState.reminders = (appState.reminders || []).filter(r => r && r.id !== remId);
+
+  // 3. Guardar estado sincronizado
+  saveState();
+
+  // 4. Renderizar vistas inmediatamente
   renderUserReminders();
   renderRemindersTab();
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 // Emergency Contacts & Important Phone Numbers Engine
@@ -2493,7 +2585,8 @@ function editCategoryName(oldName) {
 }
 
 /**
- * Elimina una categoría personalizada creada por el usuario para el vehículo activo.
+ * Elimina una categoría personalizada creada por el usuario para el vehículo activo
+ * sin eliminar los registros de mantenimiento asociados (los reasigna a 'Otro').
  * @param {string} catName - Nombre del servicio a eliminar.
  */
 function deleteCategory(catName) {
@@ -2507,12 +2600,28 @@ function deleteCategory(catName) {
 
   if (!confirm(`¿Eliminar el servicio "${catName}" de este vehículo?`)) return;
 
+  // 1. Eliminar exclusivamente la categoría del vehículo activo
   if (appState.serviceCategories && Array.isArray(appState.serviceCategories)) {
     appState.serviceCategories = appState.serviceCategories.filter(c => {
       if (!c || typeof c !== 'object') return false;
-      const cName = c.name || '';
+      const cName = (c.name || '').trim();
       return !(c.vehicleId === veh.id && cName.toLowerCase() === catName.toLowerCase());
     });
+  }
+
+  // 2. Reasignar los mantenimientos existentes bajo esta categoría a 'Otro' para no perder historial
+  if (appState.services && Array.isArray(appState.services)) {
+    appState.services.forEach(s => {
+      if (s && s.vehicleId === veh.id && (s.category || '').toLowerCase() === catName.toLowerCase()) {
+        s.category = 'Otro';
+        LocalDB.put(STORES.SERVICES, s);
+      }
+    });
+  }
+
+  // 3. Resetear filtro si coincidía con la categoría eliminada
+  if (currentFilter && currentFilter.toLowerCase() === catName.toLowerCase()) {
+    currentFilter = 'all';
   }
 
   syncServiceCategoriesWithState();
@@ -2520,6 +2629,7 @@ function deleteCategory(catName) {
   populateServCategorySelect();
   renderMaintenanceFilterPills();
   renderCustomCategoriesList();
+  renderServiceList(veh.id);
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
@@ -2743,11 +2853,25 @@ async function deleteDocumentDirect(docId, event = null) {
     } catch (e) {}
   }
   if (!docId) return;
-  if (confirm('¿Eliminar este documento de la Guantera?')) {
-    await SyncService.executeCrud('DELETE', STORES.DOCUMENTS, { id: docId });
-    await loadAppStateFromDB();
-    renderApp();
+  if (!confirm('¿Eliminar este documento de la Guantera?')) return;
+
+  // 1. Eliminar exclusivamente de IndexedDB
+  try {
+    await LocalDB.delete(STORES.DOCUMENTS, docId);
+  } catch (err) {
+    console.error('[deleteDocumentDirect] Error en LocalDB:', err);
   }
+
+  // 2. Eliminar exclusivamente de memoria
+  appState.documents = (appState.documents || []).filter(d => d && d.id !== docId);
+
+  // 3. Guardar estado sincronizado
+  saveState();
+
+  // 4. Renderizar vistas inmediatamente
+  renderApp();
+  if (typeof renderGuantera === 'function') renderGuantera();
+  if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
 function viewDocumentFile(docId) {
@@ -3968,8 +4092,15 @@ function renderServiceList(vehId) {
 
   let list = (appState.services || []).filter(s => s && s.vehicleId === targetId);
 
+  // Verificación de seguridad de filtro activo
   if (currentFilter !== 'all') {
-    list = list.filter(s => s.category === currentFilter);
+    const filtered = list.filter(s => s.category === currentFilter);
+    if (filtered.length === 0 && list.length > 0) {
+      currentFilter = 'all';
+      if (typeof renderMaintenanceFilterPills === 'function') renderMaintenanceFilterPills();
+    } else {
+      list = filtered;
+    }
   }
 
   list.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -4021,6 +4152,7 @@ function renderServiceList(vehId) {
 }
 
 function openServiceModal(servId = null) {
+  const veh = getActiveVehicle();
   const form = document.getElementById('formService');
   if (form) form.reset();
   document.getElementById('servId').value = '';
@@ -4031,7 +4163,7 @@ function openServiceModal(servId = null) {
   updateServiceModalUnitLabel();
 
   if (servId) {
-    const s = appState.services.find(item => item.id === servId);
+    const s = (appState.services || []).find(item => item.id === servId);
     if (s) {
       document.getElementById('modalServiceTitle').textContent = 'Editar Mantenimiento';
       document.getElementById('servId').value = s.id;
@@ -4042,6 +4174,8 @@ function openServiceModal(servId = null) {
       document.getElementById('servShop').value = s.shop || '';
       if (document.getElementById('servNotes')) document.getElementById('servNotes').value = s.notes || '';
     }
+  } else if (veh) {
+    if (document.getElementById('servKm')) document.getElementById('servKm').value = veh.km || '';
   }
 
   openModal('modalService');
@@ -4127,6 +4261,7 @@ function renderFuelList(vehId) {
 }
 
 function openFuelModal(fuelId = null) {
+  const veh = getActiveVehicle();
   const form = document.getElementById('formFuel');
   if (form) form.reset();
   document.getElementById('fuelId').value = '';
@@ -4136,7 +4271,7 @@ function openFuelModal(fuelId = null) {
   updateFuelModalUnitLabel();
 
   if (fuelId) {
-    const f = appState.fuels.find(item => item.id === fuelId);
+    const f = (appState.fuels || []).find(item => item.id === fuelId);
     if (f) {
       document.getElementById('modalFuelTitle').textContent = 'Editar Gasolina';
       document.getElementById('fuelId').value = f.id;
@@ -4147,6 +4282,8 @@ function openFuelModal(fuelId = null) {
       document.getElementById('fuelDate').value = f.date;
       if (document.getElementById('fuelNotes')) document.getElementById('fuelNotes').value = f.notes || '';
     }
+  } else if (veh) {
+    if (document.getElementById('fuelKm')) document.getElementById('fuelKm').value = veh.km || '';
   }
 
   openModal('modalFuel');
@@ -4619,14 +4756,23 @@ function saveService(e) {
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
     };
 
-    await SyncService.executeCrud(targetServ ? 'UPDATE' : 'CREATE', STORES.SERVICES, servData);
+    const saved = await SyncService.executeCrud(targetServ ? 'UPDATE' : 'CREATE', STORES.SERVICES, servData);
 
     if (safeKm > veh.km) {
       veh.km = safeKm;
       await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
     }
 
-    await loadAppStateFromDB();
+    // Actualización atómica en memoria
+    if (targetServ) {
+      const idx = (appState.services || []).findIndex(s => s && s.id === targetServ.id);
+      if (idx !== -1) appState.services[idx] = { ...appState.services[idx], ...servData, id: saved.id || targetServ.id };
+    } else {
+      if (!appState.services) appState.services = [];
+      appState.services.push(saved);
+    }
+
+    saveState();
     closeModal('modalService');
     document.getElementById('formService').reset();
     setTodayDates();
@@ -4635,6 +4781,7 @@ function saveService(e) {
     currentFilter = 'all';
     renderMaintenanceFilterPills();
     renderApp();
+    if (typeof renderServiceList === 'function') renderServiceList(veh.id);
     if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
   };
 
@@ -4672,18 +4819,29 @@ async function saveFuel(e) {
       receipt: receiptBase64 || (targetFuel ? targetFuel.receipt : '')
     };
 
-    await SyncService.executeCrud(targetFuel ? 'UPDATE' : 'CREATE', STORES.FUELS, fuelData);
+    const saved = await SyncService.executeCrud(targetFuel ? 'UPDATE' : 'CREATE', STORES.FUELS, fuelData);
 
     if (safeKm > veh.km) {
       veh.km = safeKm;
       await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
     }
 
-    await loadAppStateFromDB();
+    // Actualización atómica en memoria
+    if (targetFuel) {
+      const idx = (appState.fuels || []).findIndex(f => f && f.id === targetFuel.id);
+      if (idx !== -1) appState.fuels[idx] = { ...appState.fuels[idx], ...fuelData, id: saved.id || targetFuel.id };
+    } else {
+      if (!appState.fuels) appState.fuels = [];
+      appState.fuels.push(saved);
+    }
+
+    saveState();
     closeModal('modalFuel');
     document.getElementById('formFuel').reset();
     setTodayDates();
     renderApp();
+    if (typeof renderFuelList === 'function') renderFuelList(veh.id);
+    if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
   };
 
   if (receiptInput && receiptInput.files && receiptInput.files[0]) {
