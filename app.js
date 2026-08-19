@@ -1030,22 +1030,35 @@ function loadState() {
 function saveState() {
   try {
     syncServiceCategoriesWithState();
-    const uId = currentUser ? currentUser.id : null;
+    const uId = currentUser ? currentUser.id : 'local_user';
     const key = getUserStorageKey(currentUser);
     localStorage.setItem(key, JSON.stringify(appState));
 
     if (uId) {
-      const userVehicles = (appState.vehicles || []).filter(v => v && v.userId === uId);
-      const userServices = (appState.services || []).filter(s => s && s.userId === uId);
-      const userFuels = (appState.fuels || []).filter(f => f && f.userId === uId);
-      const userDocs = (appState.documents || []).filter(d => d && d.userId === uId);
-      const userReminders = (appState.reminders || []).filter(r => r && r.userId === uId);
+      const userVehicles = (appState.vehicles || []).filter(v => v && (v.userId === uId || !v.userId));
+      userVehicles.forEach(v => { v.userId = uId; });
+
+      const userServices = (appState.services || []).filter(s => s && (s.userId === uId || !s.userId));
+      userServices.forEach(s => { s.userId = uId; });
+
+      const userFuels = (appState.fuels || []).filter(f => f && (f.userId === uId || !f.userId));
+      userFuels.forEach(f => { f.userId = uId; });
+
+      const userDocs = (appState.documents || []).filter(d => d && (d.userId === uId || !d.userId));
+      userDocs.forEach(d => { d.userId = uId; });
+
+      const userReminders = (appState.reminders || []).filter(r => r && (r.userId === uId || !r.userId));
+      userReminders.forEach(r => { r.userId = uId; });
+
+      const userContacts = (appState.emergencyContacts || []).filter(c => c && (c.userId === uId || !c.userId));
+      userContacts.forEach(c => { c.userId = uId; });
 
       if (userVehicles.length > 0) LocalDB.putMany(STORES.VEHICLES, userVehicles);
       if (userServices.length > 0) LocalDB.putMany(STORES.SERVICES, userServices);
       if (userFuels.length > 0) LocalDB.putMany(STORES.FUELS, userFuels);
       if (userDocs.length > 0) LocalDB.putMany(STORES.DOCUMENTS, userDocs);
       if (userReminders.length > 0) LocalDB.putMany(STORES.REMINDERS, userReminders);
+      if (userContacts.length > 0) LocalDB.putMany(STORES.EMERGENCY_CONTACTS, userContacts);
     }
   } catch (e) {
     console.error('Error guardando estado local:', e);
@@ -1152,6 +1165,7 @@ async function loadAppStateFromDB() {
   const allFuels = await LocalDB.getAll(STORES.FUELS);
   const allDocuments = await LocalDB.getAll(STORES.DOCUMENTS);
   const allReminders = await LocalDB.getAll(STORES.REMINDERS);
+  const allContacts = await LocalDB.getAll(STORES.EMERGENCY_CONTACTS);
   appState.users = await LocalDB.getAll(STORES.USERS);
 
   if (currentUser && currentUser.id) {
@@ -1160,7 +1174,6 @@ async function loadAppStateFromDB() {
     const cleanUsername = (currentUser.username || '').toLowerCase();
 
     // Determinar si este usuario es Marcos (marcos_frc@outlook.com) o el usuario principal del dispositivo
-    // Coincidencia exacta para asegurar que marcos2 u otras cuentas mantengan una sesión 100% independiente.
     const isPrimaryOwner = (
       cleanEmail === 'marcos_frc@outlook.com' ||
       cleanEmail === 'marcos_rc@icloud.com' ||
@@ -1185,6 +1198,7 @@ async function loadAppStateFromDB() {
       (allFuels || []).forEach(migrateItem);
       (allDocuments || []).forEach(migrateItem);
       (allReminders || []).forEach(migrateItem);
+      (allContacts || []).forEach(migrateItem);
 
       if (needsMigration) {
         if (allVehicles.length > 0) await LocalDB.putMany(STORES.VEHICLES, allVehicles);
@@ -1192,6 +1206,7 @@ async function loadAppStateFromDB() {
         if (allFuels.length > 0) await LocalDB.putMany(STORES.FUELS, allFuels);
         if (allDocuments.length > 0) await LocalDB.putMany(STORES.DOCUMENTS, allDocuments);
         if (allReminders.length > 0) await LocalDB.putMany(STORES.REMINDERS, allReminders);
+        if (allContacts.length > 0) await LocalDB.putMany(STORES.EMERGENCY_CONTACTS, allContacts);
       }
     }
 
@@ -1201,6 +1216,11 @@ async function loadAppStateFromDB() {
     appState.documents = (allDocuments || []).filter(d => d && (d.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(d.userId, uId))));
     appState.reminders = (allReminders || []).filter(r => r && (r.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(r.userId, uId))));
 
+    const userEmergencyContacts = (allContacts || []).filter(c => c && (c.userId === uId || (isPrimaryOwner && isLegacyOrUnassignedUserId(c.userId, uId))));
+    if (userEmergencyContacts.length > 0) {
+      appState.emergencyContacts = userEmergencyContacts;
+    }
+
     // Fusión de seguridad: integrar registros válidos en memoria o caché para evitar cualquier pérdida accidental
     try {
       const key = getUserStorageKey(currentUser);
@@ -1208,13 +1228,11 @@ async function loadAppStateFromDB() {
       if (cachedRaw) {
         const cachedState = JSON.parse(cachedRaw);
         if (cachedState.services && Array.isArray(cachedState.services)) {
-          let hasNewServs = false;
           cachedState.services.forEach(cs => {
             if (cs && cs.id && !appState.services.some(s => s.id === cs.id)) {
               cs.userId = uId;
               appState.services.push(cs);
               LocalDB.put(STORES.SERVICES, cs);
-              hasNewServs = true;
             }
           });
         }
@@ -1224,6 +1242,27 @@ async function loadAppStateFromDB() {
               cf.userId = uId;
               appState.fuels.push(cf);
               LocalDB.put(STORES.FUELS, cf);
+            }
+          });
+        }
+        if (cachedState.documents && Array.isArray(cachedState.documents)) {
+          cachedState.documents.forEach(cd => {
+            if (cd && cd.id && !appState.documents.some(d => d.id === cd.id)) {
+              cd.userId = uId;
+              appState.documents.push(cd);
+              LocalDB.put(STORES.DOCUMENTS, cd);
+            }
+          });
+        }
+        if (cachedState.emergencyContacts && Array.isArray(cachedState.emergencyContacts) && (!appState.emergencyContacts || appState.emergencyContacts.length === 0)) {
+          cachedState.emergencyContacts.forEach(cc => {
+            if (cc && cc.name) {
+              cc.userId = uId;
+              if (!appState.emergencyContacts) appState.emergencyContacts = [];
+              if (!appState.emergencyContacts.some(ec => ec.id === cc.id)) {
+                appState.emergencyContacts.push(cc);
+                LocalDB.put(STORES.EMERGENCY_CONTACTS, cc);
+              }
             }
           });
         }
@@ -1244,6 +1283,10 @@ async function loadAppStateFromDB() {
     appState.fuels = [];
     appState.documents = [];
     appState.reminders = [];
+  }
+
+  if (!appState.emergencyContacts || appState.emergencyContacts.length === 0) {
+    appState.emergencyContacts = JSON.parse(JSON.stringify(DEFAULT_STATE.emergencyContacts || []));
   }
 
   if (appState.vehicles.length > 0) {
@@ -2342,7 +2385,7 @@ function openContactModal(contactId = null) {
   openModal('modalContact');
 }
 
-function saveEmergencyContact(e) {
+async function saveEmergencyContact(e) {
   e.preventDefault();
   const contactId = document.getElementById('contactId').value;
   const name = document.getElementById('contactName').value.trim();
@@ -2352,8 +2395,10 @@ function saveEmergencyContact(e) {
 
   if (!name || !phone) return;
 
+  const uId = currentUser ? currentUser.id : 'local_user';
   appState.emergencyContacts = appState.emergencyContacts || [];
 
+  let targetContact = null;
   if (contactId) {
     const existing = appState.emergencyContacts.find(c => c.id === contactId);
     if (existing) {
@@ -2361,13 +2406,24 @@ function saveEmergencyContact(e) {
       existing.phone = phone;
       existing.category = category;
       existing.notes = notes;
+      existing.userId = uId;
+      targetContact = existing;
     }
   } else {
-    const newContact = {
+    targetContact = {
       id: 'c_' + Date.now(),
+      userId: uId,
       name, phone, category, notes
     };
-    appState.emergencyContacts.push(newContact);
+    appState.emergencyContacts.push(targetContact);
+  }
+
+  if (targetContact) {
+    try {
+      await LocalDB.put(STORES.EMERGENCY_CONTACTS, targetContact);
+    } catch (err) {
+      console.warn('[saveEmergencyContact] Error en LocalDB:', err);
+    }
   }
 
   saveState();
@@ -2376,7 +2432,13 @@ function saveEmergencyContact(e) {
   renderEmergencyContacts();
 }
 
-function deleteEmergencyContactDirect(contactId) {
+async function deleteEmergencyContactDirect(contactId) {
+  if (!contactId) return;
+  try {
+    await LocalDB.delete(STORES.EMERGENCY_CONTACTS, contactId);
+  } catch (err) {
+    console.warn('[deleteEmergencyContactDirect] Error en LocalDB:', err);
+  }
   appState.emergencyContacts = (appState.emergencyContacts || []).filter(c => c.id !== contactId);
   saveState();
   renderEmergencyContacts();
@@ -2813,29 +2875,43 @@ function saveDocument(e) {
   const fileInput = document.getElementById('docFile');
 
   let targetDoc = docId ? (appState.documents || []).find(d => d.id === docId) : null;
+  const uId = currentUser ? currentUser.id : 'local_user';
 
-  const processAndSave = (fileBase64) => {
+  const processAndSave = async (fileBase64) => {
+    let savedDoc = null;
     if (targetDoc) {
       targetDoc.type = type;
       targetDoc.title = title;
       targetDoc.expDate = expDate;
       targetDoc.phone = phone;
       targetDoc.notes = notes;
+      targetDoc.userId = uId;
       if (fileBase64) targetDoc.file = fileBase64;
+      savedDoc = targetDoc;
     } else {
-      const newDoc = {
+      savedDoc = {
         id: 'd_' + Date.now(),
         vehicleId: veh.id,
+        userId: uId,
         type, title, expDate, phone, notes, file: fileBase64
       };
       appState.documents = appState.documents || [];
-      appState.documents.push(newDoc);
+      appState.documents.push(savedDoc);
+    }
+
+    if (savedDoc) {
+      try {
+        await LocalDB.put(STORES.DOCUMENTS, savedDoc);
+      } catch (err) {
+        console.warn('[saveDocument] Error en LocalDB:', err);
+      }
     }
 
     saveState();
     closeModal('modalDocument');
     document.getElementById('formDocument').reset();
     renderApp();
+    if (typeof renderGuantera === 'function') renderGuantera();
   };
 
   if (fileInput.files && fileInput.files[0]) {
@@ -3993,10 +4069,23 @@ function openVehicleModal(vehId = null) {
       if (document.getElementById('vehKm')) document.getElementById('vehKm').value = v.km || 0;
       if (document.getElementById('vehVin')) document.getElementById('vehVin').value = v.vin || '';
       if (document.getElementById('vehUnit')) document.getElementById('vehUnit').value = v.unitDistance || 'km';
+
+      // New vehicle attributes
+      if (document.getElementById('vehDisplacement')) document.getElementById('vehDisplacement').value = v.displacement || '';
+      if (document.getElementById('vehTransmission')) document.getElementById('vehTransmission').value = v.transmission || 'Automático';
+      if (document.getElementById('vehDoors')) document.getElementById('vehDoors').value = v.doors || '4 Puertas';
+      if (document.getElementById('vehDrivetrain')) document.getElementById('vehDrivetrain').value = v.drivetrain || '4x2';
+      if (document.getElementById('vehAbs')) document.getElementById('vehAbs').value = v.abs || 'Sí';
+      if (document.getElementById('vehExtras')) document.getElementById('vehExtras').value = v.extras || '';
+
       updateVehicleModalUnitLabel(v.unitDistance || 'km');
     }
   } else {
     if (document.getElementById('vehUnit')) document.getElementById('vehUnit').value = 'km';
+    if (document.getElementById('vehTransmission')) document.getElementById('vehTransmission').value = 'Automático';
+    if (document.getElementById('vehDoors')) document.getElementById('vehDoors').value = '4 Puertas';
+    if (document.getElementById('vehDrivetrain')) document.getElementById('vehDrivetrain').value = '4x2';
+    if (document.getElementById('vehAbs')) document.getElementById('vehAbs').value = 'Sí';
     updateVehicleModalUnitLabel('km');
   }
 
@@ -4035,6 +4124,15 @@ function saveVehicle(e) {
   const vin = document.getElementById('vehVin') ? document.getElementById('vehVin').value.trim() : '';
   const unitEl = document.getElementById('vehUnit');
   const unitDistance = unitEl ? unitEl.value : 'km';
+
+  // Extract new vehicle attributes
+  const displacement = document.getElementById('vehDisplacement') ? document.getElementById('vehDisplacement').value.trim() : '';
+  const transmission = document.getElementById('vehTransmission') ? document.getElementById('vehTransmission').value : 'Automático';
+  const doors = document.getElementById('vehDoors') ? document.getElementById('vehDoors').value : '4 Puertas';
+  const drivetrain = document.getElementById('vehDrivetrain') ? document.getElementById('vehDrivetrain').value : '4x2';
+  const abs = document.getElementById('vehAbs') ? document.getElementById('vehAbs').value : 'Sí';
+  const extras = document.getElementById('vehExtras') ? document.getElementById('vehExtras').value.trim() : '';
+
   const photoInput = document.getElementById('vehPhotoFile');
 
   const currentYear = new Date().getFullYear();
@@ -4050,6 +4148,7 @@ function saveVehicle(e) {
     const vehData = {
       id: vehId || undefined,
       type, brand, make: brand, model, name, year, plate, km: safeKm, vin, unitDistance,
+      displacement, transmission, doors, drivetrain, abs, extras,
       photo: photoBase64 || (targetVeh ? targetVeh.photo : '')
     };
 
@@ -4962,28 +5061,28 @@ function generateCertifiedReport() {
     ${services.length === 0 ? `
       <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este período.</p>
     ` : `
-      <table class="cert-table" style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:0.82rem; background:#ffffff; color:#0f172a;">
+      <table class="cert-table" style="width:100%; border-collapse:collapse; table-layout:fixed; word-break:break-word; overflow-wrap:break-word; margin-bottom:16px; font-size:0.8rem; background:#ffffff; color:#0f172a;">
         <thead>
           <tr style="background:#0f172a; color:#ffffff; text-align:left;">
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos / Garantía</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller / Mecánico</th>
-            <th style="padding:8px; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
+            <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
+            <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+            <th style="padding:6px 8px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
+            <th style="padding:6px 8px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
+            <th style="padding:6px 8px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos</th>
+            <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller</th>
+            <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
           </tr>
         </thead>
         <tbody>
           ${services.map((s, idx) => `
             <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
-              <td style="padding:8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700;">${formatCurrency(s.cost)}</td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
+              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap;">${formatCurrency(s.cost)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -5031,18 +5130,18 @@ function downloadReportPDF() {
   wrapper.style.position = 'fixed';
   wrapper.style.top = '0';
   wrapper.style.left = '0';
-  wrapper.style.width = '820px';
+  wrapper.style.width = '710px';
   wrapper.style.minHeight = '100vh';
   wrapper.style.zIndex = '999999';
   wrapper.style.background = '#ffffff';
   wrapper.style.color = '#0f172a';
   wrapper.style.overflowY = 'auto';
-  wrapper.style.padding = '15px';
+  wrapper.style.padding = '10px';
   wrapper.style.boxSizing = 'border-box';
 
   const clone = element.cloneNode(true);
-  clone.style.width = '790px';
-  clone.style.maxWidth = '100%';
+  clone.style.width = '100%';
+  clone.style.maxWidth = '690px';
   clone.style.margin = '0 auto';
   clone.style.background = '#ffffff';
   clone.style.color = '#0f172a';
@@ -5063,7 +5162,7 @@ function downloadReportPDF() {
 
   if (window.html2pdf) {
     const opt = {
-      margin:       [10, 10, 10, 10],
+      margin:       [8, 8, 8, 8],
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
@@ -5072,7 +5171,7 @@ function downloadReportPDF() {
         allowTaint: true,
         scrollY: 0, 
         scrollX: 0,
-        windowWidth: 820,
+        windowWidth: 720,
         backgroundColor: '#ffffff'
       },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -5205,7 +5304,160 @@ function xmlToObject(xmlStr) {
 
 
 
-// Report Sharing (Text & Email)
+// Report Sharing (Text, Email & Vehicle Spec Sheet PDF)
+/**
+ * Genera y exporta en PDF la Ficha Técnica de Venta del vehículo activo.
+ * Muestra exclusivamente las especificaciones y equipamiento del carro
+ * (sin historial de servicios mecánicos ni gastos de mantenimiento).
+ */
+function exportVehicleSpecPDF() {
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes seleccionar o registrar un vehículo en el Garaje.');
+    return;
+  }
+
+  const emissionDate = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const cleanName = (veh.plate || veh.name || 'Vehiculo').replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = `Ficha_Tecnica_Venta_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+  const specHtml = `
+    <div style="background:#ffffff; color:#0f172a; padding:18px; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box; width:100%; max-width:690px; margin:0 auto;">
+      <!-- Header -->
+      <div style="border-bottom:2px solid #0f172a; padding-bottom:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div style="font-size:0.75rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">GARAGEONE • FICHA TÉCNICA OFICIAL</div>
+          <h1 style="color:#0f172a; margin:0 0 2px 0; font-size:1.4rem; text-transform:uppercase; letter-spacing:0.5px;">${escapeHtml(veh.name)}</h1>
+          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Especificaciones Técnicas para Venta y Presentación</p>
+        </div>
+        <div style="text-align:right; font-size:0.8rem; color:#475569;">
+          <div>Emisión: <strong style="color:#0f172a;">${emissionDate}</strong></div>
+          <div>Propietario: <strong style="color:#0f172a;">${currentUser ? escapeHtml(currentUser.name) : 'Particular'}</strong></div>
+        </div>
+      </div>
+
+      <!-- Vehicle Photo (if available) -->
+      ${veh.photo ? `
+        <div style="text-align:center; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px;">
+          <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-width:100%; max-height:250px; object-fit:contain; border-radius:6px;">
+        </div>
+      ` : ''}
+
+      <!-- Main Specifications Box -->
+      <div style="margin-bottom:14px;">
+        <h3 style="margin:0 0 8px 0; font-size:0.95rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; letter-spacing:0.5px;">
+          Datos Generales y Mecánicos
+        </h3>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.84rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Marca y Modelo:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.brand || veh.make || '')} ${escapeHtml(veh.model || '')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Año de Fabricación:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${veh.year || 'No indicado'}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Placa / Matrícula:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.plate) || 'SIN PLACA'}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Odómetro Actual:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${formatVehicleDistance(veh.km, veh)}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Tipo de Carrocería:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.type || 'Sedán')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Cilindraje / Motor:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.displacement) || 'Estándar'}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Transmisión:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.transmission || 'Automático')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Número de Puertas:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.doors || '4 Puertas')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Tracción:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.drivetrain || '4x2')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Sistema de Frenos ABS:</strong>
+            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.abs || 'Sí')}</span>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px; grid-column:1 / -1;">
+            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Número de Chasis / VIN:</strong>
+            <span style="font-size:0.88rem; font-weight:700; color:#0f172a; letter-spacing:0.5px;">${escapeHtml(veh.vin) || 'No especificado'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Equipment and Extras Section -->
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:14px;">
+        <h3 style="margin:0 0 6px 0; font-size:0.92rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; letter-spacing:0.5px;">
+          Equipamiento, Extras y Accesorios
+        </h3>
+        <p style="margin:0; font-size:0.85rem; color:#1e293b; line-height:1.45; white-space:pre-wrap;">${escapeHtml(veh.extras) || 'Equipamiento original de fábrica en óptimas condiciones.'}</p>
+      </div>
+
+      <!-- Legal / Footer -->
+      <div style="border-top:1px solid #cbd5e1; padding-top:10px; font-size:0.74rem; color:#64748b; text-align:center; margin-top:20px;">
+        GarageOne • Plataforma de Gestión Vehicular • Ficha técnica digital de venta y exhibición
+      </div>
+    </div>
+  `;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '0';
+  wrapper.style.width = '710px';
+  wrapper.style.minHeight = '100vh';
+  wrapper.style.zIndex = '999999';
+  wrapper.style.background = '#ffffff';
+  wrapper.style.color = '#0f172a';
+  wrapper.style.overflowY = 'auto';
+  wrapper.style.padding = '10px';
+  wrapper.style.boxSizing = 'border-box';
+  wrapper.innerHTML = specHtml;
+
+  document.body.appendChild(wrapper);
+
+  if (window.html2pdf) {
+    const opt = {
+      margin:       [8, 8, 8, 8],
+      filename:     fileName,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: false, 
+        allowTaint: true,
+        scrollY: 0, 
+        scrollX: 0,
+        windowWidth: 720,
+        backgroundColor: '#ffffff'
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    html2pdf().set(opt).from(wrapper.firstElementChild).save().then(() => {
+      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+    }).catch(err => {
+      console.error('Error al generar Ficha Técnica con html2pdf:', err);
+      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+      window.print();
+    });
+  } else {
+    if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+    window.print();
+  }
+}
+
 function shareReportText() {
   const veh = getActiveVehicle();
   if (!veh) return;

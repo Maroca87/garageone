@@ -369,9 +369,9 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Descargar PDF</span>
             </button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;">
+            <button class="btn btn-secondary btn-block" onclick="exportVehicleSpecPDF()" style="flex:1; min-width:140px;" title="Exportar Ficha Técnica de Venta (PDF)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-              <span>Compartir</span>
+              <span>Compartir Ficha (PDF)</span>
             </button>
           </div>
         </div>
@@ -579,9 +579,53 @@
             </select>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cilindraje / Motor</label>
+            <input type="text" id="vehDisplacement" class="form-control" placeholder="Ej. 2000 cc o 2.0L">
+          </div>
+          <div class="form-group">
+            <label>Transmisión</label>
+            <select id="vehTransmission" class="form-control">
+              <option value="Automático">Automático</option>
+              <option value="Manual">Manual</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Número de Puertas</label>
+            <select id="vehDoors" class="form-control">
+              <option value="4 Puertas">4 Puertas</option>
+              <option value="5 Puertas">5 Puertas</option>
+              <option value="2 Puertas">2 Puertas</option>
+              <option value="3 Puertas">3 Puertas</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tracción</label>
+            <select id="vehDrivetrain" class="form-control">
+              <option value="4x2">4x2 (Tracción simple)</option>
+              <option value="4x4">4x4 (Tracción integral / 4WD)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Frenos ABS</label>
+            <select id="vehAbs" class="form-control">
+              <option value="Sí">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Número de Chasis / VIN (Opcional)</label>
+            <input type="text" id="vehVin" class="form-control" placeholder="">
+          </div>
+        </div>
         <div class="form-group">
-          <label>Número de Chasis / VIN (Opcional)</label>
-          <input type="text" id="vehVin" class="form-control" placeholder="">
+          <label>Extras y Accesorios (Cámaras, Alfombras, Racks, etc.)</label>
+          <textarea id="vehExtras" class="form-control" rows="2" placeholder="Ej. Cámara de retroceso, alfombras todo clima, racks de techo, dashcam, alarma, etc."></textarea>
         </div>
         <div class="form-group">
           <label>Fotografía del Vehículo (Opcional)</label>

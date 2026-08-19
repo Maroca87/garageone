@@ -1848,6 +1848,90 @@ input:checked + .slider:before {
   border-radius: 8px;
 }
 
+.cert-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-size: 0.82rem;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.cert-table th, .cert-table td {
+  border: 1px solid #cbd5e1;
+  padding: 6px 8px;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+/* Ficha Técnica de Venta (Sales Spec Sheet Layout) */
+.sales-spec-container {
+  background: #ffffff;
+  color: #0f172a;
+  padding: 18px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.sales-spec-header {
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.sales-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sales-spec-cell {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+
+.sales-spec-cell strong {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 2px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sales-spec-cell span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.sales-spec-extras {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.sales-spec-photo-wrap {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.sales-spec-photo {
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
 /* ==========================================================================
    Comprehensive Responsive & Adaptive Layout System
    (iPhone / Mobile, iPad / Tablet, Desktop / Web)

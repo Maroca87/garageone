@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = 'GarageOne_LocalDB_v2';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORES = {
   VEHICLES: 'vehicles',
@@ -13,6 +13,7 @@ const STORES = {
   FUELS: 'fuels',
   DOCUMENTS: 'documents',
   REMINDERS: 'reminders',
+  EMERGENCY_CONTACTS: 'emergency_contacts',
   USERS: 'users',
   AI_CHATS: 'ai_chats',
   SYNC_QUEUE: 'sync_queue',
@@ -59,6 +60,11 @@ const LocalDB = {
         if (!db.objectStoreNames.contains(STORES.REMINDERS)) {
           const store = db.createObjectStore(STORES.REMINDERS, { keyPath: 'id' });
           store.createIndex('vehicleId', 'vehicleId', { unique: false });
+          store.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(STORES.EMERGENCY_CONTACTS)) {
+          const store = db.createObjectStore(STORES.EMERGENCY_CONTACTS, { keyPath: 'id' });
+          store.createIndex('userId', 'userId', { unique: false });
           store.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
         if (!db.objectStoreNames.contains(STORES.USERS)) {
