@@ -5026,14 +5026,21 @@ function generateCertifiedReport() {
 
     <!-- Vehicle Specs Box -->
     <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:16px; color:#0f172a;">
-      <h3 style="margin:0 0 8px 0; font-size:1rem; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">Ficha del Vehículo</h3>
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:0.85rem; color:#1e293b;">
-        <div><strong style="color:#0f172a;">Vehículo:</strong> ${escapeHtml(veh.name)}</div>
-        <div><strong style="color:#0f172a;">Placa / Matrícula:</strong> ${escapeHtml(veh.plate) || 'SIN PLACA'}</div>
-        <div><strong style="color:#0f172a;">Año:</strong> ${veh.year}</div>
-        <div><strong style="color:#0f172a;">Tipo:</strong> ${escapeHtml(veh.type)}</div>
-        <div><strong style="color:#0f172a;">Odómetro Actual:</strong> ${formatVehicleDistance(veh.km, veh)}</div>
-        <div><strong style="color:#0f172a;">Última Revisión:</strong> ${lastService ? lastService.date : 'Sin registro'}</div>
+      <h3 style="margin:0 0 10px 0; font-size:1rem; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">Ficha del Vehículo</h3>
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+        ${veh.photo ? `
+          <div style="flex-shrink:0; text-align:center;">
+            <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-height:110px; max-width:160px; object-fit:contain; border-radius:6px; border:1px solid #cbd5e1;">
+          </div>
+        ` : ''}
+        <div style="flex:1; display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; font-size:0.85rem; color:#1e293b;">
+          <div><strong style="color:#0f172a;">Vehículo:</strong> ${escapeHtml(veh.name)}</div>
+          <div><strong style="color:#0f172a;">Placa / Matrícula:</strong> ${escapeHtml(veh.plate) || 'SIN PLACA'}</div>
+          <div><strong style="color:#0f172a;">Año:</strong> ${veh.year}</div>
+          <div><strong style="color:#0f172a;">Tipo:</strong> ${escapeHtml(veh.type)}</div>
+          <div><strong style="color:#0f172a;">Odómetro:</strong> ${formatVehicleDistance(veh.km, veh)}</div>
+          <div><strong style="color:#0f172a;">Última Revisión:</strong> ${lastService ? lastService.date : 'Sin registro'}</div>
+        </div>
       </div>
     </div>
 
@@ -5061,32 +5068,34 @@ function generateCertifiedReport() {
     ${services.length === 0 ? `
       <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este período.</p>
     ` : `
-      <table class="cert-table" style="width:100%; border-collapse:collapse; table-layout:fixed; word-break:break-word; overflow-wrap:break-word; margin-bottom:16px; font-size:0.8rem; background:#ffffff; color:#0f172a;">
-        <thead>
-          <tr style="background:#0f172a; color:#ffffff; text-align:left;">
-            <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
-            <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
-            <th style="padding:6px 8px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
-            <th style="padding:6px 8px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
-            <th style="padding:6px 8px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos</th>
-            <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller</th>
-            <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${services.map((s, idx) => `
-            <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
-              <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap;">${formatCurrency(s.cost)}</td>
+      <div class="table-responsive-wrapper" style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:16px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff;">
+        <table class="cert-table" style="width:100%; min-width:680px; border-collapse:collapse; font-size:0.84rem; background:#ffffff; color:#0f172a; margin:0;">
+          <thead>
+            <tr style="background:#0f172a; color:#ffffff; text-align:left;">
+              <th style="padding:8px 10px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
+              <th style="padding:8px 10px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+              <th style="padding:8px 10px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
+              <th style="padding:8px 10px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
+              <th style="padding:8px 10px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos</th>
+              <th style="padding:8px 10px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller</th>
+              <th style="padding:8px 10px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${services.map((s, idx) => `
+              <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
+                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap;">${formatCurrency(s.cost)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     `}
 
     <!-- Pending / Recommended Maintenance for Mechanic -->
@@ -5147,6 +5156,20 @@ function downloadReportPDF() {
   clone.style.color = '#0f172a';
   clone.style.fontFamily = 'Arial, Helvetica, sans-serif';
   clone.style.boxSizing = 'border-box';
+
+  const tableWrapper = clone.querySelector('.table-responsive-wrapper');
+  if (tableWrapper) {
+    tableWrapper.style.overflow = 'visible';
+    tableWrapper.style.border = 'none';
+    tableWrapper.style.margin = '0 0 16px 0';
+  }
+
+  const certTable = clone.querySelector('.cert-table');
+  if (certTable) {
+    certTable.style.minWidth = '100%';
+    certTable.style.width = '100%';
+    certTable.style.tableLayout = 'fixed';
+  }
 
   const allNodes = clone.querySelectorAll('*');
   allNodes.forEach(el => {

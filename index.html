@@ -746,13 +746,19 @@
 
   <!-- Modal: Expediente Certificado -->
   <div id="modalCertifiedReport" class="modal-backdrop">
-    <div class="modal-card print-wrapper">
-      <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 data-i18n="certifiedModalTitle" style="margin:0;">Expediente Técnico y Mantenimiento</h3>
-        <button class="close-btn" onclick="closeModal('modalCertifiedReport')">✕</button>
+    <div class="modal-card print-wrapper" style="max-width:880px; width:95%; max-height:90vh; overflow-y:auto; background:#ffffff; padding:18px; border-radius:12px;">
+      <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px;">
+        <h3 data-i18n="certifiedModalTitle" style="margin:0; font-size:1.15rem; color:#0f172a; font-weight:700;">Expediente Técnico y Mantenimiento</h3>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="downloadReportPDF()" style="color:#0284c7; border-color:rgba(2,132,199,0.3); font-weight:600; padding:4px 10px; font-size:0.8rem; display:inline-flex; align-items:center; gap:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Descargar PDF</span>
+          </button>
+          <button class="close-btn" onclick="closeModal('modalCertifiedReport')" style="color:#64748b; font-size:1.2rem; cursor:pointer;">✕</button>
+        </div>
       </div>
       
-      <div class="certified-document" id="certifiedDocumentContent">
+      <div class="certified-document" id="certifiedDocumentContent" style="background:#ffffff; color:#0f172a; padding:0;">
         <!-- Printable formal report rendered dynamically -->
       </div>
     </div>
