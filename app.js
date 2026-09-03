@@ -126,6 +126,10 @@ const DEFAULT_STATE = {
   distanceUnit: 'km',
   language: 'es',
   geminiApiKey: '',
+  backupFrequency: 'off',
+  backupTime: '03:00',
+  lastAutoBackupTimestamp: 0,
+  backupHistory: [],
   vehicles: [],
   activeVehicleId: '',
   documents: [],
@@ -154,8 +158,9 @@ const DEFAULT_STATE = {
   ]
 };
 
-appState = loadState();
+const BACKUP_SETTINGS_KEY = 'GARAGEONE_BACKUP_SETTINGS';
 currentUser = loadUser();
+appState = loadState();
 isAuthenticated = false;
 let failedLoginAttempts = 0;
 let lockoutUntil = 0;
@@ -695,7 +700,6 @@ async function handleLogout() {
   appState.documents = [];
   appState.reminders = [];
   appState.emergencyContacts = [];
-  appState.backupHistory = [];
   appState.activeVehicleId = null;
 
   const listContainers = [
@@ -709,7 +713,6 @@ async function handleLogout() {
     if (el) el.innerHTML = '';
   });
 
-  saveState();
   await checkAuth();
 }
 
@@ -1018,6 +1021,18 @@ function loadState() {
       state = sanitizeState(parsed);
     }
   } catch (e) { console.error('Error loading state from cache:', e); }
+
+  // Fallback dedicado para asegurar persistencia de respaldo en cualquier escenario
+  try {
+    const rawBk = localStorage.getItem(BACKUP_SETTINGS_KEY);
+    if (rawBk) {
+      const bk = JSON.parse(rawBk);
+      if (bk.frequency) state.backupFrequency = bk.frequency;
+      if (bk.time) state.backupTime = bk.time;
+      if (bk.lastTimestamp) state.lastAutoBackupTimestamp = bk.lastTimestamp;
+    }
+  } catch (e) {}
+
   const finalState = sanitizeState(state);
 
   if (finalState.serviceCategories && Array.isArray(finalState.serviceCategories)) {
@@ -1033,6 +1048,15 @@ function saveState() {
     const uId = currentUser ? currentUser.id : 'local_user';
     const key = getUserStorageKey(currentUser);
     localStorage.setItem(key, JSON.stringify(appState));
+
+    // Guardado dedicado e inmutable de la configuración de respaldos
+    try {
+      localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify({
+        frequency: appState.backupFrequency || 'off',
+        time: appState.backupTime || '03:00',
+        lastTimestamp: appState.lastAutoBackupTimestamp || 0
+      }));
+    } catch (e) {}
 
     if (uId) {
       const userVehicles = (appState.vehicles || []).filter(v => v && (v.userId === uId || !v.userId));
@@ -1059,6 +1083,10 @@ function saveState() {
       if (userDocs.length > 0) LocalDB.putMany(STORES.DOCUMENTS, userDocs);
       if (userReminders.length > 0) LocalDB.putMany(STORES.REMINDERS, userReminders);
       if (userContacts.length > 0) LocalDB.putMany(STORES.EMERGENCY_CONTACTS, userContacts);
+      if (appState.backupHistory && appState.backupHistory.length > 0) {
+        const userBackups = appState.backupHistory.map(b => ({ ...b, userId: uId }));
+        LocalDB.putMany(STORES.BACKUPS, userBackups);
+      }
     }
   } catch (e) {
     console.error('Error guardando estado local:', e);
@@ -1166,6 +1194,7 @@ async function loadAppStateFromDB() {
   const allDocuments = await LocalDB.getAll(STORES.DOCUMENTS);
   const allReminders = await LocalDB.getAll(STORES.REMINDERS);
   const allContacts = await LocalDB.getAll(STORES.EMERGENCY_CONTACTS);
+  const allBackups = await LocalDB.getAll(STORES.BACKUPS);
   appState.users = await LocalDB.getAll(STORES.USERS);
 
   if (currentUser && currentUser.id) {
@@ -1273,9 +1302,37 @@ async function loadAppStateFromDB() {
             }
           });
         }
+        if (cachedState.backupFrequency) appState.backupFrequency = cachedState.backupFrequency;
+        if (cachedState.backupTime) appState.backupTime = cachedState.backupTime;
+        if (cachedState.lastAutoBackupTimestamp) appState.lastAutoBackupTimestamp = cachedState.lastAutoBackupTimestamp;
+        if (cachedState.backupHistory && Array.isArray(cachedState.backupHistory)) {
+          appState.backupHistory = cachedState.backupHistory;
+        }
       }
     } catch (errCache) {
       console.warn('[loadAppStateFromDB] Error fusionando caché:', errCache);
+    }
+
+    // Fallback de configuración de respaldos
+    try {
+      const rawBk = localStorage.getItem(BACKUP_SETTINGS_KEY);
+      if (rawBk) {
+        const bk = JSON.parse(rawBk);
+        if (bk.frequency && (!appState.backupFrequency || appState.backupFrequency === 'off')) {
+          appState.backupFrequency = bk.frequency;
+        }
+        if (bk.time) appState.backupTime = bk.time;
+        if (bk.lastTimestamp && !appState.lastAutoBackupTimestamp) {
+          appState.lastAutoBackupTimestamp = bk.lastTimestamp;
+        }
+      }
+    } catch (e) {}
+
+    if (allBackups && allBackups.length > 0) {
+      const userBackups = (allBackups || []).filter(b => b && (b.userId === uId || !b.userId));
+      if (userBackups.length > 0 && (!appState.backupHistory || appState.backupHistory.length === 0)) {
+        appState.backupHistory = userBackups.slice(0, 3);
+      }
     }
   } else {
     appState.vehicles = [];
@@ -1313,6 +1370,16 @@ async function initAsyncStorage() {
   isAuthenticated = AuthService.isAuthenticated();
 
   await loadAppStateFromDB();
+  if (typeof checkAndTriggerAutoBackup === 'function') {
+    checkAndTriggerAutoBackup();
+  }
+
+  // Verificación periódica cada minuto mientras la app permanezca abierta
+  setInterval(() => {
+    if (typeof checkAndTriggerAutoBackup === 'function') {
+      checkAndTriggerAutoBackup(false);
+    }
+  }, 60 * 1000);
 
   SyncService.onStateChanged(async () => {
     await loadAppStateFromDB();
@@ -1321,6 +1388,9 @@ async function initAsyncStorage() {
     renderReports();
     renderGuantera();
     renderUserSettings();
+    if (typeof checkAndTriggerAutoBackup === 'function') {
+      checkAndTriggerAutoBackup();
+    }
   });
 
   checkAuth();
@@ -4437,8 +4507,8 @@ function renderUserSettings() {
   const backupFreqEl = document.getElementById('backupFrequency');
   const backupTimeEl = document.getElementById('backupTime');
   if (backupFreqEl) backupFreqEl.value = appState.backupFrequency || 'off';
-  if (backupTimeEl && appState.backupTime) backupTimeEl.value = appState.backupTime;
-  updateBackupScheduleSettings();
+  if (backupTimeEl) backupTimeEl.value = appState.backupTime || '03:00';
+  updateBackupScheduleSettings(false);
   renderBackupHistory();
 
   applyLanguageTranslations();
@@ -4478,18 +4548,23 @@ function calculateNextBackupSchedule(frequency, timeStr = '03:00') {
   return `Próximo respaldo automático programado: <br><strong>${dateFormatted}</strong> a las <strong>${timeFormatted}</strong>`;
 }
 
-function updateBackupScheduleSettings() {
+function updateBackupScheduleSettings(save = true) {
   const freqEl = document.getElementById('backupFrequency');
   const timeEl = document.getElementById('backupTime');
   const timeGroup = document.getElementById('backupTimeGroup');
   const previewEl = document.getElementById('backupNextSchedule');
 
-  const freq = freqEl ? freqEl.value : 'off';
-  const timeStr = timeEl ? timeEl.value : '03:00';
+  const freq = freqEl ? freqEl.value : (appState.backupFrequency || 'off');
+  const timeStr = timeEl ? timeEl.value : (appState.backupTime || '03:00');
 
-  appState.backupFrequency = freq;
-  appState.backupTime = timeStr;
-  saveState();
+  if (save) {
+    appState.backupFrequency = freq;
+    appState.backupTime = timeStr;
+    saveState();
+    if (freq !== 'off' && typeof checkAndTriggerAutoBackup === 'function') {
+      checkAndTriggerAutoBackup();
+    }
+  }
 
   if (freq === 'off') {
     if (timeGroup) timeGroup.style.display = 'none';
@@ -4507,7 +4582,7 @@ function updateBackupScheduleSettings() {
 }
 
 function saveBackupFrequency(val) {
-  updateBackupScheduleSettings();
+  updateBackupScheduleSettings(true);
 }
 
 function changeCurrencySetting(val) {
@@ -7076,41 +7151,83 @@ function deleteBackupItem(id) {
   }
 }
 
-function saveBackupFrequency(freq) {
-  appState.backupFrequency = freq;
-  saveState();
-  if (freq !== 'off') {
-    checkAndTriggerAutoBackup(true);
+/**
+ * Determina con precisión si corresponde ejecutar un respaldo automático según cualquier frecuencia y horario.
+ * @returns {boolean}
+ */
+function isAutoBackupDue() {
+  const freq = appState.backupFrequency || 'off';
+  if (freq === 'off') return false;
+
+  const timeStr = appState.backupTime || '03:00';
+  const parts = timeStr.split(':');
+  const targetHour = parseInt(parts[0], 10) || 0;
+  const targetMinute = parseInt(parts[1], 10) || 0;
+
+  const now = new Date();
+  const lastTime = Number(appState.lastAutoBackupTimestamp || 0);
+
+  // Fecha del horario programado correspondiente a hoy
+  let scheduledSlot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetHour, targetMinute, 0, 0);
+
+  // Si la hora programada de hoy aún no ha llegado, el ciclo anterior programado fue ayer/semana anterior
+  if (now.getTime() < scheduledSlot.getTime()) {
+    if (freq === 'daily') {
+      scheduledSlot.setDate(scheduledSlot.getDate() - 1);
+    } else if (freq === 'weekly') {
+      scheduledSlot.setDate(scheduledSlot.getDate() - 7);
+    } else if (freq === 'monthly') {
+      scheduledSlot.setMonth(scheduledSlot.getMonth() - 1);
+    }
   }
+
+  // Si nunca se ha realizado un respaldo o el último respaldo ocurrió antes del horario programado más reciente
+  if (lastTime === 0 || lastTime < scheduledSlot.getTime()) {
+    return true;
+  }
+
+  // Control secundario por intervalo de tiempo
+  let intervalMs = 24 * 60 * 60 * 1000;
+  if (freq === 'weekly') intervalMs = 7 * 24 * 60 * 60 * 1000;
+  if (freq === 'monthly') intervalMs = 30 * 24 * 60 * 60 * 1000;
+
+  if (now.getTime() - lastTime >= intervalMs) {
+    return true;
+  }
+
+  return false;
 }
 
+/**
+ * Verifica y ejecuta el respaldo automático si corresponde según la programación activa.
+ * @param {boolean} forceCheck - Si es true, fuerza la generación independientemente del temporizador.
+ */
 function checkAndTriggerAutoBackup(forceCheck = false) {
   const freq = appState.backupFrequency || 'off';
   if (freq === 'off') return;
 
-  const now = Date.now();
-  const lastTime = appState.lastAutoBackupTimestamp || 0;
-  let intervalMs = 86400000; // daily
-  if (freq === 'weekly') intervalMs = 604800000;
-  if (freq === 'monthly') intervalMs = 2592000000;
+  if (forceCheck || isAutoBackupDue()) {
+    try {
+      const xmlStr = objectToXML(appState);
+      const nowDate = new Date();
+      const now = Date.now();
+      const backupItem = {
+        id: 'bk_' + now,
+        filename: `GarageOne_AutoBackup_${nowDate.toISOString().substring(0,10)}_${String(nowDate.getHours()).padStart(2,'0')}${String(nowDate.getMinutes()).padStart(2,'0')}.xml`,
+        date: nowDate.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
+        timestamp: now,
+        sizeKb: Math.round(xmlStr.length / 1024) || 1,
+        type: 'auto',
+        xmlData: xmlStr
+      };
 
-  if (now - lastTime >= intervalMs || (forceCheck && (now - lastTime >= intervalMs))) {
-    const xmlStr = objectToXML(appState);
-    const nowDate = new Date();
-    const backupItem = {
-      id: 'bk_' + now,
-      filename: `GarageOne_AutoBackup_${nowDate.toISOString().substring(0,10)}_${String(nowDate.getHours()).padStart(2,'0')}${String(nowDate.getMinutes()).padStart(2,'0')}.xml`,
-      date: nowDate.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
-      timestamp: now,
-      sizeKb: Math.round(xmlStr.length / 1024) || 1,
-      type: 'auto',
-      xmlData: xmlStr
-    };
-
-    appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
-    appState.lastAutoBackupTimestamp = now;
-    saveState();
-    renderBackupHistory();
+      appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
+      appState.lastAutoBackupTimestamp = now;
+      saveState();
+      renderBackupHistory();
+    } catch (err) {
+      console.error('Error al generar respaldo automático:', err);
+    }
   }
 }
 
