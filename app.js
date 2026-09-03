@@ -4977,12 +4977,12 @@ function viewFuelReceipt(fuelId) {
 }
 
 /**
- * Genera el informe técnico y expediente formal del vehículo,
- * permitiendo su visualización completa o filtrada según el mes seleccionado.
+ * Construye el contenido del expediente técnico vehicular en el DOM.
+ * @returns {boolean} true si se pudo construir el contenido, false si no hay vehículo activo o contenedor.
  */
-function generateCertifiedReport() {
+function buildCertifiedReportDOM() {
   const veh = getActiveVehicle();
-  if (!veh) return;
+  if (!veh) return false;
 
   const selectedMonth = document.getElementById('reportMonthFilter')?.value || 'all';
 
@@ -5008,7 +5008,7 @@ function generateCertifiedReport() {
   const emissionDate = new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const container = document.getElementById('certifiedDocumentContent');
-  if (!container) return;
+  if (!container) return false;
 
   container.innerHTML = `
     <div class="cert-header" style="border-bottom:2px solid #000000; padding-bottom:12px; margin-bottom:16px; background:#ffffff; color:#000000;">
@@ -5120,7 +5120,16 @@ function generateCertifiedReport() {
     </div>
   `;
 
-  openModal('modalCertifiedReport');
+  return true;
+}
+
+/**
+ * Abre el expediente formal exclusivamente para su visualización y cierre en el modal.
+ */
+function generateCertifiedReport() {
+  if (buildCertifiedReportDOM()) {
+    openModal('modalCertifiedReport');
+  }
 }
 
 /**
@@ -6984,11 +6993,11 @@ function saveServiceCategory(e) {
 
 
 /**
- * Genera el reporte técnico con la selección de filtro de mes actual
- * y desencadena la descarga directa en formato PDF.
+ * Genera el reporte técnico y desencadena la descarga directa en formato PDF
+ * sin abrir el modal de expediente.
  */
 function downloadReportPDFDirect() {
-  generateCertifiedReport();
+  if (!buildCertifiedReportDOM()) return;
   if (typeof downloadReportPDF === 'function') {
     downloadReportPDF();
   } else if (typeof window.print === 'function') {
