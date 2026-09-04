@@ -7094,18 +7094,6 @@ function saveServiceCategory(e) {
 
 
 
-/**
- * Genera el reporte técnico y desencadena la descarga directa en formato PDF
- * sin abrir el modal de expediente.
- */
-function downloadReportPDFDirect() {
-  if (!buildCertifiedReportDOM()) return;
-  if (typeof downloadReportPDF === 'function') {
-    downloadReportPDF();
-  } else if (typeof window.print === 'function') {
-    window.print();
-  }
-}
 
 function createManualBackup() {
   try {
