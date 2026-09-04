@@ -1793,7 +1793,7 @@ input:checked + .slider:before {
 @media print {
   @page {
     size: auto;
-    margin: 15mm 12mm 15mm 12mm;
+    margin: 10mm 10mm 10mm 10mm;
   }
 
   html, body {
@@ -1801,7 +1801,8 @@ input:checked + .slider:before {
     color: #000000 !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 12pt !important;
+    font-size: 11pt !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
   .no-print, .app-top-header, .bottom-nav, .modal-header, .close-btn {
@@ -1828,23 +1829,37 @@ input:checked + .slider:before {
     color: #000000 !important;
     background: #ffffff !important;
     padding: 0 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
   .cert-header h1, .cert-header p, .cert-header strong, .cert-header div {
     color: #000000 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
 
   .cert-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-top: 15px !important;
+    margin-top: 10px !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .cert-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .cert-table th, .cert-table td {
     border: 1px solid #cbd5e1 !important;
-    padding: 8px 10px !important;
+    padding: 6px 8px !important;
     color: #000000 !important;
     background: #ffffff !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    letter-spacing: normal !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 8pt !important;
   }
 
   .cert-table th {
@@ -1876,7 +1891,7 @@ input:checked + .slider:before {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #ffffff;
@@ -1886,17 +1901,20 @@ input:checked + .slider:before {
   width: 100%;
   min-width: 680px;
   border-collapse: collapse;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   background: #ffffff;
   color: #0f172a;
 }
 
 .cert-table th, .cert-table td {
   border: 1px solid #cbd5e1;
-  padding: 8px 10px;
+  padding: 6px 8px;
   vertical-align: middle;
   box-sizing: border-box;
   text-align: left;
+  letter-spacing: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .cert-table th {

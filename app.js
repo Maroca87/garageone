@@ -5086,29 +5086,29 @@ function buildCertifiedReportDOM() {
   if (!container) return false;
 
   container.innerHTML = `
-    <div class="cert-header" style="border-bottom:2px solid #000000; padding-bottom:12px; margin-bottom:16px; background:#ffffff; color:#000000;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <div>
-          <h1 style="color:#000000; margin:0 0 4px 0; font-size:1.4rem; text-transform:uppercase; letter-spacing:0.5px;">GARAGEONE - EXPEDIENTE TÉCNICO Y MANTENIMIENTO</h1>
-          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Reporte Detallado de Servicios Mecánicos para Taller • ${escapeHtml(periodLabel)}</p>
+    <div class="cert-header" style="border-bottom:2px solid #0f172a; padding-bottom:10px; margin-bottom:14px; background:#ffffff; color:#0f172a; page-break-inside:avoid; break-inside:avoid;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+        <div style="flex:1; min-width:0;">
+          <h1 style="color:#0f172a; margin:0 0 3px 0; font-size:1.18rem; font-weight:800; text-transform:uppercase; letter-spacing:0.2px; line-height:1.25; font-family:Arial, Helvetica, sans-serif;">GARAGEONE - EXPEDIENTE TÉCNICO Y MANTENIMIENTO</h1>
+          <p style="color:#475569; margin:0; font-size:0.82rem; font-weight:600; line-height:1.3; font-family:Arial, Helvetica, sans-serif;">Reporte Detallado de Servicios Mecánicos para Taller • ${escapeHtml(periodLabel)}</p>
         </div>
-        <div style="text-align:right; font-size:0.8rem; color:#475569;">
-          <div>Emisión: <strong style="color:#000000;">${emissionDate}</strong></div>
-          <div>Propietario: <strong style="color:#000000;">${currentUser ? escapeHtml(currentUser.name) : 'Cliente'}</strong></div>
+        <div style="text-align:right; font-size:0.78rem; color:#475569; flex-shrink:0; white-space:nowrap; line-height:1.4; font-family:Arial, Helvetica, sans-serif;">
+          <div>Emisión: <strong style="color:#0f172a;">${emissionDate}</strong></div>
+          <div>Propietario: <strong style="color:#0f172a;">${currentUser ? escapeHtml(currentUser.name) : 'Cliente'}</strong></div>
         </div>
       </div>
     </div>
 
     <!-- Vehicle Specs Box -->
-    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:16px; color:#0f172a;">
-      <h3 style="margin:0 0 10px 0; font-size:1rem; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">Ficha del Vehículo</h3>
-      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+    <div class="cert-card" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; margin-bottom:14px; color:#0f172a; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif;">
+      <h3 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; border-bottom:1px solid #e2e8f0; padding-bottom:4px; font-weight:700;">Ficha del Vehículo</h3>
+      <div style="display:flex; gap:14px; align-items:center;">
         ${veh.photo ? `
           <div style="flex-shrink:0; text-align:center;">
-            <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-height:110px; max-width:160px; object-fit:contain; border-radius:6px; border:1px solid #cbd5e1;">
+            <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-height:100px; max-width:150px; object-fit:contain; border-radius:6px; border:1px solid #cbd5e1;">
           </div>
         ` : ''}
-        <div style="flex:1; display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; font-size:0.85rem; color:#1e293b;">
+        <div style="flex:1; display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:6px 12px; font-size:0.82rem; color:#1e293b; line-height:1.35;">
           <div><strong style="color:#0f172a;">Vehículo:</strong> ${escapeHtml(veh.name)}</div>
           <div><strong style="color:#0f172a;">Placa / Matrícula:</strong> ${escapeHtml(veh.plate) || 'SIN PLACA'}</div>
           <div><strong style="color:#0f172a;">Año:</strong> ${veh.year}</div>
@@ -5120,52 +5120,52 @@ function buildCertifiedReportDOM() {
     </div>
 
     <!-- Financial & Service Overview -->
-    <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
-        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Total Servicios</span>
-        <strong style="font-size:1.1rem; color:#0f172a;">${services.length} Mantenimiento(s)</strong>
+    <div class="cert-summary" style="display:flex; gap:10px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif;">
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center;">
+        <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Servicios</span>
+        <strong style="font-size:1.05rem; color:#0f172a;">${services.length} Mantenimiento(s)</strong>
       </div>
-      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
-        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Inversión Mantenimiento</span>
-        <strong style="font-size:1.1rem; color:#0f172a;">${formatCurrency(totalServSpend)}</strong>
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center;">
+        <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Inversión Mantenimiento</span>
+        <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalServSpend)}</strong>
       </div>
-      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; text-align:center;">
-        <span style="display:block; font-size:0.75rem; color:#64748b; text-transform:uppercase;">Total Combustible</span>
-        <strong style="font-size:1.1rem; color:#0f172a;">${formatCurrency(totalFuelSpend)} (${fuels.length} cargas)</strong>
+      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center;">
+        <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Combustible</span>
+        <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalFuelSpend)} (${fuels.length} cargas)</strong>
       </div>
     </div>
 
-    <!-- Detailed Services Table -->
-    <h3 style="margin:16px 0 8px 0; font-size:1.05rem; color:#0f172a; border-bottom:2px solid #0f172a; padding-bottom:4px;">
+    <!-- Detailed Services Table Section Title -->
+    <h3 class="cert-section-title" style="margin:14px 0 8px 0; font-size:1rem; font-weight:700; color:#0f172a; border-bottom:2px solid #0f172a; padding-bottom:4px; page-break-after:avoid; break-after:avoid; font-family:Arial, Helvetica, sans-serif;">
       Historial Detallado de Trabajos y Repuestos (${escapeHtml(periodLabel)})
     </h3>
 
     ${services.length === 0 ? `
-      <p style="text-align:center; padding:16px; color:#64748b; font-style:italic;">No hay servicios registrados para este período.</p>
+      <p style="text-align:center; padding:16px; color:#64748b; font-style:italic; font-family:Arial, Helvetica, sans-serif;">No hay servicios registrados para este período.</p>
     ` : `
-      <div class="table-responsive-wrapper" style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:16px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff;">
-        <table class="cert-table" style="width:100%; min-width:680px; border-collapse:collapse; font-size:0.84rem; background:#ffffff; color:#0f172a; margin:0;">
+      <div class="table-responsive-wrapper" style="width:100%; overflow:visible; margin-bottom:14px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; page-break-inside:auto; break-inside:auto;">
+        <table class="cert-table" style="width:100%; border-collapse:collapse; font-size:0.80rem; line-height:1.35; background:#ffffff; color:#0f172a; margin:0; table-layout:fixed; font-family:Arial, Helvetica, sans-serif;">
           <thead>
-            <tr style="background:#0f172a; color:#ffffff; text-align:left;">
-              <th style="padding:8px 10px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Fecha</th>
-              <th style="padding:8px 10px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
-              <th style="padding:8px 10px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Categoría</th>
-              <th style="padding:8px 10px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Trabajo Realizado</th>
-              <th style="padding:8px 10px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Detalles / Repuestos</th>
-              <th style="padding:8px 10px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a;">Taller</th>
-              <th style="padding:8px 10px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; text-align:right;">Costo</th>
+            <tr style="background:#0f172a; color:#ffffff; text-align:left; page-break-inside:avoid; break-inside:avoid;">
+              <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap;">Fecha</th>
+              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+              <th style="padding:6px 8px; width:13%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word;">Categoría</th>
+              <th style="padding:6px 8px; width:20%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word;">Trabajo Realizado</th>
+              <th style="padding:6px 8px; width:24%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word;">Detalles / Repuestos</th>
+              <th style="padding:6px 8px; width:12%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word;">Taller</th>
+              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap;">Costo</th>
             </tr>
           </thead>
           <tbody>
             ${services.map((s, idx) => `
-              <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1;">
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;"><strong style="color:#0f172a;">${s.date}</strong></td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap;">${formatVehicleDistance(s.km, veh)}</td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#334155;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
-                <td style="padding:8px 10px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap;">${formatCurrency(s.cost)}</td>
+              <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1; page-break-inside:avoid; break-inside:avoid;">
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle;"><strong style="color:#0f172a;">${s.date}</strong></td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle;">${formatVehicleDistance(s.km, veh)}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#334155; word-break:break-word; overflow-wrap:break-word; vertical-align:middle;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap; vertical-align:middle;">${formatCurrency(s.cost)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -5175,11 +5175,11 @@ function buildCertifiedReportDOM() {
 
     <!-- Pending / Recommended Maintenance for Mechanic -->
     ${reminders.length > 0 ? `
-      <div style="margin-top:16px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:12px; color:#78350f;">
-        <h4 style="margin:0 0 6px 0; color:#b45309; font-size:0.95rem;">Mantenimientos Pendientes y Próximos (Para Atención del Mecánico)</h4>
-        <ul style="margin:0; padding-left:20px; font-size:0.83rem; color:#78350f;">
+      <div class="cert-reminders" style="margin-top:14px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:10px 12px; color:#78350f; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif;">
+        <h4 style="margin:0 0 6px 0; color:#b45309; font-size:0.90rem; font-weight:700;">Mantenimientos Pendientes y Próximos (Para Atención del Mecánico)</h4>
+        <ul style="margin:0; padding-left:18px; font-size:0.80rem; color:#78350f; line-height:1.4;">
           ${reminders.map(r => `
-            <li style="margin-bottom:4px;">
+            <li style="margin-bottom:3px;">
               <strong style="color:#78350f;">${escapeHtml(r.title)}</strong> (${escapeHtml(r.category)}) 
               ${r.targetKm ? ` • Meta: ${formatVehicleDistance(r.targetKm, veh)}` : ''}
               ${r.targetDate ? ` • Fecha Meta: ${r.targetDate}` : ''}
@@ -5190,7 +5190,7 @@ function buildCertifiedReportDOM() {
       </div>
     ` : ''}
 
-    <div style="margin-top:24px; border-top:1px solid #cbd5e1; padding-top:10px; font-size:0.75rem; color:#64748b; text-align:center; background:#ffffff;">
+    <div class="cert-footer" style="margin-top:16px; border-top:1px solid #cbd5e1; padding-top:8px; padding-bottom:4px; font-size:0.73rem; color:#64748b; text-align:center; background:#ffffff; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif;">
       GarageOne • Expediente Vehicular Inteligente • Documento preparado para entrega al Taller / Mecánico
     </div>
   `;
@@ -5223,44 +5223,54 @@ function downloadReportPDF() {
   wrapper.style.position = 'fixed';
   wrapper.style.top = '0';
   wrapper.style.left = '0';
-  wrapper.style.width = '710px';
-  wrapper.style.minHeight = '100vh';
+  wrapper.style.width = '750px';
   wrapper.style.zIndex = '999999';
   wrapper.style.background = '#ffffff';
   wrapper.style.color = '#0f172a';
-  wrapper.style.overflowY = 'auto';
-  wrapper.style.padding = '10px';
+  wrapper.style.overflow = 'visible';
+  wrapper.style.padding = '0';
+  wrapper.style.margin = '0';
   wrapper.style.boxSizing = 'border-box';
 
   const clone = element.cloneNode(true);
-  clone.style.width = '100%';
-  clone.style.maxWidth = '690px';
-  clone.style.margin = '0 auto';
+  clone.style.width = '750px';
+  clone.style.maxWidth = '750px';
+  clone.style.margin = '0';
+  clone.style.padding = '0';
   clone.style.background = '#ffffff';
   clone.style.color = '#0f172a';
   clone.style.fontFamily = 'Arial, Helvetica, sans-serif';
+  clone.style.letterSpacing = 'normal';
+  clone.style.lineHeight = '1.35';
   clone.style.boxSizing = 'border-box';
 
   const tableWrapper = clone.querySelector('.table-responsive-wrapper');
   if (tableWrapper) {
     tableWrapper.style.overflow = 'visible';
     tableWrapper.style.border = 'none';
-    tableWrapper.style.margin = '0 0 16px 0';
+    tableWrapper.style.margin = '0 0 14px 0';
   }
 
   const certTable = clone.querySelector('.cert-table');
   if (certTable) {
-    certTable.style.minWidth = '100%';
     certTable.style.width = '100%';
+    certTable.style.minWidth = '100%';
     certTable.style.tableLayout = 'fixed';
+    certTable.style.borderCollapse = 'collapse';
   }
 
   const allNodes = clone.querySelectorAll('*');
   allNodes.forEach(el => {
+    el.style.fontFamily = 'Arial, Helvetica, sans-serif';
+    el.style.letterSpacing = 'normal';
+    el.style.wordSpacing = 'normal';
     if (el.tagName === 'TH' || (el.style && el.style.background && el.style.background.includes('0f172a'))) {
       el.style.color = '#ffffff';
+      el.style.backgroundColor = '#0f172a';
     } else {
-      el.style.color = '#0f172a';
+      if (!el.style.color || el.style.color === '#ffffff') {
+        el.style.color = '#0f172a';
+      }
     }
   });
 
@@ -5269,20 +5279,20 @@ function downloadReportPDF() {
 
   if (window.html2pdf) {
     const opt = {
-      margin:       [8, 8, 8, 8],
+      margin:       [10, 10, 10, 10],
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
         scale: 2, 
-        useCORS: false, 
+        useCORS: true, 
         allowTaint: true,
         scrollY: 0, 
         scrollX: 0,
-        windowWidth: 720,
+        windowWidth: 750,
         backgroundColor: '#ffffff'
       },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak:    { mode: ['css', 'legacy'] }
     };
 
     html2pdf().set(opt).from(clone).save().then(() => {
@@ -5429,15 +5439,15 @@ function exportVehicleSpecPDF() {
   const fileName = `Ficha_Tecnica_Venta_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
 
   const specHtml = `
-    <div style="background:#ffffff; color:#0f172a; padding:18px; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box; width:100%; max-width:690px; margin:0 auto;">
+    <div class="sales-spec-container" style="background:#ffffff; color:#0f172a; padding:12px; font-family:Arial, Helvetica, sans-serif; line-height:1.35; letter-spacing:normal; box-sizing:border-box; width:100%; max-width:750px; margin:0 auto;">
       <!-- Header -->
-      <div style="border-bottom:2px solid #0f172a; padding-bottom:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start;">
-        <div>
-          <div style="font-size:0.75rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">GARAGEONE • FICHA TÉCNICA OFICIAL</div>
-          <h1 style="color:#0f172a; margin:0 0 2px 0; font-size:1.4rem; text-transform:uppercase; letter-spacing:0.5px;">${escapeHtml(veh.name)}</h1>
-          <p style="color:#475569; margin:0; font-size:0.85rem; font-weight:600;">Especificaciones Técnicas para Venta y Presentación</p>
+      <div class="sales-spec-header" style="border-bottom:2px solid #0f172a; padding-bottom:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:0.75rem; font-weight:800; color:#0284c7; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:2px;">GARAGEONE • FICHA TÉCNICA OFICIAL</div>
+          <h1 style="color:#0f172a; margin:0 0 2px 0; font-size:1.22rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; line-height:1.25;">${escapeHtml(veh.name)}</h1>
+          <p style="color:#64748b; margin:0; font-size:0.80rem; font-weight:600;">Especificaciones Técnicas para Venta y Presentación</p>
         </div>
-        <div style="text-align:right; font-size:0.8rem; color:#475569;">
+        <div style="text-align:right; font-size:0.78rem; color:#64748b; flex-shrink:0; white-space:nowrap; line-height:1.4;">
           <div>Emisión: <strong style="color:#0f172a;">${emissionDate}</strong></div>
           <div>Propietario: <strong style="color:#0f172a;">${currentUser ? escapeHtml(currentUser.name) : 'Particular'}</strong></div>
         </div>
@@ -5445,74 +5455,74 @@ function exportVehicleSpecPDF() {
 
       <!-- Vehicle Photo (if available) -->
       ${veh.photo ? `
-        <div style="text-align:center; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px;">
-          <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-width:100%; max-height:250px; object-fit:contain; border-radius:6px;">
+        <div style="text-align:center; margin-bottom:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px; page-break-inside:avoid; break-inside:avoid;">
+          <img src="${veh.photo}" alt="${escapeHtml(veh.name)}" style="max-width:100%; max-height:220px; object-fit:contain; border-radius:6px;">
         </div>
       ` : ''}
 
       <!-- Main Specifications Box -->
-      <div style="margin-bottom:14px;">
-        <h3 style="margin:0 0 8px 0; font-size:0.95rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; letter-spacing:0.5px;">
+      <div style="margin-bottom:14px; page-break-inside:avoid; break-inside:avoid;">
+        <h3 style="margin:0 0 8px 0; font-size:0.92rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; font-weight:700;">
           Datos Generales y Mecánicos
         </h3>
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.84rem;">
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Marca y Modelo:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.brand || veh.make || '')} ${escapeHtml(veh.model || '')}</span>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.82rem;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Marca y Modelo:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.brand || veh.make || '')} ${escapeHtml(veh.model || '')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Año de Fabricación:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${veh.year || 'No indicado'}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Año de Fabricación:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${veh.year || 'No indicado'}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Placa / Matrícula:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.plate) || 'SIN PLACA'}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Placa / Matrícula:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.plate) || 'SIN PLACA'}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Odómetro Actual:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${formatVehicleDistance(veh.km, veh)}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Odómetro Actual:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${formatVehicleDistance(veh.km, veh)}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Tipo de Carrocería:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.type || 'Sedán')}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Tipo de Carrocería:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.type || 'Sedán')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Cilindraje / Motor:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.displacement) || 'Estándar'}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Cilindraje / Motor:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.displacement) || 'Estándar'}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Transmisión:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.transmission || 'Automático')}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Transmisión:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.transmission || 'Automático')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Número de Puertas:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.doors || '4 Puertas')}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Número de Puertas:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.doors || '4 Puertas')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Tracción:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.drivetrain || '4x2')}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Tracción:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.drivetrain || '4x2')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Sistema de Frenos ABS:</strong>
-            <span style="font-size:0.92rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.abs || 'Sí')}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Sistema de Frenos ABS:</strong>
+            <span style="font-size:0.90rem; font-weight:700; color:#0f172a;">${escapeHtml(veh.abs || 'Sí')}</span>
           </div>
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:7px 10px; grid-column:1 / -1;">
-            <strong style="display:block; font-size:0.7rem; color:#64748b; text-transform:uppercase;">Número de Chasis / VIN:</strong>
-            <span style="font-size:0.88rem; font-weight:700; color:#0f172a; letter-spacing:0.5px;">${escapeHtml(veh.vin) || 'No especificado'}</span>
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; grid-column:1 / -1;">
+            <strong style="display:block; font-size:0.68rem; color:#64748b; text-transform:uppercase;">Número de Chasis / VIN:</strong>
+            <span style="font-size:0.86rem; font-weight:700; color:#0f172a; letter-spacing:0.5px;">${escapeHtml(veh.vin) || 'No especificado'}</span>
           </div>
         </div>
       </div>
 
       <!-- Equipment and Extras Section -->
-      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:12px; margin-bottom:14px;">
-        <h3 style="margin:0 0 6px 0; font-size:0.92rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; letter-spacing:0.5px;">
+      <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; margin-bottom:14px; page-break-inside:avoid; break-inside:avoid;">
+        <h3 style="margin:0 0 6px 0; font-size:0.90rem; text-transform:uppercase; color:#0f172a; border-bottom:1px solid #cbd5e1; padding-bottom:4px; font-weight:700;">
           Equipamiento, Extras y Accesorios
         </h3>
-        <p style="margin:0; font-size:0.85rem; color:#1e293b; line-height:1.45; white-space:pre-wrap;">${escapeHtml(veh.extras) || 'Equipamiento original de fábrica en óptimas condiciones.'}</p>
+        <p style="margin:0; font-size:0.82rem; color:#1e293b; line-height:1.4; white-space:pre-wrap;">${escapeHtml(veh.extras) || 'Equipamiento original de fábrica en óptimas condiciones.'}</p>
       </div>
 
       <!-- Legal / Footer -->
-      <div style="border-top:1px solid #cbd5e1; padding-top:10px; font-size:0.74rem; color:#64748b; text-align:center; margin-top:20px;">
+      <div style="border-top:1px solid #cbd5e1; padding-top:8px; font-size:0.73rem; color:#64748b; text-align:center; margin-top:16px; page-break-inside:avoid; break-inside:avoid;">
         GarageOne • Plataforma de Gestión Vehicular • Ficha técnica digital de venta y exhibición
       </div>
     </div>
@@ -5522,34 +5532,40 @@ function exportVehicleSpecPDF() {
   wrapper.style.position = 'fixed';
   wrapper.style.top = '0';
   wrapper.style.left = '0';
-  wrapper.style.width = '710px';
-  wrapper.style.minHeight = '100vh';
+  wrapper.style.width = '750px';
   wrapper.style.zIndex = '999999';
   wrapper.style.background = '#ffffff';
   wrapper.style.color = '#0f172a';
-  wrapper.style.overflowY = 'auto';
-  wrapper.style.padding = '10px';
+  wrapper.style.overflow = 'visible';
+  wrapper.style.padding = '0';
   wrapper.style.boxSizing = 'border-box';
   wrapper.innerHTML = specHtml;
+
+  const allNodes = wrapper.querySelectorAll('*');
+  allNodes.forEach(el => {
+    el.style.fontFamily = 'Arial, Helvetica, sans-serif';
+    el.style.letterSpacing = 'normal';
+    el.style.wordSpacing = 'normal';
+  });
 
   document.body.appendChild(wrapper);
 
   if (window.html2pdf) {
     const opt = {
-      margin:       [8, 8, 8, 8],
+      margin:       [10, 10, 10, 10],
       filename:     fileName,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { 
         scale: 2, 
-        useCORS: false, 
+        useCORS: true, 
         allowTaint: true,
         scrollY: 0, 
         scrollX: 0,
-        windowWidth: 720,
+        windowWidth: 750,
         backgroundColor: '#ffffff'
       },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak:    { mode: ['css', 'legacy'] }
     };
 
     html2pdf().set(opt).from(wrapper.firstElementChild).save().then(() => {
