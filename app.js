@@ -5145,7 +5145,7 @@ function buildCertifiedReportDOM() {
     ` : `
       <div class="table-responsive-wrapper" style="width:100%; overflow:visible; margin-bottom:14px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; page-break-inside:auto; break-inside:auto;">
         <table class="cert-table" style="width:100%; border-collapse:collapse; font-size:0.80rem; line-height:1.35; background:#ffffff; color:#0f172a; margin:0; table-layout:fixed; font-family:Arial, Helvetica, sans-serif;">
-          <thead>
+          <thead style="display:table-header-group;">
             <tr style="background:#0f172a; color:#ffffff; text-align:left; page-break-inside:avoid; break-inside:avoid;">
               <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap;">Fecha</th>
               <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
@@ -5156,7 +5156,7 @@ function buildCertifiedReportDOM() {
               <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap;">Costo</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody style="display:table-row-group;">
             ${services.map((s, idx) => `
               <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1; page-break-inside:avoid; break-inside:avoid;">
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle;"><strong style="color:#0f172a;">${s.date}</strong></td>
