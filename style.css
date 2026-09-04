@@ -1792,8 +1792,8 @@ input:checked + .slider:before {
 /* PDF Print & Export Layout Margins */
 @media print {
   @page {
-    size: auto;
-    margin: 10mm 10mm 10mm 10mm;
+    size: A4 landscape;
+    margin: 8mm 8mm 8mm 8mm;
   }
 
   html, body {
@@ -1801,7 +1801,7 @@ input:checked + .slider:before {
     color: #000000 !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 11pt !important;
+    font-size: 10pt !important;
     font-family: Arial, Helvetica, sans-serif !important;
   }
 
@@ -1830,6 +1830,10 @@ input:checked + .slider:before {
     background: #ffffff !important;
     padding: 0 !important;
     font-family: Arial, Helvetica, sans-serif !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
   }
 
   .cert-header h1, .cert-header p, .cert-header strong, .cert-header div {
@@ -1843,6 +1847,16 @@ input:checked + .slider:before {
     margin-top: 10px !important;
     page-break-inside: auto !important;
     break-inside: auto !important;
+    table-layout: fixed !important;
+    box-sizing: border-box !important;
+  }
+
+  .cert-table thead {
+    display: table-header-group !important;
+  }
+
+  .cert-table tbody {
+    display: table-row-group !important;
   }
 
   .cert-table tr {
@@ -1860,10 +1874,12 @@ input:checked + .slider:before {
     letter-spacing: normal !important;
     font-family: Arial, Helvetica, sans-serif !important;
     font-size: 8pt !important;
+    box-sizing: border-box !important;
   }
 
   .cert-table th {
-    background-color: #f1f5f9 !important;
+    background-color: #0f172a !important;
+    color: #ffffff !important;
     font-weight: 700 !important;
   }
 }
@@ -1871,10 +1887,11 @@ input:checked + .slider:before {
 .modal-card.print-wrapper {
   background: #ffffff !important;
   color: #0f172a !important;
-  max-width: 880px;
-  width: 95%;
-  max-height: 90vh;
+  max-width: 1080px;
+  width: 96%;
+  max-height: 92vh;
   overflow-y: auto;
+  overflow-x: auto;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
@@ -1882,28 +1899,35 @@ input:checked + .slider:before {
 .certified-document {
   background: #ffffff !important;
   color: #0f172a !important;
-  padding: 8px 4px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.45;
+  padding: 18px 20px;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.35;
+  width: 1000px;
+  max-width: 1000px;
+  min-width: 1000px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .table-responsive-wrapper {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #ffffff;
+  box-sizing: border-box;
 }
 
 .cert-table {
   width: 100%;
-  min-width: 680px;
   border-collapse: collapse;
   font-size: 0.82rem;
   background: #ffffff;
   color: #0f172a;
+  table-layout: fixed;
+  box-sizing: border-box;
 }
 
 .cert-table th, .cert-table td {
