@@ -216,6 +216,8 @@ function updateServiceModalUnitLabel() {
   const unit = getVehicleUnit(veh);
   const lbl = document.getElementById('lblServKm');
   if (lbl) lbl.textContent = unit === 'mi' ? 'Millaje (mi)' : 'Kilometraje (km)';
+  const lblNext = document.getElementById('lblServNextKm');
+  if (lblNext) lblNext.textContent = unit === 'mi' ? 'Próximo Servicio en Odómetro (mi) (Opcional)' : 'Próximo Servicio en Odómetro (km) (Opcional)';
 }
 
 /**
@@ -2623,6 +2625,23 @@ function openNewCategoryModal() {
 }
 
 /**
+ * Alterna dinámicamente los selectores específicos de frenos o correas según la categoría de servicio.
+ * @param {string} [catName] - Nombre de la categoría a evaluar.
+ */
+function updateConditionalServiceFields(catName = '') {
+  const val = (catName || document.getElementById('servCategory')?.value || '').toLowerCase();
+  const brakeGroup = document.getElementById('servBrakePartGroup');
+  const beltGroup = document.getElementById('servBeltTypeGroup');
+
+  if (brakeGroup) {
+    brakeGroup.style.display = (val.includes('freno') || val.includes('brake')) ? 'block' : 'none';
+  }
+  if (beltGroup) {
+    beltGroup.style.display = (val.includes('correa') || val.includes('banda') || val.includes('belt')) ? 'block' : 'none';
+  }
+}
+
+/**
  * Maneja el cambio de selección en el selector de categoría de servicios.
  * @param {string} val - Valor seleccionado.
  */
@@ -2631,7 +2650,9 @@ function handleServCategoryChange(val) {
     openNewCategoryModal();
     const select = document.getElementById('servCategory');
     if (select) select.selectedIndex = 0;
+    return;
   }
+  updateConditionalServiceFields(val);
 }
 
 /**
@@ -4342,9 +4363,20 @@ function openServiceModal(servId = null) {
       document.getElementById('servKm').value = s.km;
       document.getElementById('servShop').value = s.shop || '';
       if (document.getElementById('servNotes')) document.getElementById('servNotes').value = s.notes || '';
+      if (document.getElementById('servNextKm')) document.getElementById('servNextKm').value = s.nextKm || '';
+      if (document.getElementById('servBrakePart')) document.getElementById('servBrakePart').value = s.brakePart || 'general';
+      if (document.getElementById('servBeltType')) document.getElementById('servBeltType').value = s.beltType || 'distribucion';
+      updateConditionalServiceFields(s.category);
     }
-  } else if (veh) {
-    if (document.getElementById('servKm')) document.getElementById('servKm').value = veh.km || '';
+  } else {
+    if (document.getElementById('servNextKm')) document.getElementById('servNextKm').value = '';
+    if (document.getElementById('servBrakePart')) document.getElementById('servBrakePart').value = 'general';
+    if (document.getElementById('servBeltType')) document.getElementById('servBeltType').value = 'distribucion';
+    if (veh) {
+      if (document.getElementById('servKm')) document.getElementById('servKm').value = veh.km || '';
+    }
+    const currentCat = document.getElementById('servCategory')?.value || '';
+    updateConditionalServiceFields(currentCat);
   }
 
   openModal('modalService');
@@ -4913,12 +4945,22 @@ function saveService(e) {
   const cost = parseFloat(document.getElementById('servCost').value);
   const date = document.getElementById('servDate').value;
   const km = parseInt(document.getElementById('servKm').value);
+  const nextKmVal = document.getElementById('servNextKm') ? parseInt(document.getElementById('servNextKm').value) : NaN;
   const shop = document.getElementById('servShop').value.trim();
   const notes = document.getElementById('servNotes') ? document.getElementById('servNotes').value.trim() : '';
   const receiptInput = document.getElementById('servReceiptFile');
 
   const safeCost = isNaN(cost) || cost < 0 ? 0 : cost;
   const safeKm = isNaN(km) || km < 0 ? veh.km : km;
+  const safeNextKm = isNaN(nextKmVal) || nextKmVal <= 0 ? null : nextKmVal;
+
+  const catLower = (category || '').toLowerCase();
+  const brakePart = (catLower.includes('freno') || catLower.includes('brake'))
+    ? (document.getElementById('servBrakePart')?.value || 'general')
+    : null;
+  const beltType = (catLower.includes('correa') || catLower.includes('banda') || catLower.includes('belt'))
+    ? (document.getElementById('servBeltType')?.value || 'distribucion')
+    : null;
 
   let targetServ = servId ? appState.services.find(s => s.id === servId) : null;
 
@@ -4927,6 +4969,9 @@ function saveService(e) {
       id: servId || undefined,
       vehicleId: veh.id,
       category, title, cost: safeCost, date, km: safeKm, shop, notes,
+      nextKm: safeNextKm !== null ? safeNextKm : (targetServ ? targetServ.nextKm : null),
+      brakePart: brakePart !== null ? brakePart : (targetServ ? targetServ.brakePart : undefined),
+      beltType: beltType !== null ? beltType : (targetServ ? targetServ.beltType : undefined),
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
     };
 
@@ -5808,6 +5853,7 @@ const DEFAULT_HEALTH_SETTINGS = {
   filtersKm: 15000,
   beltKm: 60000,
   beltMonths: 48,
+  hasTimingChain: false,
   weights: {
     oil: 20,
     tires: 20,
@@ -5831,6 +5877,7 @@ function getHealthSettings(veh = getActiveVehicle()) {
     return {
       ...DEFAULT_HEALTH_SETTINGS,
       ...veh.healthSettings,
+      hasTimingChain: Boolean(veh.healthSettings.hasTimingChain),
       weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(veh.healthSettings.weights || {}) }
     };
   }
@@ -5840,6 +5887,7 @@ function getHealthSettings(veh = getActiveVehicle()) {
     return {
       ...DEFAULT_HEALTH_SETTINGS,
       ...appState.healthSettings,
+      hasTimingChain: Boolean(appState.healthSettings.hasTimingChain),
       weights: { ...DEFAULT_HEALTH_SETTINGS.weights, ...(appState.healthSettings.weights || {}) }
     };
   }
@@ -5884,6 +5932,7 @@ function openHealthSettingsModal() {
   const elFilt = document.getElementById('hsFiltersKm');
   const elBeltKm = document.getElementById('hsBeltKm');
   const elBeltM = document.getElementById('hsBeltMonths');
+  const elChain = document.getElementById('hsHasTimingChain');
 
   const hwOil = document.getElementById('hwOil');
   const hwTires = document.getElementById('hwTires');
@@ -5901,6 +5950,7 @@ function openHealthSettingsModal() {
   if (elFilt) elFilt.value = cfg.filtersKm;
   if (elBeltKm) elBeltKm.value = cfg.beltKm;
   if (elBeltM) elBeltM.value = cfg.beltMonths;
+  if (elChain) elChain.checked = Boolean(cfg.hasTimingChain);
 
   if (hwOil) hwOil.value = cfg.weights.oil;
   if (hwTires) hwTires.value = cfg.weights.tires;
@@ -5914,7 +5964,7 @@ function openHealthSettingsModal() {
 }
 
 /**
- * Guarda los ajustes de salud individualmente para el vehículo activo.
+ * Guarda los ajustes de salud individualmente para el vehículo activo con validaciones estrictas.
  * @param {Event} e - Evento de formulario.
  */
 async function saveHealthSettings(e) {
@@ -5926,23 +5976,56 @@ async function saveHealthSettings(e) {
     return;
   }
 
+  const oilKm = Number(document.getElementById('hsOilKm').value) || 0;
+  const tiresKm = Number(document.getElementById('hsTiresKm').value) || 0;
+  const brakePadsKm = Number(document.getElementById('hsBrakePadsKm').value) || 0;
+  const brakeDiscsKm = Number(document.getElementById('hsBrakeDiscsKm').value) || 0;
+  const batteryMonths = Number(document.getElementById('hsBatteryMonths').value) || 0;
+  const filtersKm = Number(document.getElementById('hsFiltersKm').value) || 0;
+  const beltKm = Number(document.getElementById('hsBeltKm').value) || 0;
+  const beltMonths = Number(document.getElementById('hsBeltMonths').value) || 0;
+  const hasTimingChain = Boolean(document.getElementById('hsHasTimingChain')?.checked);
+
+  // Validación 1: Vidas útiles obligatoriamente mayores a cero
+  if (oilKm <= 0 || tiresKm <= 0 || brakePadsKm <= 0 || brakeDiscsKm <= 0 || 
+      batteryMonths <= 0 || filtersKm <= 0 || beltKm <= 0 || beltMonths <= 0) {
+    alert('Las vidas útiles sugeridas deben ser valores mayores a cero.');
+    return;
+  }
+
+  const wOil = Number(document.getElementById('hwOil').value) || 0;
+  const wTires = Number(document.getElementById('hwTires').value) || 0;
+  const wBrakes = Number(document.getElementById('hwBrakes').value) || 0;
+  const wBattery = Number(document.getElementById('hwBattery').value) || 0;
+  const wFilters = Number(document.getElementById('hwFilters').value) || 0;
+  const wBelts = Number(document.getElementById('hwBelts').value) || 0;
+  const wDocs = Number(document.getElementById('hwDocs').value) || 0;
+
+  // Validación 2: Suma obligatoria de pesos al 100%
+  const totalWeight = wOil + wTires + wBrakes + wBattery + wFilters + wBelts + wDocs;
+  if (totalWeight !== 100) {
+    alert(`La suma de los pesos de ponderación debe ser exactamente 100%. Actualmente suma ${totalWeight}%.`);
+    return;
+  }
+
   const cfg = {
-    oilKm: Number(document.getElementById('hsOilKm').value) || 5000,
-    tiresKm: Number(document.getElementById('hsTiresKm').value) || 50000,
-    brakePadsKm: Number(document.getElementById('hsBrakePadsKm').value) || 30000,
-    brakeDiscsKm: Number(document.getElementById('hsBrakeDiscsKm').value) || 80000,
-    batteryMonths: Number(document.getElementById('hsBatteryMonths').value) || 36,
-    filtersKm: Number(document.getElementById('hsFiltersKm').value) || 15000,
-    beltKm: Number(document.getElementById('hsBeltKm').value) || 60000,
-    beltMonths: Number(document.getElementById('hsBeltMonths').value) || 48,
+    oilKm,
+    tiresKm,
+    brakePadsKm,
+    brakeDiscsKm,
+    batteryMonths,
+    filtersKm,
+    beltKm,
+    beltMonths,
+    hasTimingChain,
     weights: {
-      oil: Number(document.getElementById('hwOil').value) || 20,
-      tires: Number(document.getElementById('hwTires').value) || 20,
-      brakes: Number(document.getElementById('hwBrakes').value) || 20,
-      battery: Number(document.getElementById('hwBattery').value) || 15,
-      filters: Number(document.getElementById('hwFilters').value) || 10,
-      belts: Number(document.getElementById('hwBelts').value) || 10,
-      docs: Number(document.getElementById('hwDocs').value) || 5
+      oil: wOil,
+      tires: wTires,
+      brakes: wBrakes,
+      battery: wBattery,
+      filters: wFilters,
+      belts: wBelts,
+      docs: wDocs
     }
   };
 
@@ -6052,8 +6135,8 @@ function calculateVehicleHealth(veh) {
   if (oilServices.length > 0) {
     const lastOil = oilServices[0];
     const lastKm = convertToKm(lastOil.mileage || lastOil.km || veh.km);
-    const interval = convertToKm(lastOil.nextKm) > 0 ? (convertToKm(lastOil.nextKm) - lastKm) : cfg.oilKm;
-    const effInterval = interval > 0 ? interval : cfg.oilKm;
+    // Vida útil configurada del vehículo como referencia estricta de desgaste (sin mezclar con Próximo km)
+    const effInterval = cfg.oilKm > 0 ? cfg.oilKm : 5000;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, effInterval - kmUsed);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / effInterval) * 100)));
@@ -6068,9 +6151,10 @@ function calculateVehicleHealth(veh) {
       interval: convertFromKm(effInterval),
       lastDate: lastOil.date,
       oilType: lastOil.title || 'Aceite de motor',
+      nextKm: lastOil.nextKm || null,
       detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
-    if (remKm <= 1000) {
+    if (remKm <= 1000 || (lastOil.nextKm && currentKm >= convertToKm(lastOil.nextKm) - 1000)) {
       oilData.alert = `Próximo cambio de aceite en ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
@@ -6111,18 +6195,34 @@ function calculateVehicleHealth(veh) {
     missingItems.push({ name: 'Cambio de llantas', key: 'llantas' });
   }
 
-  // 3. Frenos
+  // 3. Frenos (Identificación estructurada y retrocompatible de componentes)
   const brakeServices = services.filter(s =>
+    (s.brakePart && s.brakePart !== '') ||
     (s.category && s.category.toLowerCase() === 'frenos') ||
     (s.title && (s.title.toLowerCase().includes('freno') || s.title.toLowerCase().includes('pastilla') || s.title.toLowerCase().includes('disco'))) ||
-    (s.description && s.description.toLowerCase().includes('freno'))
+    (s.description && s.description.toLowerCase().includes('freno')) ||
+    (s.notes && (s.notes.toLowerCase().includes('freno') || s.notes.toLowerCase().includes('pastilla') || s.notes.toLowerCase().includes('disco')))
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   let brakeData = { hasData: false, score: 0, categoryKey: 'frenos', remainingKm: cfg.brakePadsKm, detail: 'Sin historial de frenos', alert: null };
   if (brakeServices.length > 0) {
     const lastBrake = brakeServices[0];
     const lastKm = convertToKm(lastBrake.mileage || lastBrake.km || veh.km);
-    const isDisc = (lastBrake.title || '').toLowerCase().includes('disco');
+
+    // Determinar si es disco o pastilla a partir de campo estructurado o fallback textual
+    let isDisc = false;
+    let partLabel = 'Frenos';
+    if (lastBrake.brakePart) {
+      if (lastBrake.brakePart === 'discos_delanteros') { isDisc = true; partLabel = 'Discos delanteros'; }
+      else if (lastBrake.brakePart === 'discos_traseros') { isDisc = true; partLabel = 'Discos traseros'; }
+      else if (lastBrake.brakePart === 'pastillas_delanteras') { isDisc = false; partLabel = 'Pastillas delanteras'; }
+      else if (lastBrake.brakePart === 'pastillas_traseras') { isDisc = false; partLabel = 'Pastillas traseras'; }
+      else { isDisc = false; partLabel = 'Sistema de frenos'; }
+    } else {
+      isDisc = (lastBrake.title || '').toLowerCase().includes('disco') || (lastBrake.notes || '').toLowerCase().includes('disco');
+      partLabel = isDisc ? 'Discos de freno' : 'Pastillas de freno';
+    }
+
     const lifespan = isDisc ? cfg.brakeDiscsKm : cfg.brakePadsKm;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, lifespan - kmUsed);
@@ -6133,12 +6233,13 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: score,
       categoryKey: 'frenos',
+      brakePart: lastBrake.brakePart || (isDisc ? 'discos' : 'pastillas'),
       remainingKm: dispRem,
       usedKm: convertFromKm(kmUsed),
-      detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
+      detail: `${partLabel} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      brakeData.alert = `Desgaste de frenos crítico. Restan solo ${dispRem.toLocaleString()} ${unitLabel}.`;
+      brakeData.alert = `Desgaste de frenos crítico (${partLabel}). Restan solo ${dispRem.toLocaleString()} ${unitLabel}.`;
     }
   } else {
     missingItems.push({ name: 'Cambio de frenos', key: 'frenos' });
@@ -6202,10 +6303,12 @@ function calculateVehicleHealth(veh) {
     missingItems.push({ name: 'Cambio de filtros', key: 'filtros' });
   }
 
-  // 6. Correas
+  // 6. Correas (Diferenciación de distribución, accesorios y compatibilidad con cadena de distribución)
   const beltServices = services.filter(s =>
+    (s.beltType && s.beltType !== '') ||
     (s.category && (s.category.toLowerCase() === 'correa' || s.category.toLowerCase() === 'correas')) ||
-    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('distribución') || s.title.toLowerCase().includes('banda')))
+    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('distribución') || s.title.toLowerCase().includes('banda'))) ||
+    (s.notes && (s.notes.toLowerCase().includes('correa') || s.notes.toLowerCase().includes('distribucion') || s.notes.toLowerCase().includes('distribución') || s.notes.toLowerCase().includes('banda')))
   ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   let beltData = { hasData: false, score: 0, categoryKey: 'correa', detail: 'Sin historial de correas', alert: null };
@@ -6222,16 +6325,30 @@ function calculateVehicleHealth(veh) {
     const remKm = Math.max(0, cfg.beltKm - kmUsed);
     const dispRem = convertFromKm(remKm);
 
+    const beltTypeName = lastBelt.beltType === 'accesorios' ? 'Correa de accesorios' :
+                         (lastBelt.beltType === 'distribucion' ? 'Correa de distribución' : 'Correas');
+
     beltData = {
       hasData: true,
       score: score,
       categoryKey: 'correa',
+      beltType: lastBelt.beltType || 'general',
       remainingKm: dispRem,
-      detail: `Uso: ${Math.round(worstWear)}% • Restan ${dispRem.toLocaleString()} ${unitLabel}`
+      detail: `${beltTypeName} • Uso: ${Math.round(worstWear)}% • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
-      beltData.alert = `Correa de distribución supera el 75% de desgaste estimado.`;
+      beltData.alert = `${beltTypeName} supera el 75% de desgaste estimado.`;
     }
+  } else if (cfg.hasTimingChain || (veh && veh.hasTimingChain)) {
+    // Si el vehículo utiliza cadena de distribución y no hay registros de correas, no marcar como pendiente crítico
+    beltData = {
+      hasData: true,
+      score: 100,
+      categoryKey: 'correa',
+      beltType: 'cadena',
+      detail: 'Cadena de distribución • Sin correa de tiempo',
+      alert: null
+    };
   } else {
     missingItems.push({ name: 'Revisión de correas', key: 'correa' });
   }

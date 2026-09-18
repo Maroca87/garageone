@@ -637,6 +637,26 @@
             <!-- Dynamic Categories -->
           </select>
         </div>
+        <!-- Selector específico de componente de freno (visible cuando la categoría es Frenos) -->
+        <div class="form-group" id="servBrakePartGroup" style="display:none;">
+          <label>Componente de Freno Atendido</label>
+          <select id="servBrakePart" class="form-control">
+            <option value="general">Sistema de frenos / General</option>
+            <option value="pastillas_delanteras">Pastillas delanteras</option>
+            <option value="pastillas_traseras">Pastillas traseras</option>
+            <option value="discos_delanteros">Discos delanteros</option>
+            <option value="discos_traseros">Discos traseros</option>
+          </select>
+        </div>
+        <!-- Selector específico de tipo de correa (visible cuando la categoría es Correa) -->
+        <div class="form-group" id="servBeltTypeGroup" style="display:none;">
+          <label>Tipo de Correa Atendida</label>
+          <select id="servBeltType" class="form-control">
+            <option value="distribucion">Correa de distribución / tiempo</option>
+            <option value="accesorios">Correa de accesorios / alternador</option>
+            <option value="general">Correas (General)</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Fecha</label>
@@ -646,6 +666,10 @@
             <label id="lblServKm">Kilometraje (km)</label>
             <input type="number" id="servKm" class="form-control" placeholder="" required>
           </div>
+        </div>
+        <div class="form-group">
+          <label id="lblServNextKm">Próximo Servicio en Odómetro (Opcional)</label>
+          <input type="number" id="servNextKm" class="form-control" placeholder="Ej. próximo kilometraje programado">
         </div>
         <div class="form-group">
           <label>Costo Total</label>
@@ -1139,6 +1163,12 @@
             <label style="font-size:0.78rem;">Correas (Meses)</label>
             <input type="number" id="hsBeltMonths" class="form-control" min="12" step="6" required>
           </div>
+        </div>
+        <div class="form-group" style="margin-top:4px; margin-bottom:12px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.80rem; color:var(--text-primary); font-weight:600;">
+            <input type="checkbox" id="hsHasTimingChain">
+            <span>Este vehículo usa cadena de distribución (no requiere cambio de correa de tiempo)</span>
+          </label>
         </div>
 
         <h3 style="font-size:0.88rem; font-weight:700; margin-top:12px; margin-bottom:10px; color:#38bdf8; border-bottom:1px solid var(--border-color); padding-bottom:4px;">Pesos del Promedio Ponderado (%)</h3>
