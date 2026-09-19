@@ -1564,7 +1564,7 @@ function switchTab(tabId, el) {
   }
 
   if (tabId === 'tabGarage') renderApp();
-  if (tabId === 'tabMaintenance') renderServiceList(appState.activeVehicleId);
+  if (tabId === 'tabMaintenance') { renderMaintenanceFilterPills(); renderServiceList(appState.activeVehicleId); }
   if (tabId === 'tabFuel') renderFuelList(appState.activeVehicleId);
   if (tabId === 'tabReminders') renderRemindersTab();
   if (tabId === 'tabHealth' || tabId === 'tabAI') renderVehicleHealth();
@@ -2546,10 +2546,12 @@ function renderMaintenanceFilterPills() {
     });
   }
 
-  let html = `<button class="pill ${currentFilter === 'all' ? 'active' : ''}" onclick="filterLogs('all', this)">Todos</button>`;
+  const activeNorm = (currentFilter || 'all').trim().toLowerCase();
+  let html = `<button type="button" class="pill ${activeNorm === 'all' ? 'active' : ''}" data-category="all" onclick="filterLogs('all', this)">Todos</button>`;
   
   vehicleCatsSet.forEach(cat => {
-    html += `<button class="pill ${currentFilter === cat ? 'active' : ''}" onclick="filterLogs('${escapeHtml(cat)}', this)">${escapeHtml(cat)}</button>`;
+    const isCatActive = activeNorm === cat.trim().toLowerCase();
+    html += `<button type="button" class="pill ${isCatActive ? 'active' : ''}" data-category="${escapeHtml(cat)}" onclick="filterLogs(this.dataset.category, this)">${escapeHtml(cat)}</button>`;
   });
   
   container.innerHTML = html;
@@ -4263,9 +4265,16 @@ function saveVehicle(e) {
 let currentFilter = 'all';
 
 function filterLogs(cat, el) {
-  currentFilter = cat;
-  document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
-  if (el) el.classList.add('active');
+  currentFilter = cat || 'all';
+  const pills = document.querySelectorAll('#maintenanceFilterPills .pill');
+  pills.forEach(p => p.classList.remove('active'));
+  if (el) {
+    el.classList.add('active');
+  } else {
+    const norm = currentFilter.trim().toLowerCase();
+    const matchingPill = Array.from(pills).find(p => (p.dataset.category || '').trim().toLowerCase() === norm);
+    if (matchingPill) matchingPill.classList.add('active');
+  }
   renderServiceList(appState.activeVehicleId);
 }
 
@@ -4282,15 +4291,21 @@ function renderServiceList(vehId) {
 
   let list = (appState.services || []).filter(s => s && s.vehicleId === targetId);
 
-  // Verificación de seguridad de filtro activo
-  if (currentFilter !== 'all') {
-    const filtered = list.filter(s => s.category === currentFilter);
-    if (filtered.length === 0 && list.length > 0) {
-      currentFilter = 'all';
-      if (typeof renderMaintenanceFilterPills === 'function') renderMaintenanceFilterPills();
-    } else {
-      list = filtered;
-    }
+  // Filtrado robusto por categoría seleccionada
+  if (currentFilter && currentFilter !== 'all') {
+    const filterNorm = currentFilter.trim().toLowerCase();
+    list = list.filter(s => {
+      if (!s || !s.category) return false;
+      const catNorm = String(s.category).trim().toLowerCase();
+      if (catNorm === filterNorm) return true;
+      if (filterNorm === 'correa' && (catNorm === 'correas' || catNorm === 'banda' || catNorm === 'bandas')) return true;
+      if (filterNorm === 'correas' && (catNorm === 'correa' || catNorm === 'banda' || catNorm === 'bandas')) return true;
+      if (filterNorm === 'llantas' && catNorm === 'llanta') return true;
+      if (filterNorm === 'filtros' && catNorm === 'filtro') return true;
+      if (filterNorm === 'bujías' && (catNorm === 'bujias' || catNorm === 'bujía' || catNorm === 'bujia')) return true;
+      if (filterNorm === 'batería' && (catNorm === 'bateria' || catNorm === 'baterias' || catNorm === 'baterías')) return true;
+      return false;
+    });
   }
 
   list.sort((a, b) => new Date(b.date) - new Date(a.date));
