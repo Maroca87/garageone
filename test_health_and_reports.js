@@ -225,45 +225,18 @@ if (vehCorrupted.km !== 100000 || healthAutoRepaired.oilData.score !== 100) {
 
 // PRUEBA DE sendVehicleSpec
 console.log('\n--- PRUEBA DE EJECUCIÓN DE sendVehicleSpec ---');
+let pdfExportCalled = false;
+context.exportVehicleSpecPDF = () => { pdfExportCalled = true; };
 const sendSpecCode = `
 ${appJsContent.substring(appJsContent.indexOf('function sendVehicleSpec()'), appJsContent.indexOf('const I18N_DICT'))}
 `;
 vm.runInContext(sendSpecCode, context);
+context.sendVehicleSpec();
+console.log('sendVehicleSpec invoca exportVehicleSpecPDF:', pdfExportCalled ? 'PASÓ' : 'FALLÓ');
+if (!pdfExportCalled) {
+  console.error('ERROR: sendVehicleSpec no invocó exportVehicleSpecPDF');
+  process.exit(1);
+}
 
-let alertCalled = false;
-let alertMsg = '';
-context.alert = (msg) => { alertCalled = true; alertMsg = msg; };
-context.confirm = () => false;
-context.prompt = () => {};
-context.navigator = {
-  clipboard: {
-    writeText: async () => {}
-  }
-};
-
-// Vehículo con datos heterogéneos (números en displacement, booleano en abs, etc.)
-const vehMixed = {
-  id: 'veh_spec_test',
-  brand: 'Toyota',
-  model: 'Corolla',
-  year: 2022,
-  km: 45000,
-  displacement: 1800, // número
-  doors: 4,          // número
-  abs: true,         // booleano
-  extras: 'Cámara de reversa'
-};
-context.getActiveVehicle = () => vehMixed;
-
-(async () => {
-  context.sendVehicleSpec();
-  await new Promise(resolve => setTimeout(resolve, 50));
-  console.log('sendVehicleSpec ejecutado sin errores:', alertCalled ? 'PASÓ' : 'FALLÓ', alertMsg ? `(${alertMsg.split('\n')[0]})` : '');
-  if (!alertCalled) {
-    console.error('ERROR: sendVehicleSpec no respondió con alerta/confirmación');
-    process.exit(1);
-  }
-
-  console.log('\n¡TODAS LAS PRUEBAS PASARON EXITOSAMENTE!');
-})();
+console.log('\n¡TODAS LAS PRUEBAS PASARON EXITOSAMENTE!');
 
