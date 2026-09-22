@@ -78,7 +78,7 @@ vm.createContext(context);
 const codeToRun = `
 ${appJsContent.substring(appJsContent.indexOf('function reconcileVehicleOdometer'), appJsContent.indexOf('async function deleteFuelDirect'))}
 ${appJsContent.substring(appJsContent.indexOf('const DEFAULT_HEALTH_SETTINGS'), appJsContent.indexOf('function openHealthSettingsModal'))}
-${appJsContent.substring(appJsContent.indexOf('function formatVehicleDistance'), appJsContent.indexOf('function getActiveVehicle'))}
+${appJsContent.substring(appJsContent.indexOf('function getVehicleUnit'), appJsContent.indexOf('function getActiveVehicle'))}
 ${appJsContent.substring(appJsContent.indexOf('function getRelativeTimeString'), appJsContent.indexOf('function renderVehicleHealth'))}
 `;
 
@@ -223,5 +223,47 @@ if (vehCorrupted.km !== 100000 || healthAutoRepaired.oilData.score !== 100) {
   process.exit(1);
 }
 
-console.log('\n¡TODAS LAS PRUEBAS PASARON EXITOSAMENTE!');
+// PRUEBA DE sendVehicleSpec
+console.log('\n--- PRUEBA DE EJECUCIÓN DE sendVehicleSpec ---');
+const sendSpecCode = `
+${appJsContent.substring(appJsContent.indexOf('function sendVehicleSpec()'), appJsContent.indexOf('const I18N_DICT'))}
+`;
+vm.runInContext(sendSpecCode, context);
+
+let alertCalled = false;
+let alertMsg = '';
+context.alert = (msg) => { alertCalled = true; alertMsg = msg; };
+context.confirm = () => false;
+context.prompt = () => {};
+context.navigator = {
+  clipboard: {
+    writeText: async () => {}
+  }
+};
+
+// Vehículo con datos heterogéneos (números en displacement, booleano en abs, etc.)
+const vehMixed = {
+  id: 'veh_spec_test',
+  brand: 'Toyota',
+  model: 'Corolla',
+  year: 2022,
+  km: 45000,
+  displacement: 1800, // número
+  doors: 4,          // número
+  abs: true,         // booleano
+  extras: 'Cámara de reversa'
+};
+context.getActiveVehicle = () => vehMixed;
+
+(async () => {
+  context.sendVehicleSpec();
+  await new Promise(resolve => setTimeout(resolve, 50));
+  console.log('sendVehicleSpec ejecutado sin errores:', alertCalled ? 'PASÓ' : 'FALLÓ', alertMsg ? `(${alertMsg.split('\n')[0]})` : '');
+  if (!alertCalled) {
+    console.error('ERROR: sendVehicleSpec no respondió con alerta/confirmación');
+    process.exit(1);
+  }
+
+  console.log('\n¡TODAS LAS PRUEBAS PASARON EXITOSAMENTE!');
+})();
 
