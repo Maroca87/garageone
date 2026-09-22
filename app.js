@@ -5940,6 +5940,80 @@ function shareReportEmail() {
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+/**
+ * Envía y comparte la Ficha Técnica del vehículo activo.
+ * Muestra ÚNICAMENTE información automotriz y técnica del vehículo (sin datos financieros,
+ * costos de mano de obra, repuestos, combustible ni gastos de talleres).
+ */
+function sendVehicleSpec() {
+  const veh = getActiveVehicle();
+  if (!veh) {
+    alert('Primero debes registrar o seleccionar un vehículo en el Garaje.');
+    return;
+  }
+
+  const brand = (veh.brand || veh.make || '').trim();
+  const model = (veh.model || '').trim();
+  const year = veh.year ? String(veh.year) : 'No especificado';
+  const version = (veh.version || '').trim();
+  const plate = (veh.plate || '').trim() || 'No especificado';
+  const vin = (veh.vin || '').trim() || 'No especificado';
+  const kmFormatted = formatVehicleDistance(veh.km, veh);
+  const type = (veh.type || '').trim();
+  const color = (veh.color || '').trim();
+  const displacement = (veh.displacement || '').trim();
+  const fuelType = (veh.fuelType || veh.fuel || '').trim();
+  const transmission = (veh.transmission || '').trim();
+  const drivetrain = (veh.drivetrain || '').trim();
+  const doors = (veh.doors || '').trim();
+  const abs = (veh.abs || '').trim();
+  const extras = (veh.extras || '').trim();
+
+  let lines = [
+    `FICHA TÉCNICA DEL VEHÍCULO`,
+    `=============================`,
+    `• Marca: ${brand || 'No especificado'}`,
+    `• Modelo: ${model || 'No especificado'}`,
+    `• Año: ${year}`
+  ];
+
+  if (version) lines.push(`• Versión: ${version}`);
+  lines.push(`• Placa: ${plate}`);
+  if (vin && vin !== 'No especificado') lines.push(`• Chasis / VIN: ${vin}`);
+  lines.push(`• Odómetro actual: ${kmFormatted}`);
+  if (type) lines.push(`• Carrocería: ${type}`);
+  if (color) lines.push(`• Color: ${color}`);
+  if (displacement) lines.push(`• Motor / Cilindraje: ${displacement}`);
+  if (fuelType) lines.push(`• Combustible: ${fuelType}`);
+  if (transmission) lines.push(`• Transmisión: ${transmission}`);
+  if (drivetrain) lines.push(`• Tracción: ${drivetrain}`);
+  if (doors) lines.push(`• Puertas: ${doors}`);
+  if (abs) lines.push(`• Frenos ABS: ${abs}`);
+  if (extras) lines.push(`• Equipamiento y Extras: ${extras}`);
+
+  lines.push(`=============================`);
+  lines.push(`GarageOne • Ficha de Vehículo`);
+
+  const specText = lines.join('\n');
+  const shareTitle = `Ficha Técnica - ${brand} ${model} ${year}`.trim();
+
+  if (navigator.share) {
+    navigator.share({
+      title: shareTitle,
+      text: specText
+    }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(specText).then(() => {
+      alert('Ficha técnica copiada al portapapeles.');
+    }).catch(() => {
+      alert(specText);
+    });
+  } else {
+    window.location.href = `mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodeURIComponent(specText)}`;
+  }
+}
+
+
 // Internationalization (i18n) Engine
 const I18N_DICT = {
   es: {
@@ -6354,6 +6428,29 @@ function calculateDaysDiff(d1Str) {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Ordena un conjunto de servicios de manera determinista y cronológica descendente:
+ * 1. Fecha más reciente primero.
+ * 2. En caso de empate de fecha, kilometraje (odómetro) más alto primero.
+ * 3. En caso de mismo odómetro, marca de tiempo de actualización más reciente primero.
+ */
+function sortServicesDescending(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.sort((a, b) => {
+    const timeA = a && a.date ? new Date(a.date).getTime() : 0;
+    const timeB = b && b.date ? new Date(b.date).getTime() : 0;
+    if (timeB !== timeA) return timeB - timeA;
+
+    const kmA = Number(a && (a.km !== undefined ? a.km : (a.mileage || 0))) || 0;
+    const kmB = Number(b && (b.km !== undefined ? b.km : (b.mileage || 0))) || 0;
+    if (kmB !== kmA) return kmB - kmA;
+
+    const upA = a && a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const upB = b && b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    return upB - upA;
+  });
+}
+
 function calculateVehicleHealth(veh) {
   if (!veh) return null;
   const cfg = getHealthSettings(veh);
@@ -6372,20 +6469,35 @@ function calculateVehicleHealth(veh) {
   const missingItems = [];
 
   // 1. Aceite
-  const oilServices = services.filter(s => 
-    (s.category && s.category.toLowerCase() === 'aceite') ||
+  const oilServices = sortServicesDescending(services.filter(s => 
+    (s.category && s.category.toLowerCase().includes('aceite')) ||
     (s.title && s.title.toLowerCase().includes('aceite')) ||
-    (s.description && s.description.toLowerCase().includes('aceite'))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+    (s.description && s.description.toLowerCase().includes('aceite')) ||
+    (s.notes && s.notes.toLowerCase().includes('aceite'))
+  ));
 
-  let oilData = { hasData: false, score: 0, categoryKey: 'aceite', remainingKm: cfg.oilKm, detail: 'Sin historial registrado', alert: null };
+  let oilData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'aceite', 
+    name: 'Aceite',
+    remainingKm: cfg.oilKm, 
+    usedKm: 0,
+    interval: cfg.oilKm,
+    wearPct: 0,
+    lastRecord: null,
+    serviceKm: 0,
+    currentKm: convertFromKm(currentKm),
+    detail: 'Sin historial registrado', 
+    alert: null 
+  };
   if (oilServices.length > 0) {
     const lastOil = oilServices[0];
-    const lastKm = convertToKm(lastOil.mileage || lastOil.km || veh.km);
-    // Vida útil configurada del vehículo como referencia estricta de desgaste (sin mezclar con Próximo km)
+    const lastKm = convertToKm(lastOil.km !== undefined ? lastOil.km : (lastOil.mileage || veh.km));
     const effInterval = cfg.oilKm > 0 ? cfg.oilKm : 5000;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, effInterval - kmUsed);
+    const wearPct = Math.round((kmUsed / effInterval) * 100);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / effInterval) * 100)));
     const dispRem = convertFromKm(remKm);
 
@@ -6393,9 +6505,14 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: score,
       categoryKey: 'aceite',
+      name: 'Aceite',
       remainingKm: dispRem,
       usedKm: convertFromKm(kmUsed),
       interval: convertFromKm(effInterval),
+      wearPct: wearPct,
+      lastRecord: { date: lastOil.date, title: lastOil.title || 'Aceite de motor', shop: lastOil.shop || '' },
+      serviceKm: convertFromKm(lastKm),
+      currentKm: convertFromKm(currentKm),
       lastDate: lastOil.date,
       oilType: lastOil.title || 'Aceite de motor',
       nextKm: lastOil.nextKm || null,
@@ -6409,19 +6526,35 @@ function calculateVehicleHealth(veh) {
   }
 
   // 2. Llantas
-  const tireServices = services.filter(s =>
-    (s.category && (s.category.toLowerCase() === 'llantas' || s.category.toLowerCase() === 'neumaticos' || s.category.toLowerCase() === 'neumáticos')) ||
+  const tireServices = sortServicesDescending(services.filter(s =>
+    (s.category && (s.category.toLowerCase().includes('llanta') || s.category.toLowerCase().includes('neumatic'))) ||
     (s.title && (s.title.toLowerCase().includes('llanta') || s.title.toLowerCase().includes('neumatic'))) ||
-    (s.description && s.description.toLowerCase().includes('llanta'))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+    (s.description && s.description.toLowerCase().includes('llanta')) ||
+    (s.notes && (s.notes.toLowerCase().includes('llanta') || s.notes.toLowerCase().includes('neumatic')))
+  ));
 
-  let tireData = { hasData: false, score: 0, categoryKey: 'llantas', remainingKm: cfg.tiresKm, detail: 'Sin historial de llantas', alert: null };
+  let tireData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'llantas', 
+    name: 'Llantas',
+    remainingKm: cfg.tiresKm, 
+    usedKm: 0,
+    interval: cfg.tiresKm,
+    wearPct: 0,
+    lastRecord: null,
+    serviceKm: 0,
+    currentKm: convertFromKm(currentKm),
+    detail: 'Sin historial de llantas', 
+    alert: null 
+  };
   if (tireServices.length > 0) {
     const lastTire = tireServices[0];
-    const lastKm = convertToKm(lastTire.mileage || lastTire.km || veh.km);
-    const lifespan = cfg.tiresKm;
+    const lastKm = convertToKm(lastTire.km !== undefined ? lastTire.km : (lastTire.mileage || veh.km));
+    const lifespan = cfg.tiresKm > 0 ? cfg.tiresKm : 50000;
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, lifespan - kmUsed);
+    const wearPct = Math.round((kmUsed / lifespan) * 100);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
     const condText = score >= 60 ? 'Buenas condiciones' : (score >= 30 ? 'Desgaste moderado' : 'Reemplazo cercano');
     const dispRem = convertFromKm(remKm);
@@ -6430,8 +6563,14 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: score,
       categoryKey: 'llantas',
+      name: 'Llantas',
       remainingKm: dispRem,
       usedKm: convertFromKm(kmUsed),
+      interval: convertFromKm(lifespan),
+      wearPct: wearPct,
+      lastRecord: { date: lastTire.date, title: lastTire.title || 'Llantas', shop: lastTire.shop || '' },
+      serviceKm: convertFromKm(lastKm),
+      currentKm: convertFromKm(currentKm),
       condition: condText,
       detail: `${condText} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
@@ -6443,36 +6582,61 @@ function calculateVehicleHealth(veh) {
   }
 
   // 3. Frenos (Identificación estructurada y retrocompatible de componentes)
-  const brakeServices = services.filter(s =>
-    (s.brakePart && s.brakePart !== '') ||
-    (s.category && s.category.toLowerCase() === 'frenos') ||
-    (s.title && (s.title.toLowerCase().includes('freno') || s.title.toLowerCase().includes('pastilla') || s.title.toLowerCase().includes('disco'))) ||
-    (s.description && s.description.toLowerCase().includes('freno')) ||
-    (s.notes && (s.notes.toLowerCase().includes('freno') || s.notes.toLowerCase().includes('pastilla') || s.notes.toLowerCase().includes('disco')))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const brakeServices = sortServicesDescending(services.filter(s =>
+    (s.brakePart && s.brakePart !== '' && s.brakePart !== 'none') ||
+    (s.category && (s.category.toLowerCase().includes('freno') || s.category.toLowerCase().includes('brake'))) ||
+    (s.title && (s.title.toLowerCase().includes('freno') || s.title.toLowerCase().includes('pastilla') || s.title.toLowerCase().includes('disco') || s.title.toLowerCase().includes('balata') || s.title.toLowerCase().includes('caliper'))) ||
+    ((!s.category || s.category.toLowerCase() === 'otro' || s.category.toLowerCase() === 'mantenimiento') && s.notes && (s.notes.toLowerCase().includes('pastilla') || s.notes.toLowerCase().includes('disco de freno') || s.notes.toLowerCase().includes('cambio de freno')))
+  ));
 
-  let brakeData = { hasData: false, score: 0, categoryKey: 'frenos', remainingKm: cfg.brakePadsKm, detail: 'Sin historial de frenos', alert: null };
+  let brakeData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'frenos', 
+    name: 'Frenos',
+    remainingKm: cfg.brakePadsKm, 
+    usedKm: 0,
+    interval: cfg.brakePadsKm,
+    wearPct: 0,
+    lastRecord: null,
+    serviceKm: 0,
+    currentKm: convertFromKm(currentKm),
+    detail: 'Sin historial de frenos', 
+    alert: null 
+  };
   if (brakeServices.length > 0) {
     const lastBrake = brakeServices[0];
-    const lastKm = convertToKm(lastBrake.mileage || lastBrake.km || veh.km);
+    const lastKm = convertToKm(lastBrake.km !== undefined ? lastBrake.km : (lastBrake.mileage || veh.km));
 
-    // Determinar si es disco o pastilla a partir de campo estructurado o fallback textual
+    // Determinar si es disco o pastilla
     let isDisc = false;
-    let partLabel = 'Frenos';
-    if (lastBrake.brakePart) {
-      if (lastBrake.brakePart === 'discos_delanteros') { isDisc = true; partLabel = 'Discos delanteros'; }
-      else if (lastBrake.brakePart === 'discos_traseros') { isDisc = true; partLabel = 'Discos traseros'; }
-      else if (lastBrake.brakePart === 'pastillas_delanteras') { isDisc = false; partLabel = 'Pastillas delanteras'; }
-      else if (lastBrake.brakePart === 'pastillas_traseras') { isDisc = false; partLabel = 'Pastillas traseras'; }
-      else { isDisc = false; partLabel = 'Sistema de frenos'; }
+    let partLabel = 'Pastillas de freno';
+    if (lastBrake.brakePart && lastBrake.brakePart !== 'general') {
+      if (lastBrake.brakePart.includes('disco')) {
+        isDisc = true;
+        partLabel = lastBrake.brakePart === 'discos_delanteros' ? 'Discos delanteros' : (lastBrake.brakePart === 'discos_traseros' ? 'Discos traseros' : 'Discos de freno');
+      } else {
+        isDisc = false;
+        partLabel = lastBrake.brakePart === 'pastillas_delanteras' ? 'Pastillas delanteras' : (lastBrake.brakePart === 'pastillas_traseras' ? 'Pastillas traseras' : 'Pastillas de freno');
+      }
     } else {
-      isDisc = (lastBrake.title || '').toLowerCase().includes('disco') || (lastBrake.notes || '').toLowerCase().includes('disco');
-      partLabel = isDisc ? 'Discos de freno' : 'Pastillas de freno';
+      const textToSearch = `${lastBrake.title || ''} ${lastBrake.notes || ''}`.toLowerCase();
+      if (textToSearch.includes('disco') && !textToSearch.includes('pastilla')) {
+        isDisc = true;
+        partLabel = 'Discos de freno';
+      } else if (textToSearch.includes('pastilla') || textToSearch.includes('balata')) {
+        isDisc = false;
+        partLabel = 'Pastillas de freno';
+      } else {
+        isDisc = false;
+        partLabel = 'Sistema de frenos';
+      }
     }
 
-    const lifespan = isDisc ? cfg.brakeDiscsKm : cfg.brakePadsKm;
+    const lifespan = isDisc ? (cfg.brakeDiscsKm || 80000) : (cfg.brakePadsKm || 30000);
     const kmUsed = Math.max(0, currentKm - lastKm);
     const remKm = Math.max(0, lifespan - kmUsed);
+    const wearPct = Math.round((kmUsed / lifespan) * 100);
     const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / lifespan) * 100)));
     const dispRem = convertFromKm(remKm);
 
@@ -6480,9 +6644,15 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: score,
       categoryKey: 'frenos',
+      name: 'Frenos',
       brakePart: lastBrake.brakePart || (isDisc ? 'discos' : 'pastillas'),
       remainingKm: dispRem,
       usedKm: convertFromKm(kmUsed),
+      interval: convertFromKm(lifespan),
+      wearPct: wearPct,
+      lastRecord: { date: lastBrake.date, title: lastBrake.title || partLabel, shop: lastBrake.shop || '' },
+      serviceKm: convertFromKm(lastKm),
+      currentKm: convertFromKm(currentKm),
       detail: `${partLabel} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
@@ -6493,25 +6663,43 @@ function calculateVehicleHealth(veh) {
   }
 
   // 4. Batería
-  const batServices = services.filter(s =>
-    (s.category && (s.category.toLowerCase() === 'bateria' || s.category.toLowerCase() === 'batería')) ||
-    (s.title && (s.title.toLowerCase().includes('bateria') || s.title.toLowerCase().includes('batería')))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const batServices = sortServicesDescending(services.filter(s =>
+    (s.category && (s.category.toLowerCase().includes('bater') || s.category.toLowerCase().includes('battery'))) ||
+    (s.title && (s.title.toLowerCase().includes('bater') || s.title.toLowerCase().includes('battery'))) ||
+    (s.notes && (s.notes.toLowerCase().includes('bater') || s.notes.toLowerCase().includes('acumulador')))
+  ));
 
-  let batteryData = { hasData: false, score: 0, categoryKey: 'bateria', remainingMonths: cfg.batteryMonths, detail: 'Sin historial de batería', alert: null };
+  let batteryData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'bateria', 
+    name: 'Batería',
+    remainingMonths: cfg.batteryMonths, 
+    monthsElapsed: 0,
+    lifespanMonths: cfg.batteryMonths,
+    wearPct: 0,
+    lastRecord: null,
+    detail: 'Sin historial de batería', 
+    alert: null 
+  };
   if (batServices.length > 0) {
     const lastBat = batServices[0];
     const monthsElapsed = calculateMonthsDiff(lastBat.date);
-    const lifespanM = cfg.batteryMonths;
+    const lifespanM = cfg.batteryMonths > 0 ? cfg.batteryMonths : 36;
     const remMonths = Math.max(0, lifespanM - monthsElapsed);
+    const wearPct = Math.round((monthsElapsed / lifespanM) * 100);
     const score = Math.max(0, Math.min(100, Math.round(100 - (monthsElapsed / lifespanM) * 100)));
 
     batteryData = {
       hasData: true,
       score: score,
       categoryKey: 'bateria',
+      name: 'Batería',
       remainingMonths: remMonths,
       monthsElapsed: monthsElapsed,
+      lifespanMonths: lifespanM,
+      wearPct: wearPct,
+      lastRecord: { date: lastBat.date, title: lastBat.title || 'Batería', shop: lastBat.shop || '' },
       detail: `Instalada hace ${monthsElapsed} meses • Restan ${remMonths} meses`
     };
     if (monthsElapsed >= Math.floor(lifespanM * 0.8)) {
@@ -6522,25 +6710,49 @@ function calculateVehicleHealth(veh) {
   }
 
   // 5. Filtros
-  const filterServices = services.filter(s =>
-    (s.category && s.category.toLowerCase() === 'filtros') ||
-    (s.title && (s.title.toLowerCase().includes('filtro') || s.title.toLowerCase().includes('filter')))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const filterServices = sortServicesDescending(services.filter(s =>
+    (s.category && (s.category.toLowerCase().includes('filtr') || s.category.toLowerCase().includes('filter'))) ||
+    (s.title && (s.title.toLowerCase().includes('filtr') || s.title.toLowerCase().includes('filter'))) ||
+    (s.notes && (s.notes.toLowerCase().includes('filtro') || s.notes.toLowerCase().includes('filter')))
+  ));
 
-  let filterData = { hasData: false, score: 0, categoryKey: 'filtros', remainingKm: cfg.filtersKm, detail: 'Sin historial de filtros', alert: null };
+  let filterData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'filtros', 
+    name: 'Filtros',
+    remainingKm: cfg.filtersKm, 
+    usedKm: 0,
+    interval: cfg.filtersKm,
+    wearPct: 0,
+    lastRecord: null,
+    serviceKm: 0,
+    currentKm: convertFromKm(currentKm),
+    detail: 'Sin historial de filtros', 
+    alert: null 
+  };
   if (filterServices.length > 0) {
     const lastFilt = filterServices[0];
-    const lastKm = convertToKm(lastFilt.mileage || lastFilt.km || veh.km);
+    const lastKm = convertToKm(lastFilt.km !== undefined ? lastFilt.km : (lastFilt.mileage || veh.km));
+    const filterInterval = cfg.filtersKm > 0 ? cfg.filtersKm : 15000;
     const kmUsed = Math.max(0, currentKm - lastKm);
-    const remKm = Math.max(0, cfg.filtersKm - kmUsed);
-    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / cfg.filtersKm) * 100)));
+    const remKm = Math.max(0, filterInterval - kmUsed);
+    const wearPct = Math.round((kmUsed / filterInterval) * 100);
+    const score = Math.max(0, Math.min(100, Math.round(100 - (kmUsed / filterInterval) * 100)));
     const dispRem = convertFromKm(remKm);
 
     filterData = {
       hasData: true,
       score: score,
       categoryKey: 'filtros',
+      name: 'Filtros',
       remainingKm: dispRem,
+      usedKm: convertFromKm(kmUsed),
+      interval: convertFromKm(filterInterval),
+      wearPct: wearPct,
+      lastRecord: { date: lastFilt.date, title: lastFilt.title || 'Filtros', shop: lastFilt.shop || '' },
+      serviceKm: convertFromKm(lastKm),
+      currentKm: convertFromKm(currentKm),
       detail: `Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
@@ -6551,17 +6763,30 @@ function calculateVehicleHealth(veh) {
   }
 
   // 6. Correas (Diferenciación de distribución, accesorios y compatibilidad con cadena de distribución)
-  const beltServices = services.filter(s =>
-    (s.beltType && s.beltType !== '') ||
-    (s.category && (s.category.toLowerCase() === 'correa' || s.category.toLowerCase() === 'correas')) ||
-    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('distribucion') || s.title.toLowerCase().includes('distribución') || s.title.toLowerCase().includes('banda'))) ||
-    (s.notes && (s.notes.toLowerCase().includes('correa') || s.notes.toLowerCase().includes('distribucion') || s.notes.toLowerCase().includes('distribución') || s.notes.toLowerCase().includes('banda')))
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const beltServices = sortServicesDescending(services.filter(s =>
+    (s.beltType && s.beltType !== '' && s.beltType !== 'none') ||
+    (s.category && (s.category.toLowerCase().includes('correa') || s.category.toLowerCase().includes('banda') || s.category.toLowerCase().includes('distribuc'))) ||
+    (s.title && (s.title.toLowerCase().includes('correa') || s.title.toLowerCase().includes('banda') || s.title.toLowerCase().includes('distribuc'))) ||
+    (s.notes && (s.notes.toLowerCase().includes('correa') || s.notes.toLowerCase().includes('banda') || s.notes.toLowerCase().includes('distribuc')))
+  ));
 
-  let beltData = { hasData: false, score: 0, categoryKey: 'correa', detail: 'Sin historial de correas', alert: null };
+  let beltData = { 
+    hasData: false, 
+    score: 0, 
+    categoryKey: 'correa', 
+    name: 'Correas',
+    detail: 'Sin historial de correas', 
+    usedKm: 0,
+    interval: cfg.beltKm,
+    wearPct: 0,
+    lastRecord: null,
+    serviceKm: 0,
+    currentKm: convertFromKm(currentKm),
+    alert: null 
+  };
   if (beltServices.length > 0) {
     const lastBelt = beltServices[0];
-    const lastKm = convertToKm(lastBelt.mileage || lastBelt.km || veh.km);
+    const lastKm = convertToKm(lastBelt.km !== undefined ? lastBelt.km : (lastBelt.mileage || veh.km));
     const kmUsed = Math.max(0, currentKm - lastKm);
     const kmPct = (kmUsed / cfg.beltKm) * 100;
     const monthsElapsed = calculateMonthsDiff(lastBelt.date);
@@ -6579,9 +6804,16 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: score,
       categoryKey: 'correa',
+      name: 'Correas',
       beltType: lastBelt.beltType || 'general',
       remainingKm: dispRem,
-      detail: `${beltTypeName} • Uso: ${Math.round(worstWear)}% • Restan ${dispRem.toLocaleString()} ${unitLabel}`
+      usedKm: convertFromKm(kmUsed),
+      interval: convertFromKm(cfg.beltKm),
+      wearPct: Math.round(worstWear),
+      lastRecord: { date: lastBelt.date, title: lastBelt.title || beltTypeName, shop: lastBelt.shop || '' },
+      serviceKm: convertFromKm(lastKm),
+      currentKm: convertFromKm(currentKm),
+      detail: `${beltTypeName} • Restan ${dispRem.toLocaleString()} ${unitLabel}`
     };
     if (score < 25) {
       beltData.alert = `${beltTypeName} supera el 75% de desgaste estimado.`;
@@ -6592,7 +6824,9 @@ function calculateVehicleHealth(veh) {
       hasData: true,
       score: 100,
       categoryKey: 'correa',
+      name: 'Correas',
       beltType: 'cadena',
+      wearPct: 0,
       detail: 'Cadena de distribución • Sin correa de tiempo',
       alert: null
     };
@@ -6638,6 +6872,8 @@ function calculateVehicleHealth(veh) {
     hasData: hasDocsData,
     score: docAvgScore,
     categoryKey: 'guantera',
+    name: 'Documentación',
+    wearPct: 100 - docAvgScore,
     details: docDetails.length > 0 ? docDetails.join(' • ') : 'Sin documentos registrados',
     alerts: docAlerts
   };
@@ -6678,13 +6914,13 @@ function calculateVehicleHealth(veh) {
 
   // RELIABILITY & SCORE CALCULATION
   const componentsList = [
-    { name: 'Aceite', data: oilData, weight: cfg.weights.oil },
-    { name: 'Llantas', data: tireData, weight: cfg.weights.tires },
-    { name: 'Frenos', data: brakeData, weight: cfg.weights.brakes },
-    { name: 'Batería', data: batteryData, weight: cfg.weights.battery },
-    { name: 'Filtros', data: filterData, weight: cfg.weights.filters },
-    { name: 'Correas', data: beltData, weight: cfg.weights.belts },
-    { name: 'Documentación', data: docData, weight: cfg.weights.docs }
+    { name: 'Aceite', key: 'oil', data: oilData, weight: cfg.weights.oil },
+    { name: 'Llantas', key: 'tires', data: tireData, weight: cfg.weights.tires },
+    { name: 'Frenos', key: 'brakes', data: brakeData, weight: cfg.weights.brakes },
+    { name: 'Batería', key: 'battery', data: batteryData, weight: cfg.weights.battery },
+    { name: 'Filtros', key: 'filters', data: filterData, weight: cfg.weights.filters },
+    { name: 'Correas', key: 'belts', data: beltData, weight: cfg.weights.belts },
+    { name: 'Documentación', key: 'docs', data: docData, weight: cfg.weights.docs }
   ];
 
   const presentComponents = componentsList.filter(c => c.data.hasData);
@@ -6699,6 +6935,14 @@ function calculateVehicleHealth(veh) {
       weightedHealthSum += (c.data.score * c.weight);
     });
   }
+
+  // Trazabilidad diagnóstica: contribución proporcional de cada componente
+  presentComponents.forEach(c => {
+    c.contributionPts = evaluatedWeightSum > 0 
+      ? Math.round((c.data.score * c.weight) / evaluatedWeightSum) 
+      : 0;
+    c.isCritical = c.data.score < 50;
+  });
 
   const rawHealthPct = evaluatedWeightSum > 0 
     ? Math.round(weightedHealthSum / evaluatedWeightSum)
@@ -6778,14 +7022,18 @@ function calculateVehicleHealth(veh) {
   if (dueRem > 0) {
     firstAction = `Atender ${dueRem} recordatorio(s) vencido(s).`;
   } else if (lowestComp && lowestComp.data.score < 70) {
-    firstAction = `Revisar ${lowestComp.name} (${lowestComp.data.score}% de vida útil).`;
+    firstAction = `Revisar ${lowestComp.name} (${lowestComp.data.score}% de salud restante).`;
   } else if (oilData.hasData && oilData.remainingKm <= 1000) {
     firstAction = `Cambiar aceite pronto (restan ${oilData.remainingKm.toLocaleString()} ${unitLabel}).`;
   } else if (missingItems.length > 0) {
     firstAction = `Registrar ${missingItems[0].name.toLowerCase()} para aumentar la confiabilidad.`;
   }
 
-  let worstWearText = lowestComp ? `${lowestComp.name} (${lowestComp.data.score}%)` : 'Sin datos suficientes';
+  // Desgaste vs Salud Restante completamente desambiguado
+  let worstWearText = lowestComp 
+    ? `${lowestComp.name} (${100 - lowestComp.data.score}% desgaste • ${lowestComp.data.score}% salud restante)` 
+    : 'Sin datos suficientes';
+
   let nextServiceText = 'No hay servicios inmediatos pendientes.';
   if (oilData.hasData && oilData.remainingKm > 0) {
     nextServiceText = `Cambio de aceite (${oilData.remainingKm.toLocaleString()} ${unitLabel} restantes)`;
@@ -6806,19 +7054,19 @@ function calculateVehicleHealth(veh) {
     const catNameLower = (cat.name || '').toLowerCase().trim();
     if (!catNameLower) return;
 
-    const catServices = services.filter(s => {
+    const catServices = sortServicesDescending(services.filter(s => {
       const sCat = (s.category || '').toLowerCase().trim();
       const sTitle = (s.title || '').toLowerCase().trim();
       const sNotes = (s.notes || '').toLowerCase().trim();
       return sCat === catNameLower || (sCat && catNameLower.includes(sCat)) || (sCat && sCat.includes(catNameLower)) || (sTitle && sTitle.includes(catNameLower)) || (sNotes && sNotes.includes(catNameLower));
-    }).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    }));
 
     const recIntervalKm = convertToKm(cat.recommendedIntervalKm);
     const recIntervalMonths = Number(cat.recommendedIntervalMonths) || 0;
 
     if (catServices.length > 0) {
       const lastS = catServices[0];
-      const lastKm = convertToKm(lastS.mileage || lastS.km || veh.km);
+      const lastKm = convertToKm(lastS.km !== undefined ? lastS.km : (lastS.mileage || veh.km));
       const kmUsed = Math.max(0, currentKm - lastKm);
       const monthsElapsed = calculateMonthsDiff(lastS.date);
 
@@ -6885,6 +7133,7 @@ function calculateVehicleHealth(veh) {
     docStatusSummary,
     lastEvaluationText,
     allSmartAlerts,
+    presentComponents,
     oilData,
     tireData,
     brakeData,
@@ -7071,6 +7320,71 @@ function renderVehicleHealth() {
 
     <!-- SMART ALERTS -->
     ${alertsHtml}
+
+    <!-- DIAGNÓSTICO INTERNO DE SALUD PONDERADA -->
+    <div class="health-diagnostic-card" style="background:var(--surface, #1e293b); border:1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius:12px; padding:16px; margin-bottom:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h3 style="margin:0; font-size:0.95rem; font-weight:800; color:var(--text-primary);">
+            Diagnóstico Interno de Salud Ponderada
+          </h3>
+          <p class="subtitle" style="margin:2px 0 0 0; font-size:0.75rem;">
+            Trazabilidad matemática y ponderación de cada componente según su último mantenimiento y vida útil.
+          </p>
+        </div>
+        <div style="font-size:0.80rem; font-weight:700; color:${h.ratingColor}; background:rgba(255,255,255,0.04); padding:4px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+          Estado: ${h.ratingLabel} (${h.rawHealthPct} pts)
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; text-align:left;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.70rem; text-transform:uppercase;">
+              <th style="padding:6px 8px;">Componente</th>
+              <th style="padding:6px 8px;">Último Servicio</th>
+              <th style="padding:6px 8px;">Km Servicio / Actual</th>
+              <th style="padding:6px 8px;">Intervalo</th>
+              <th style="padding:6px 8px;">Desgaste</th>
+              <th style="padding:6px 8px;">Salud Restante</th>
+              <th style="padding:6px 8px;">Peso</th>
+              <th style="padding:6px 8px; text-align:right;">Aporte Final</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${h.presentComponents.map(c => `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.05); background:${c.isCritical ? 'rgba(239,68,68,0.08)' : 'transparent'};">
+                <td style="padding:8px 8px; font-weight:700; color:var(--text-primary);">
+                  ${escapeHtml(c.name)}
+                  ${c.isCritical ? '<span style="color:#ef4444; font-size:0.68rem; margin-left:4px; font-weight:800;">[CRÍTICO]</span>' : ''}
+                </td>
+                <td style="padding:8px 8px; color:#cbd5e1;">
+                  ${c.data.lastRecord ? `${c.data.lastRecord.date || 'Reciente'}<br><small style="color:#94a3b8;">${escapeHtml(c.data.lastRecord.title || '')}</small>` : 'Historial'}
+                </td>
+                <td style="padding:8px 8px; color:#cbd5e1; white-space:nowrap;">
+                  ${c.data.serviceKm !== undefined ? `${c.data.serviceKm.toLocaleString()} / ${c.data.currentKm.toLocaleString()} ${getVehicleUnit(veh)}` : (c.data.monthsElapsed !== undefined ? `${c.data.monthsElapsed} m transcurridos` : '-')}
+                </td>
+                <td style="padding:8px 8px; color:#94a3b8; white-space:nowrap;">
+                  ${c.data.interval !== undefined ? `${c.data.interval.toLocaleString()} ${getVehicleUnit(veh)}` : (c.data.lifespanMonths !== undefined ? `${c.data.lifespanMonths} meses` : '-')}
+                </td>
+                <td style="padding:8px 8px; font-weight:600; color:${c.data.wearPct > 70 ? '#f87171' : (c.data.wearPct > 40 ? '#fb923c' : '#34d399')};">
+                  ${c.data.wearPct !== undefined ? c.data.wearPct + '%' : '-'}
+                </td>
+                <td style="padding:8px 8px; font-weight:700; color:${c.data.score >= 70 ? '#34d399' : (c.data.score >= 50 ? '#fb923c' : '#f87171')};">
+                  ${c.data.score}%
+                </td>
+                <td style="padding:8px 8px; color:#94a3b8;">
+                  ${c.weight}%
+                </td>
+                <td style="padding:8px 8px; text-align:right; font-weight:700; color:#38bdf8;">
+                  +${c.contributionPts} pts
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- SECCIÓN 1: COMPONENTES PRINCIPALES (ESTÁNDAR) -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">

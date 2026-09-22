@@ -391,18 +391,9 @@
             </p>
           </div>
 
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:160px;">Ver Expediente</button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;" title="Compartir Resumen como Texto">
-              <span>Compartir Texto</span>
-            </button>
-            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:130px;" title="Compartir por Correo">
-              <span>Enviar por Correo</span>
-            </button>
-            <button class="btn btn-secondary btn-block" onclick="exportVehicleSpecPDF()" style="flex:1; min-width:140px;" title="Exportar Ficha Técnica de Venta (PDF)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-              <span>Ficha Técnica (PDF)</span>
-            </button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;">Ver expediente</button>
+            <button class="btn btn-secondary btn-block" onclick="sendVehicleSpec()" style="flex:1; min-width:180px;">Enviar ficha técnica</button>
           </div>
         </div>
       </section>
