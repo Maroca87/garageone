@@ -339,6 +339,17 @@
           </div>
         </div>
 
+        <div class="stats-summary-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); gap:6px; margin-top:6px;">
+          <div class="summary-card" style="padding:10px 8px;">
+            <span class="sum-title">Total Mano de Obra</span>
+            <span class="sum-num" id="totalLaborSpend">₡0</span>
+          </div>
+          <div class="summary-card" style="padding:10px 8px;">
+            <span class="sum-title">Total Repuestos</span>
+            <span class="sum-num" id="totalPartsSpend">₡0</span>
+          </div>
+        </div>
+
         <div id="reportEmptyMonthNotice" style="display:none; text-align:center; margin-top:8px; padding:8px 12px; border-radius:8px; background:rgba(255,255,255,0.03); font-size:0.82rem; color:var(--text-secondary, #94a3b8); border:1px dashed rgba(255,255,255,0.1);">
           Sin movimientos registrados en este período
         </div>
@@ -671,9 +682,22 @@
           <label id="lblServNextKm">Próximo Servicio en Odómetro (Opcional)</label>
           <input type="number" id="servNextKm" class="form-control" placeholder="Ej. próximo kilometraje programado">
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Costo de mano de obra</label>
+            <input type="number" id="servLaborCost" class="form-control" min="0" step="any" placeholder="0" oninput="calculateServiceTotal()">
+          </div>
+          <div class="form-group">
+            <label>Costo de repuestos</label>
+            <input type="number" id="servPartsCost" class="form-control" min="0" step="any" placeholder="0" oninput="calculateServiceTotal()">
+          </div>
+        </div>
         <div class="form-group">
-          <label>Costo Total</label>
-          <input type="number" id="servCost" class="form-control" step="0.01" placeholder="" required>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin-bottom:0;">Costo total <small style="color:var(--text-secondary, #94a3b8); font-weight:normal;">(Calculado)</small></label>
+            <span id="servTotalFormatted" style="font-size:0.85rem; font-weight:700; color:#38bdf8;"></span>
+          </div>
+          <input type="number" id="servCost" class="form-control" step="any" placeholder="0" readonly style="background:rgba(255,255,255,0.06); cursor:not-allowed; font-weight:700; margin-top:4px;">
         </div>
         <div class="form-group">
           <label>Taller Mecánico / Tallerista (Opcional)</label>

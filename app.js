@@ -4356,6 +4356,50 @@ function renderServiceList(vehId) {
   setTimeout(initSwipeListeners, 50);
 }
 
+/**
+ * Calcula automáticamente en tiempo real el costo total del servicio:
+ * Costo Total = Costo de Mano de Obra + Costo de Repuestos.
+ * Soporta compatibilidad con servicios antiguos sin alterar registros existentes innecesariamente.
+ */
+function calculateServiceTotal() {
+  const laborInput = document.getElementById('servLaborCost');
+  const partsInput = document.getElementById('servPartsCost');
+  const totalInput = document.getElementById('servCost');
+  const totalFormatted = document.getElementById('servTotalFormatted');
+  if (!laborInput || !partsInput || !totalInput) return;
+
+  // Sanitizar si el usuario intenta ingresar valores negativos
+  if (laborInput.value && parseFloat(laborInput.value) < 0) laborInput.value = 0;
+  if (partsInput.value && parseFloat(partsInput.value) < 0) partsInput.value = 0;
+
+  const rawLabor = laborInput.value.trim();
+  const rawParts = partsInput.value.trim();
+
+  const servId = document.getElementById('servId')?.value;
+  const targetServ = servId ? (appState.services || []).find(s => s && s.id === servId) : null;
+  const isOldServiceWithoutBreakdown = targetServ &&
+    (targetServ.laborCost === undefined || targetServ.laborCost === null) &&
+    (targetServ.partsCost === undefined || targetServ.partsCost === null);
+
+  // Si ambos campos están vacíos y estamos editando un servicio antiguo que solo tiene cost
+  if (rawLabor === '' && rawParts === '' && isOldServiceWithoutBreakdown) {
+    const existingCost = Number(targetServ.cost || 0);
+    totalInput.value = existingCost;
+    if (totalFormatted) totalFormatted.textContent = formatCurrency(existingCost);
+    return;
+  }
+
+  const labor = rawLabor === '' ? 0 : parseFloat(rawLabor);
+  const parts = rawParts === '' ? 0 : parseFloat(rawParts);
+
+  const safeLabor = isNaN(labor) || labor < 0 ? 0 : labor;
+  const safeParts = isNaN(parts) || parts < 0 ? 0 : parts;
+
+  const total = Math.round((safeLabor + safeParts) * 100) / 100;
+  totalInput.value = total;
+  if (totalFormatted) totalFormatted.textContent = formatCurrency(total);
+}
+
 function openServiceModal(servId = null) {
   const veh = getActiveVehicle();
   const form = document.getElementById('formService');
@@ -4367,13 +4411,39 @@ function openServiceModal(servId = null) {
   setTodayDates();
   updateServiceModalUnitLabel();
 
+  const laborInput = document.getElementById('servLaborCost');
+  const partsInput = document.getElementById('servPartsCost');
+  const costInput = document.getElementById('servCost');
+  const totalFormatted = document.getElementById('servTotalFormatted');
+
+  if (laborInput) laborInput.value = '';
+  if (partsInput) partsInput.value = '';
+  if (costInput) costInput.value = '';
+  if (totalFormatted) totalFormatted.textContent = formatCurrency(0);
+
   if (servId) {
     const s = (appState.services || []).find(item => item.id === servId);
     if (s) {
       document.getElementById('modalServiceTitle').textContent = 'Editar Mantenimiento';
       document.getElementById('servId').value = s.id;
       document.getElementById('servCategory').value = s.category;
-      document.getElementById('servCost').value = s.cost;
+
+      const hasLabor = s.laborCost !== undefined && s.laborCost !== null && !isNaN(Number(s.laborCost));
+      const hasParts = s.partsCost !== undefined && s.partsCost !== null && !isNaN(Number(s.partsCost));
+
+      if (hasLabor || hasParts) {
+        if (laborInput) laborInput.value = hasLabor ? s.laborCost : 0;
+        if (partsInput) partsInput.value = hasParts ? s.partsCost : 0;
+        calculateServiceTotal();
+      } else {
+        // Servicio antiguo compatible (solo tiene cost)
+        if (laborInput) laborInput.value = '';
+        if (partsInput) partsInput.value = '';
+        const existingCost = s.cost !== undefined ? s.cost : 0;
+        if (costInput) costInput.value = existingCost;
+        if (totalFormatted) totalFormatted.textContent = formatCurrency(existingCost);
+      }
+
       document.getElementById('servDate').value = s.date;
       document.getElementById('servKm').value = s.km;
       document.getElementById('servShop').value = s.shop || '';
@@ -4384,6 +4454,8 @@ function openServiceModal(servId = null) {
       updateConditionalServiceFields(s.category);
     }
   } else {
+    if (costInput) costInput.value = '';
+    if (totalFormatted) totalFormatted.textContent = formatCurrency(0);
     if (document.getElementById('servNextKm')) document.getElementById('servNextKm').value = '';
     if (document.getElementById('servBrakePart')) document.getElementById('servBrakePart').value = 'general';
     if (document.getElementById('servBeltType')) document.getElementById('servBeltType').value = 'distribucion';
@@ -4785,14 +4857,33 @@ function renderReports() {
   const totalFuelSpend = fuels.reduce((sum, f) => sum + Number(f.cost || 0), 0);
   const totalCombinedSpend = totalServSpend + totalFuelSpend;
 
+  // Total Mano de Obra y Total Repuestos: calcular solamente con los registros que tengan laborCost y partsCost registrados
+  const totalLaborSpend = services.reduce((sum, s) => {
+    if (s.laborCost !== undefined && s.laborCost !== null && s.laborCost !== '' && !isNaN(Number(s.laborCost))) {
+      return sum + Number(s.laborCost);
+    }
+    return sum;
+  }, 0);
+
+  const totalPartsSpend = services.reduce((sum, s) => {
+    if (s.partsCost !== undefined && s.partsCost !== null && s.partsCost !== '' && !isNaN(Number(s.partsCost))) {
+      return sum + Number(s.partsCost);
+    }
+    return sum;
+  }, 0);
+
   const servEl = document.getElementById('totalServiceSpend');
   const fuelEl = document.getElementById('totalFuelSpend');
   const combinedEl = document.getElementById('totalCombinedSpend');
+  const laborEl = document.getElementById('totalLaborSpend');
+  const partsEl = document.getElementById('totalPartsSpend');
   const emptyNoticeEl = document.getElementById('reportEmptyMonthNotice');
 
   if (servEl) servEl.textContent = formatCurrency(totalServSpend);
   if (fuelEl) fuelEl.textContent = formatCurrency(totalFuelSpend);
   if (combinedEl) combinedEl.textContent = formatCurrency(totalCombinedSpend);
+  if (laborEl) laborEl.textContent = formatCurrency(totalLaborSpend);
+  if (partsEl) partsEl.textContent = formatCurrency(totalPartsSpend);
 
   if (emptyNoticeEl) {
     if (totalCombinedSpend === 0) {
@@ -4957,7 +5048,6 @@ function saveService(e) {
   const servId = document.getElementById('servId').value;
   const category = document.getElementById('servCategory').value;
   const title = category || 'Servicio Mecánico';
-  const cost = parseFloat(document.getElementById('servCost').value);
   const date = document.getElementById('servDate').value;
   const km = parseInt(document.getElementById('servKm').value);
   const nextKmVal = document.getElementById('servNextKm') ? parseInt(document.getElementById('servNextKm').value) : NaN;
@@ -4965,7 +5055,43 @@ function saveService(e) {
   const notes = document.getElementById('servNotes') ? document.getElementById('servNotes').value.trim() : '';
   const receiptInput = document.getElementById('servReceiptFile');
 
-  const safeCost = isNaN(cost) || cost < 0 ? 0 : cost;
+  let targetServ = servId ? (appState.services || []).find(s => s && s.id === servId) : null;
+
+  const laborInput = document.getElementById('servLaborCost');
+  const partsInput = document.getElementById('servPartsCost');
+  const rawLabor = laborInput ? laborInput.value.trim() : '';
+  const rawParts = partsInput ? partsInput.value.trim() : '';
+
+  const isOldServiceWithoutBreakdown = targetServ &&
+    (targetServ.laborCost === undefined || targetServ.laborCost === null) &&
+    (targetServ.partsCost === undefined || targetServ.partsCost === null);
+
+  let finalLaborCost;
+  let finalPartsCost;
+  let finalCost;
+
+  if (targetServ && isOldServiceWithoutBreakdown && rawLabor === '' && rawParts === '') {
+    // El usuario no deseó separar el servicio antiguo: conservar su costo existente sin borrarlo ni alterarlo
+    finalCost = typeof targetServ.cost === 'number' && !isNaN(targetServ.cost)
+      ? targetServ.cost
+      : (parseFloat(document.getElementById('servCost')?.value) || 0);
+    finalLaborCost = undefined;
+    finalPartsCost = undefined;
+  } else {
+    const numLabor = rawLabor === '' ? 0 : parseFloat(rawLabor);
+    const numParts = rawParts === '' ? 0 : parseFloat(rawParts);
+
+    if (isNaN(numLabor) || numLabor < 0 || isNaN(numParts) || numParts < 0) {
+      alert('Los costos de mano de obra y repuestos deben ser valores numéricos válidos mayores o iguales a 0.');
+      return;
+    }
+
+    finalLaborCost = Math.round(numLabor * 100) / 100;
+    finalPartsCost = Math.round(numParts * 100) / 100;
+    finalCost = Math.round((finalLaborCost + finalPartsCost) * 100) / 100;
+  }
+
+  const safeCost = isNaN(finalCost) || finalCost < 0 ? 0 : finalCost;
   const safeKm = isNaN(km) || km < 0 ? veh.km : km;
   const safeNextKm = isNaN(nextKmVal) || nextKmVal <= 0 ? null : nextKmVal;
 
@@ -4977,8 +5103,6 @@ function saveService(e) {
     ? (document.getElementById('servBeltType')?.value || 'distribucion')
     : null;
 
-  let targetServ = servId ? appState.services.find(s => s.id === servId) : null;
-
   const processAndSave = async (receiptBase64) => {
     const servData = {
       id: servId || undefined,
@@ -4989,6 +5113,9 @@ function saveService(e) {
       beltType: beltType !== null ? beltType : (targetServ ? targetServ.beltType : undefined),
       receipt: receiptBase64 || (targetServ ? targetServ.receipt : '')
     };
+
+    if (finalLaborCost !== undefined) servData.laborCost = finalLaborCost;
+    if (finalPartsCost !== undefined) servData.partsCost = finalPartsCost;
 
     const saved = await SyncService.executeCrud(targetServ ? 'UPDATE' : 'CREATE', STORES.SERVICES, servData);
 
@@ -5211,17 +5338,26 @@ function buildCertifiedReportDOM() {
         <table class="cert-table" style="width:100%; border-collapse:collapse; font-size:0.80rem; line-height:1.35; background:#ffffff; color:#0f172a; margin:0; table-layout:fixed; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box;">
           <thead style="display:table-header-group;">
             <tr style="background:#0f172a; color:#ffffff; text-align:left; page-break-inside:avoid; break-inside:avoid;">
-              <th style="padding:6px 8px; width:9%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">Fecha</th>
-              <th style="padding:6px 8px; width:9%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
-              <th style="padding:6px 8px; width:13%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Categoría</th>
-              <th style="padding:6px 8px; width:22%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Trabajo Realizado</th>
-              <th style="padding:6px 8px; width:26%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Detalles / Repuestos</th>
-              <th style="padding:6px 8px; width:12%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Taller</th>
-              <th style="padding:6px 8px; width:9%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Costo</th>
+              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">Fecha</th>
+              <th style="padding:6px 8px; width:7%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+              <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Categoría</th>
+              <th style="padding:6px 8px; width:18%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Trabajo Realizado</th>
+              <th style="padding:6px 8px; width:20%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Detalles / Repuestos</th>
+              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Taller</th>
+              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Mano de obra</th>
+              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Repuestos</th>
+              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Total</th>
             </tr>
           </thead>
           <tbody style="display:table-row-group;">
-            ${services.map((s, idx) => `
+            ${services.map((s, idx) => {
+              const hasLabor = s.laborCost !== undefined && s.laborCost !== null && s.laborCost !== '' && !isNaN(Number(s.laborCost));
+              const hasParts = s.partsCost !== undefined && s.partsCost !== null && s.partsCost !== '' && !isNaN(Number(s.partsCost));
+              const laborText = hasLabor ? formatCurrency(Number(s.laborCost)) : 'No especificado';
+              const partsText = hasParts ? formatCurrency(Number(s.partsCost)) : 'No especificado';
+              const totalText = formatCurrency(Number(s.cost || 0));
+
+              return `
               <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1; page-break-inside:avoid; break-inside:avoid;">
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${s.date}</strong></td>
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${formatVehicleDistance(s.km, veh)}</td>
@@ -5229,9 +5365,11 @@ function buildCertifiedReportDOM() {
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#334155; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
                 <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${formatCurrency(s.cost)}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:${hasLabor ? '600' : 'normal'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${laborText}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:${hasParts ? '600' : 'normal'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${partsText}</td>
+                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${totalText}</td>
               </tr>
-            `).join('')}
+            `;}).join('')}
           </tbody>
         </table>
       </div>
