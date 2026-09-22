@@ -371,11 +371,37 @@
         <div class="report-actions-card">
           <h3 data-i18n="reportTitle">Expediente Formal de Mantenimientos</h3>
           <p class="subtitle" data-i18n="reportSubtitle">Genera un documento formal en PDF con la bitácora completa de servicios mecánicos, talleres, fechas y repuestos registrada para este vehículo.</p>
+          
+          <div style="margin:12px 0; padding:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px;">
+            <div style="font-size:0.86rem; font-weight:700; margin-bottom:8px; color:var(--text-primary, #f8fafc);">
+              Mostrar montos en el reporte
+            </div>
+            <div style="display:flex; gap:18px; align-items:center; font-size:0.85rem; flex-wrap:wrap;">
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; margin-bottom:0;">
+                <input type="radio" name="reportShowAmounts" id="reportShowAmountsYes" value="yes" checked onchange="setReportShowAmounts(true)">
+                <span>Sí, mostrar montos</span>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; margin-bottom:0;">
+                <input type="radio" name="reportShowAmounts" id="reportShowAmountsNo" value="no" onchange="setReportShowAmounts(false)">
+                <span>No, ocultar montos</span>
+              </label>
+            </div>
+            <p style="margin:6px 0 0 0; font-size:0.75rem; color:var(--text-secondary, #94a3b8);">
+              Ideal para compartir el historial técnico con talleres o mecánicos sin revelar precios cobrados por terceros.
+            </p>
+          </div>
+
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:180px;">Ver Expediente</button>
+            <button class="btn btn-primary btn-block" onclick="generateCertifiedReport()" style="flex:1; min-width:160px;">Ver Expediente</button>
+            <button class="btn btn-secondary btn-block" onclick="shareReportText()" style="flex:1; min-width:130px;" title="Compartir Resumen como Texto">
+              <span>Compartir Texto</span>
+            </button>
+            <button class="btn btn-secondary btn-block" onclick="shareReportEmail()" style="flex:1; min-width:130px;" title="Compartir por Correo">
+              <span>Enviar por Correo</span>
+            </button>
             <button class="btn btn-secondary btn-block" onclick="exportVehicleSpecPDF()" style="flex:1; min-width:140px;" title="Exportar Ficha Técnica de Venta (PDF)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-              <span>Compartir Ficha (PDF)</span>
+              <span>Ficha Técnica (PDF)</span>
             </button>
           </div>
         </div>
@@ -778,9 +804,22 @@
   <!-- Modal: Expediente Certificado -->
   <div id="modalCertifiedReport" class="modal-backdrop">
     <div class="modal-card print-wrapper" style="max-width:1080px; width:96%; max-height:92vh; overflow-y:auto; overflow-x:auto; background:#f8fafc; padding:18px; border-radius:12px;">
-      <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px; background:#ffffff; border-radius:8px; padding:10px 14px;">
+      <div class="modal-header no-print" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px; background:#ffffff; border-radius:8px; padding:10px 14px; flex-wrap:wrap; gap:10px;">
         <h3 data-i18n="certifiedModalTitle" style="margin:0; font-size:1.15rem; color:#0f172a; font-weight:700;">Expediente Técnico y Mantenimiento</h3>
-        <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <div style="display:inline-flex; align-items:center; gap:6px; background:#f1f5f9; padding:4px 8px; border-radius:6px; border:1px solid #cbd5e1; font-size:0.80rem;">
+            <span style="font-weight:600; color:#334155;">Montos:</span>
+            <select id="modalReportShowAmounts" class="form-control" onchange="setReportShowAmounts(this.value === 'yes')" style="padding:2px 8px; font-size:0.80rem; height:auto; width:auto; border-radius:4px; font-weight:600; background:#ffffff; color:#0f172a;">
+              <option value="yes" selected>Mostrar montos</option>
+              <option value="no">Ocultar montos</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm no-print" onclick="shareReportText()" style="display:inline-flex; align-items:center; gap:5px; padding:6px 10px; font-size:0.80rem; font-weight:600; border-radius:6px; cursor:pointer;" title="Compartir texto">
+            <span>Texto</span>
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm no-print" onclick="shareReportEmail()" style="display:inline-flex; align-items:center; gap:5px; padding:6px 10px; font-size:0.80rem; font-weight:600; border-radius:6px; cursor:pointer;" title="Compartir correo">
+            <span>Correo</span>
+          </button>
           <button type="button" class="btn btn-primary btn-sm no-print" onclick="downloadReportPDF()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:0.82rem; font-weight:600; border-radius:6px; cursor:pointer;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Descargar PDF</span>

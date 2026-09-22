@@ -5238,8 +5238,36 @@ function viewFuelReceipt(fuelId) {
   }
 }
 
+let reportShowAmounts = true;
+
+/**
+ * Controla la visibilidad de montos económicos al generar/exportar/compartir reportes.
+ * @param {boolean|string} val
+ */
+function setReportShowAmounts(val) {
+  reportShowAmounts = (val === true || val === 'yes' || val === 'true');
+
+  const yesRadio = document.getElementById('reportShowAmountsYes');
+  const noRadio = document.getElementById('reportShowAmountsNo');
+  if (yesRadio && noRadio) {
+    yesRadio.checked = reportShowAmounts;
+    noRadio.checked = !reportShowAmounts;
+  }
+
+  const modalSelect = document.getElementById('modalReportShowAmounts');
+  if (modalSelect) {
+    modalSelect.value = reportShowAmounts ? 'yes' : 'no';
+  }
+
+  const certModal = document.getElementById('modalCertifiedReport');
+  if (certModal && certModal.classList.contains('open')) {
+    buildCertifiedReportDOM();
+  }
+}
+
 /**
  * Construye el contenido del expediente técnico vehicular en el DOM.
+ * Soporta modo completo con montos y modo técnico sin montos (para entrega a mecánicos).
  * @returns {boolean} true si se pudo construir el contenido, false si no hay vehículo activo o contenedor.
  */
 function buildCertifiedReportDOM() {
@@ -5272,13 +5300,25 @@ function buildCertifiedReportDOM() {
   const container = document.getElementById('certifiedDocumentContent');
   if (!container) return false;
 
+  const docSubtitle = reportShowAmounts
+    ? `Reporte Detallado de Servicios Mecánicos y Costos • ${escapeHtml(periodLabel)}`
+    : `Reporte Técnico de Servicios Mecánicos • ${escapeHtml(periodLabel)}`;
+
+  const sectionTitle = reportShowAmounts
+    ? `Historial Detallado de Trabajos y Repuestos (${escapeHtml(periodLabel)})`
+    : `Historial Técnico de Trabajos y Mantenimiento (${escapeHtml(periodLabel)})`;
+
+  const footerText = reportShowAmounts
+    ? `GarageOne • Expediente Vehicular Inteligente • Documento preparado para entrega al Taller / Mecánico`
+    : `GarageOne • Expediente Vehicular Técnico (Sin datos financieros) • Documento preparado para entrega al Taller / Mecánico`;
+
   container.innerHTML = `
     <!-- Header -->
     <div class="cert-header" style="border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:12px; background:#ffffff; color:#0f172a; page-break-inside:avoid; break-inside:avoid; width:100%; box-sizing:border-box;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:20px;">
         <div style="flex:1; min-width:0;">
           <h1 style="color:#0f172a; margin:0 0 2px 0; font-size:1.24rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; line-height:1.2; font-family:Arial, Helvetica, sans-serif;">GARAGEONE - EXPEDIENTE TÉCNICO Y MANTENIMIENTO</h1>
-          <p style="color:#475569; margin:0; font-size:0.83rem; font-weight:600; line-height:1.3; font-family:Arial, Helvetica, sans-serif;">Reporte Detallado de Servicios Mecánicos para Taller • ${escapeHtml(periodLabel)}</p>
+          <p style="color:#475569; margin:0; font-size:0.83rem; font-weight:600; line-height:1.3; font-family:Arial, Helvetica, sans-serif;">${docSubtitle}</p>
         </div>
         <div style="text-align:right; font-size:0.80rem; color:#475569; flex-shrink:0; white-space:nowrap; line-height:1.4; font-family:Arial, Helvetica, sans-serif;">
           <div>Emisión: <strong style="color:#0f172a;">${emissionDate}</strong></div>
@@ -5310,43 +5350,63 @@ function buildCertifiedReportDOM() {
       </div>
     </div>
 
-    <!-- Financial & Service Overview -->
+    <!-- Summary Box (Financiero si reportShowAmounts=true, Técnico si reportShowAmounts=false) -->
     <div class="cert-summary" style="display:flex; gap:10px; margin-bottom:12px; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif; width:100%; box-sizing:border-box;">
       <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
         <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Servicios</span>
         <strong style="font-size:1.05rem; color:#0f172a;">${services.length} Mantenimiento(s)</strong>
       </div>
-      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
-        <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Inversión Mantenimiento</span>
-        <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalServSpend)}</strong>
-      </div>
-      <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
-        <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Combustible</span>
-        <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalFuelSpend)} (${fuels.length} cargas)</strong>
-      </div>
+      ${reportShowAmounts ? `
+        <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
+          <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Inversión Mantenimiento</span>
+          <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalServSpend)}</strong>
+        </div>
+        <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
+          <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Total Combustible</span>
+          <strong style="font-size:1.05rem; color:#0f172a;">${formatCurrency(totalFuelSpend)} (${fuels.length} cargas)</strong>
+        </div>
+      ` : `
+        <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
+          <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Odómetro Actual</span>
+          <strong style="font-size:1.05rem; color:#0f172a;">${formatVehicleDistance(veh.km, veh)}</strong>
+        </div>
+        <div style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; text-align:center; min-width:0; box-sizing:border-box;">
+          <span style="display:block; font-size:0.72rem; color:#64748b; text-transform:uppercase; font-weight:600;">Historial Combustible</span>
+          <strong style="font-size:1.05rem; color:#0f172a;">${fuels.length} Recarga(s)</strong>
+        </div>
+      `}
     </div>
 
     <!-- Detailed Services Table Section Title -->
     <h3 class="cert-section-title" style="margin:12px 0 6px 0; font-size:0.96rem; font-weight:700; color:#0f172a; border-bottom:2px solid #0f172a; padding-bottom:3px; page-break-after:avoid; break-after:avoid; font-family:Arial, Helvetica, sans-serif; width:100%; box-sizing:border-box;">
-      Historial Detallado de Trabajos y Repuestos (${escapeHtml(periodLabel)})
+      ${sectionTitle}
     </h3>
 
     ${services.length === 0 ? `
       <p style="text-align:center; padding:16px; color:#64748b; font-style:italic; font-family:Arial, Helvetica, sans-serif;">No hay servicios registrados para este período.</p>
     ` : `
       <div class="table-responsive-wrapper" style="width:100%; overflow:visible; margin-bottom:12px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; page-break-inside:auto; break-inside:auto; box-sizing:border-box;">
-        <table class="cert-table" style="width:100%; border-collapse:collapse; font-size:0.80rem; line-height:1.35; background:#ffffff; color:#0f172a; margin:0; table-layout:fixed; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box;">
+        <table class="cert-table" style="width:100%; border-collapse:collapse; font-size:0.76rem; line-height:1.3; background:#ffffff; color:#0f172a; margin:0; table-layout:fixed; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box;">
           <thead style="display:table-header-group;">
             <tr style="background:#0f172a; color:#ffffff; text-align:left; page-break-inside:avoid; break-inside:avoid;">
-              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">Fecha</th>
-              <th style="padding:6px 8px; width:7%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; white-space:nowrap; box-sizing:border-box;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
-              <th style="padding:6px 8px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Categoría</th>
-              <th style="padding:6px 8px; width:18%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Trabajo Realizado</th>
-              <th style="padding:6px 8px; width:20%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Detalles / Repuestos</th>
-              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; word-break:break-word; box-sizing:border-box;">Taller</th>
-              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Mano de obra</th>
-              <th style="padding:6px 8px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Repuestos</th>
-              <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; white-space:nowrap; box-sizing:border-box;">Total</th>
+              ${reportShowAmounts ? `
+                <th style="padding:6px 5px; width:8%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:center; font-size:0.75rem; white-space:nowrap; box-sizing:border-box;">Fecha</th>
+                <th style="padding:6px 5px; width:7%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:center; font-size:0.75rem; white-space:nowrap; box-sizing:border-box;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+                <th style="padding:6px 6px; width:11%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.75rem; word-break:break-word; box-sizing:border-box;">Categoría</th>
+                <th style="padding:6px 6px; width:17%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.75rem; word-break:break-word; box-sizing:border-box;">Trabajo Realizado</th>
+                <th style="padding:6px 6px; width:19%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.75rem; word-break:break-word; box-sizing:border-box;">Detalles / Repuestos</th>
+                <th style="padding:6px 6px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.75rem; word-break:break-word; box-sizing:border-box;">Taller</th>
+                <th style="padding:6px 5px; width:9%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; font-size:0.74rem; line-height:1.2; word-break:break-word; box-sizing:border-box;">Mano de obra</th>
+                <th style="padding:6px 5px; width:9%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; font-size:0.74rem; line-height:1.2; word-break:break-word; box-sizing:border-box;">Repuestos</th>
+                <th style="padding:6px 5px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:right; font-size:0.76rem; white-space:nowrap; box-sizing:border-box;">Total</th>
+              ` : `
+                <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:center; font-size:0.78rem; white-space:nowrap; box-sizing:border-box;">Fecha</th>
+                <th style="padding:6px 8px; width:10%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; text-align:center; font-size:0.78rem; white-space:nowrap; box-sizing:border-box;">${(veh && veh.unitDistance === 'mi') ? 'MILLAS' : 'KM'}</th>
+                <th style="padding:6px 8px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.78rem; word-break:break-word; box-sizing:border-box;">Categoría</th>
+                <th style="padding:6px 8px; width:26%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.78rem; word-break:break-word; box-sizing:border-box;">Trabajo Realizado</th>
+                <th style="padding:6px 8px; width:26%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.78rem; word-break:break-word; box-sizing:border-box;">Detalles / Repuestos</th>
+                <th style="padding:6px 8px; width:14%; border:1px solid #0f172a; color:#ffffff; background:#0f172a; font-weight:700; font-size:0.78rem; word-break:break-word; box-sizing:border-box;">Taller</th>
+              `}
             </tr>
           </thead>
           <tbody style="display:table-row-group;">
@@ -5359,15 +5419,17 @@ function buildCertifiedReportDOM() {
 
               return `
               <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; color:#0f172a; border-bottom:1px solid #cbd5e1; page-break-inside:avoid; break-inside:avoid;">
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${s.date}</strong></td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${formatVehicleDistance(s.km, veh)}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#334155; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:${hasLabor ? '600' : 'normal'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${laborText}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:${hasParts ? '600' : 'normal'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${partsText}</td>
-                <td style="padding:6px 8px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-weight:700; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${totalText}</td>
+                <td style="padding:6px ${reportShowAmounts ? '5px' : '8px'}; border:1px solid #cbd5e1; color:#0f172a; text-align:center; font-size:${reportShowAmounts ? '0.75rem' : '0.78rem'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${s.date}</strong></td>
+                <td style="padding:6px ${reportShowAmounts ? '5px' : '8px'}; border:1px solid #cbd5e1; color:#0f172a; text-align:center; font-size:${reportShowAmounts ? '0.75rem' : '0.78rem'}; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${formatVehicleDistance(s.km, veh)}</td>
+                <td style="padding:6px ${reportShowAmounts ? '6px' : '8px'}; border:1px solid #cbd5e1; color:#0f172a; font-size:${reportShowAmounts ? '0.75rem' : '0.78rem'}; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${escapeHtml(s.category)}</strong></td>
+                <td style="padding:6px ${reportShowAmounts ? '6px' : '8px'}; border:1px solid #cbd5e1; color:#0f172a; font-size:${reportShowAmounts ? '0.75rem' : '0.78rem'}; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;"><strong style="color:#0f172a;">${escapeHtml(s.title)}</strong></td>
+                <td style="padding:6px ${reportShowAmounts ? '6px' : '8px'}; border:1px solid #cbd5e1; color:#334155; font-size:${reportShowAmounts ? '0.74rem' : '0.78rem'}; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.notes) || '<span style="color:#94a3b8;">Sin notas adicionales</span>'}</td>
+                <td style="padding:6px ${reportShowAmounts ? '6px' : '8px'}; border:1px solid #cbd5e1; color:#0f172a; font-size:${reportShowAmounts ? '0.75rem' : '0.78rem'}; word-break:break-word; overflow-wrap:break-word; vertical-align:middle; box-sizing:border-box;">${escapeHtml(s.shop) || 'Mecánico Privado'}</td>
+                ${reportShowAmounts ? `
+                  <td style="padding:6px 5px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-size:${hasLabor ? '0.75rem' : '0.69rem'}; font-weight:${hasLabor ? '600' : 'normal'}; line-height:1.2; word-break:break-word; vertical-align:middle; box-sizing:border-box;">${hasLabor ? formatCurrency(Number(s.laborCost)) : '<span style="color:#64748b; font-style:italic;">No especificado</span>'}</td>
+                  <td style="padding:6px 5px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-size:${hasParts ? '0.75rem' : '0.69rem'}; font-weight:${hasParts ? '600' : 'normal'}; line-height:1.2; word-break:break-word; vertical-align:middle; box-sizing:border-box;">${hasParts ? formatCurrency(Number(s.partsCost)) : '<span style="color:#64748b; font-style:italic;">No especificado</span>'}</td>
+                  <td style="padding:6px 5px; border:1px solid #cbd5e1; color:#0f172a; text-align:right; font-size:0.78rem; font-weight:700; white-space:nowrap; vertical-align:middle; box-sizing:border-box;">${totalText}</td>
+                ` : ''}
               </tr>
             `;}).join('')}
           </tbody>
@@ -5394,7 +5456,7 @@ function buildCertifiedReportDOM() {
 
     <!-- Footer -->
     <div class="cert-footer" style="margin-top:14px; border-top:1px solid #cbd5e1; padding-top:8px; padding-bottom:4px; font-size:0.74rem; color:#64748b; text-align:center; background:#ffffff; page-break-inside:avoid; break-inside:avoid; font-family:Arial, Helvetica, sans-serif; width:100%; box-sizing:border-box;">
-      GarageOne • Expediente Vehicular Inteligente • Documento preparado para entrega al Taller / Mecánico
+      ${footerText}
     </div>
   `;
 
@@ -5405,6 +5467,10 @@ function buildCertifiedReportDOM() {
  * Abre el expediente formal exclusivamente para su visualización y cierre en el modal.
  */
 function generateCertifiedReport() {
+  const modalSelect = document.getElementById('modalReportShowAmounts');
+  if (modalSelect) {
+    modalSelect.value = reportShowAmounts ? 'yes' : 'no';
+  }
   if (buildCertifiedReportDOM()) {
     openModal('modalCertifiedReport');
   }
@@ -5420,7 +5486,8 @@ function downloadReportPDF() {
   if (!element || !veh) return;
 
   const cleanName = (veh.plate || veh.name).replace(/[^a-zA-Z0-9]/g, '_');
-  const fileName = `Expediente_Mecanico_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
+  const typeTag = reportShowAmounts ? 'Financiero' : 'Tecnico';
+  const fileName = `Expediente_${typeTag}_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`;
 
   const wrapper = document.createElement('div');
   wrapper.style.position = 'fixed';
@@ -5793,20 +5860,32 @@ function exportVehicleSpecPDF() {
 function shareReportText() {
   const veh = getActiveVehicle();
   if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id);
-  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
-  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
+  const services = (appState.services || []).filter(s => s && s.vehicleId === veh.id);
+  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + Number(f.cost || 0), 0);
 
-  const text = `Expediente de Vehículo - GarageOne\n\n` +
-    `• Vehículo: ${veh.name} (${veh.year})\n` +
-    `• Placa: ${veh.plate || 'N/A'}\n` +
-    `• Odómetro: ${veh.km.toLocaleString()} KM\n\n` +
-    `Resumen de Inversión:\n` +
-    `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
-    `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
-    `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
-    `Generado con GarageOne.`;
+  let text = '';
+  if (reportShowAmounts) {
+    text = `Expediente de Mantenimiento - GarageOne\n\n` +
+      `• Vehículo: ${veh.name} (${veh.year})\n` +
+      `• Placa: ${veh.plate || 'N/A'}\n` +
+      `• Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
+      `Resumen de Inversión:\n` +
+      `• Mantenimiento: ${formatCurrency(totalServ)} (${services.length} servicios)\n` +
+      `• Combustible: ${formatCurrency(totalFuel)} (${fuels.length} cargas)\n` +
+      `• Total Invertido: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+      `Generado con GarageOne.`;
+  } else {
+    text = `Expediente Técnico de Mantenimiento - GarageOne\n\n` +
+      `• Vehículo: ${veh.name} (${veh.year})\n` +
+      `• Placa: ${veh.plate || 'N/A'}\n` +
+      `• Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
+      `Historial Técnico:\n` +
+      `• Servicios Realizados: ${services.length} mantenimiento(s)\n` +
+      `• Recargas de Gasolina: ${fuels.length} registros\n\n` +
+      `Generado con GarageOne (Reporte Técnico para Taller).`;
+  }
 
   if (navigator.share) {
     navigator.share({
@@ -5827,21 +5906,36 @@ function shareReportText() {
 function shareReportEmail() {
   const veh = getActiveVehicle();
   if (!veh) return;
-  const services = appState.services.filter(s => s.vehicleId === veh.id);
-  const fuels = appState.fuels.filter(f => f.vehicleId === veh.id);
-  const totalServ = services.reduce((sum, s) => sum + s.cost, 0);
-  const totalFuel = fuels.reduce((sum, f) => sum + f.cost, 0);
+  const services = (appState.services || []).filter(s => s && s.vehicleId === veh.id);
+  const fuels = (appState.fuels || []).filter(f => f && f.vehicleId === veh.id);
+  const totalServ = services.reduce((sum, s) => sum + Number(s.cost || 0), 0);
+  const totalFuel = fuels.reduce((sum, f) => sum + Number(f.cost || 0), 0);
 
-  const subject = `Expediente de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`;
-  const body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
-    `Vehículo: ${veh.name} (${veh.year})\n` +
-    `Placa: ${veh.plate || 'N/A'}\n` +
-    `Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
-    `RESUMEN FINANCIERO:\n` +
-    `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
-    `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
-    `- Inversión Total: ${formatCurrency(totalServ + totalFuel)}\n\n` +
-    `Generado por GarageOne.`;
+  const subject = reportShowAmounts
+    ? `Expediente de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`
+    : `Expediente Técnico de Mantenimiento - ${veh.name} (${veh.plate || 'GarageOne'})`;
+
+  let body = '';
+  if (reportShowAmounts) {
+    body = `HISTORIAL DE MANTENIMIENTO Y SERVICIOS - GARAGEONE\n\n` +
+      `Vehículo: ${veh.name} (${veh.year})\n` +
+      `Placa: ${veh.plate || 'N/A'}\n` +
+      `Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
+      `RESUMEN FINANCIERO:\n` +
+      `- Total Mantenimiento: ${formatCurrency(totalServ)} (${services.length} registros)\n` +
+      `- Total Combustible: ${formatCurrency(totalFuel)} (${fuels.length} recargas)\n` +
+      `- Inversión Total: ${formatCurrency(totalServ + totalFuel)}\n\n` +
+      `Generado por GarageOne.`;
+  } else {
+    body = `HISTORIAL TÉCNICO DE MANTENIMIENTO - GARAGEONE\n\n` +
+      `Vehículo: ${veh.name} (${veh.year})\n` +
+      `Placa: ${veh.plate || 'N/A'}\n` +
+      `Odómetro Actual: ${formatVehicleDistance(veh.km, veh)}\n\n` +
+      `RESUMEN TÉCNICO:\n` +
+      `- Servicios Realizados: ${services.length} registros de mantenimiento\n` +
+      `- Recargas de Combustible: ${fuels.length} registros\n\n` +
+      `Generado por GarageOne (Reporte Técnico para Taller).`;
+  }
 
   window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
