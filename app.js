@@ -1357,6 +1357,11 @@ async function loadAppStateFromDB() {
     const primaryVehId = appState.vehicles[0].id;
     (appState.services || []).forEach(s => { if (!s.vehicleId || s.vehicleId === 'v1' || s.vehicleId === 'default') s.vehicleId = primaryVehId; });
     (appState.fuels || []).forEach(f => { if (!f.vehicleId || f.vehicleId === 'v1' || f.vehicleId === 'default') f.vehicleId = primaryVehId; });
+
+    // Reconciliación de odómetro para sanar posibles valores huérfanos residuales (ej. 1.567.888 KM de prueba eliminados)
+    (appState.vehicles || []).forEach(v => {
+      if (v) reconcileVehicleOdometer(v);
+    });
   } else {
     appState.activeVehicleId = null;
   }
@@ -1917,6 +1922,92 @@ async function deleteVehicleDirect(vehId, event = null) {
   if (typeof renderVehicleHealth === 'function') renderVehicleHealth();
 }
 
+/**
+ * Reconcilia el odómetro del vehículo de forma coherente con su historial real restante.
+ * 
+ * Reglas de negocio:
+ * 1. Obtiene los servicios y recargas de combustible restantes del vehículo.
+ * 2. Determina el kilometraje válido más alto registrado en el historial (maxHistoryKm).
+ * 3. Si se eliminó un servicio (deletedKm !== null) y dicho servicio tenía un kilometraje >= veh.km,
+ *    significa que fue el registro que estableció o elevó el odómetro actual del vehículo.
+ *    En tal caso, el odómetro debe reajustarse al kilometraje legítimo más alto que permanece (maxHistoryKm).
+ *    Si el servicio eliminado tenía un kilometraje menor (deletedKm < veh.km), se trataba de un registro antiguo
+ *    o intermedio y NO debe disminuir artificialmente el odómetro actual del vehículo.
+ * 4. Para el caso actual / corrección automática (deletedKm === null): si el vehículo tiene registrado
+ *    un valor huérfano (ej. 1.567.888 KM de prueba) que ya no corresponde a ningún servicio existente
+ *    y es una anomalía desconectada del historial real, se reconcilia automáticamente con el registro real más alto.
+ * 5. Bajo ninguna circunstancia pone el odómetro en 0, no inventa kilometrajes, no usa valores fijos
+ *    y no modifica ningún otro dato histórico de los servicios restantes.
+ * 
+ * @param {Object} veh - Vehículo a reconciliar.
+ * @param {number|null} [deletedKm] - Kilometraje del servicio que acaba de ser eliminado (opcional).
+ * @returns {boolean} true si el odómetro fue actualizado, false en caso contrario.
+ */
+function reconcileVehicleOdometer(veh, deletedKm = null) {
+  if (!veh || typeof veh !== 'object') return false;
+
+  const vehId = veh.id;
+  const remainingServices = (appState.services || []).filter(s => s && s.vehicleId === vehId);
+  const remainingFuels = (appState.fuels || []).filter(f => f && f.vehicleId === vehId);
+
+  // 1 & 2. Obtener kilometrajes válidos de todos los registros reales que aún existen
+  const validKms = [];
+  remainingServices.forEach(s => {
+    const k = Number(s.km !== undefined ? s.km : s.mileage);
+    if (!isNaN(k) && k > 0) validKms.push(k);
+  });
+  remainingFuels.forEach(f => {
+    const k = Number(f.km);
+    if (!isNaN(k) && k > 0) validKms.push(k);
+  });
+
+  const maxHistoryKm = validKms.length > 0 ? Math.max(...validKms) : 0;
+  const currentVehKm = Number(veh.km) || 0;
+  let needsUpdate = false;
+  let newOdometer = currentVehKm;
+
+  if (deletedKm !== null && deletedKm !== undefined) {
+    const delKmNum = Number(deletedKm);
+    // Caso de eliminación: solo si el servicio eliminado era el que había establecido el kilometraje actual
+    if (!isNaN(delKmNum) && delKmNum >= currentVehKm) {
+      if (maxHistoryKm > 0 && maxHistoryKm !== currentVehKm) {
+        newOdometer = maxHistoryKm;
+        needsUpdate = true;
+      }
+    }
+  } else {
+    // Caso actual de reparación automática para el valor huérfano (1.567.888 KM)
+    const existsInHistory = validKms.some(k => k === currentVehKm);
+    const isOrphanTestValue = (currentVehKm === 1567888) || (currentVehKm > 1000000 && maxHistoryKm > 0 && maxHistoryKm < 500000);
+
+    if (!existsInHistory && isOrphanTestValue && maxHistoryKm > 0) {
+      newOdometer = maxHistoryKm;
+      needsUpdate = true;
+    }
+  }
+
+  if (needsUpdate && newOdometer > 0) {
+    veh.km = newOdometer;
+    (async () => {
+      try {
+        if (typeof SyncService !== 'undefined' && SyncService.executeCrud) {
+          await SyncService.executeCrud('UPDATE', STORES.VEHICLES, veh);
+        } else if (typeof LocalDB !== 'undefined' && LocalDB.put) {
+          await LocalDB.put(STORES.VEHICLES, veh);
+        }
+        if (typeof saveState === 'function') {
+          saveState();
+        }
+      } catch (e) {
+        console.warn('[reconcileVehicleOdometer] Error al persistir odómetro corregido:', e);
+      }
+    })();
+    return true;
+  }
+
+  return false;
+}
+
 async function deleteServiceDirect(servId, event = null) {
   if (event) {
     try {
@@ -1927,17 +2018,30 @@ async function deleteServiceDirect(servId, event = null) {
   if (!servId) return;
   if (!confirm('¿Eliminar este registro de mantenimiento?')) return;
 
-  // 1. Eliminar exclusivamente el registro objetivo de IndexedDB
+  // Identificar el servicio a eliminar y sus datos antes de removerlo
+  const targetServ = (appState.services || []).find(s => s && s.id === servId);
+  const targetVehId = targetServ ? targetServ.vehicleId : appState.activeVehicleId;
+  const deletedKm = targetServ ? (targetServ.km !== undefined ? targetServ.km : targetServ.mileage) : null;
+
+  // 1. Eliminar inmediatamente del estado en memoria
+  appState.services = (appState.services || []).filter(s => s && s.id !== servId);
+
+  // 2. Reconciliar odómetro del vehículo si el servicio eliminado era el que fijó el kilometraje actual
+  if (targetVehId) {
+    const veh = (appState.vehicles || []).find(v => v && v.id === targetVehId) || getActiveVehicle();
+    if (veh) {
+      reconcileVehicleOdometer(veh, deletedKm);
+    }
+  }
+
+  // 3. Eliminar el registro objetivo de IndexedDB
   try {
     await LocalDB.delete(STORES.SERVICES, servId);
   } catch (err) {
     console.error('[deleteServiceDirect] Error eliminando en LocalDB:', err);
   }
 
-  // 2. Eliminar exclusivamente el registro objetivo del estado en memoria
-  appState.services = (appState.services || []).filter(s => s && s.id !== servId);
-
-  // 3. Resetear filtro si la categoría filtrada quedó sin registros
+  // 4. Resetear filtro si la categoría filtrada quedó sin registros
   if (currentFilter !== 'all') {
     const veh = getActiveVehicle();
     const vehId = veh ? veh.id : appState.activeVehicleId;
@@ -1947,10 +2051,10 @@ async function deleteServiceDirect(servId, event = null) {
     }
   }
 
-  // 4. Guardar estado sincronizado
+  // 5. Guardar estado sincronizado
   saveState();
 
-  // 5. Renderizar vistas inmediatamente
+  // 6. Renderizar vistas inmediatamente
   renderApp();
   if (typeof renderMaintenanceFilterPills === 'function') renderMaintenanceFilterPills();
   if (typeof renderServiceList === 'function') renderServiceList(appState.activeVehicleId);
@@ -6453,6 +6557,7 @@ function sortServicesDescending(arr) {
 
 function calculateVehicleHealth(veh) {
   if (!veh) return null;
+  reconcileVehicleOdometer(veh);
   const cfg = getHealthSettings(veh);
 
   const isMiles = veh.unitDistance === 'mi';

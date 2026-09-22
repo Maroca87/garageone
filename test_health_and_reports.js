@@ -51,7 +51,8 @@ const vm = require('vm');
 const context = {
   console: console,
   document: {
-    getElementById: () => null
+    getElementById: () => null,
+    addEventListener: () => {}
   },
   window: {},
   navigator: {},
@@ -66,6 +67,8 @@ const context = {
   Math: Math,
   Number: Number,
   String: String,
+  currentFilter: 'all',
+  STORES: { SERVICES: 'services', FUELS: 'fuels', VEHICLES: 'vehicles' },
   Array: Array,
   escapeHtml: s => s
 };
@@ -73,9 +76,10 @@ vm.createContext(context);
 
 // Extract relevant constants and functions
 const codeToRun = `
+${appJsContent.substring(appJsContent.indexOf('function reconcileVehicleOdometer'), appJsContent.indexOf('async function deleteFuelDirect'))}
 ${appJsContent.substring(appJsContent.indexOf('const DEFAULT_HEALTH_SETTINGS'), appJsContent.indexOf('function openHealthSettingsModal'))}
 ${appJsContent.substring(appJsContent.indexOf('function formatVehicleDistance'), appJsContent.indexOf('function getActiveVehicle'))}
-${appJsContent.substring(appJsContent.indexOf('function calculateMonthsDiff'), appJsContent.indexOf('function renderVehicleHealth'))}
+${appJsContent.substring(appJsContent.indexOf('function getRelativeTimeString'), appJsContent.indexOf('function renderVehicleHealth'))}
 `;
 
 vm.runInContext(codeToRun, context);
@@ -138,4 +142,86 @@ if (!healthResult3.worstWearText.includes('75% desgaste • 25% salud restante')
 console.log('\nPrueba Trazabilidad Diagnóstica:');
 console.log('presentComponents existe:', Array.isArray(healthResult3.presentComponents));
 console.log('Componentes evaluados:', healthResult3.presentComponents.map(c => `${c.name}: score=${c.data.score}%, peso=${c.weight}%, aporte=${c.contributionPts} pts, crítico=${c.isCritical}`).join(' | '));
+
+// =========================================================================
+// ODOMETER RECONCILIATION TESTS (MANDATORY CASES)
+// =========================================================================
+console.log('\n--- PRUEBAS OBLIGATORIAS DE RECONCILIACIÓN DE ODÓMETRO ---');
+
+// CASO OBLIGATORIO 1:
+// Odómetro actual: 120.000 km
+// Servicio A: 100.000 km
+// Servicio B: 110.000 km
+// Servicio C: 130.000 km
+// Al guardar Servicio C el odómetro sube a 130.000 km.
+// Se elimina Servicio C.
+// Resultado esperado: Odómetro del vehículo = 110.000 km. No debe quedar en 130.000 km.
+const vehOdo1 = { id: 'veh_test1', km: 130000 };
+context.appState.vehicles = [vehOdo1];
+context.appState.activeVehicleId = 'veh_test1';
+context.appState.services = [
+  { id: 'servA', vehicleId: 'veh_test1', km: 100000, date: '2026-01-01', category: 'Aceite' },
+  { id: 'servB', vehicleId: 'veh_test1', km: 110000, date: '2026-02-01', category: 'Filtros' },
+  { id: 'servC', vehicleId: 'veh_test1', km: 130000, date: '2026-03-01', category: 'Frenos' }
+];
+context.confirm = () => true;
+context.saveState = () => {};
+context.renderApp = () => {};
+context.LocalDB = { delete: async () => {} };
+
+// Simular eliminación de Servicio C
+context.deleteServiceDirect('servC');
+console.log('\n[CASO 1] Eliminar Servicio C (130.000 km):');
+console.log('Odómetro resultante (debe ser 110.000 km):', vehOdo1.km, vehOdo1.km === 110000 ? 'PASÓ' : 'FALLÓ');
+if (vehOdo1.km !== 110000) {
+  console.error('ERROR EN CASO 1: Odómetro no se reconcilió a 110.000 km');
+  process.exit(1);
+}
+
+// CASO OBLIGATORIO 2:
+// Odómetro actual: 130.000 km
+// Servicio A: 100.000 km
+// Servicio B: 110.000 km
+// Eliminar Servicio A.
+// Resultado: Odómetro sigue siendo 130.000 km o el valor legítimo actualmente almacenado.
+const vehOdo2 = { id: 'veh_test2', km: 130000 };
+context.appState.vehicles = [vehOdo2];
+context.appState.activeVehicleId = 'veh_test2';
+context.appState.services = [
+  { id: 'servA2', vehicleId: 'veh_test2', km: 100000, date: '2026-01-01', category: 'Aceite' },
+  { id: 'servB2', vehicleId: 'veh_test2', km: 110000, date: '2026-02-01', category: 'Filtros' }
+];
+
+context.deleteServiceDirect('servA2');
+console.log('\n[CASO 2] Eliminar Servicio A (100.000 km con odómetro en 130.000 km):');
+console.log('Odómetro resultante (debe mantenerse en 130.000 km):', vehOdo2.km, vehOdo2.km === 130000 ? 'PASÓ' : 'FALLÓ');
+if (vehOdo2.km !== 130000) {
+  console.error('ERROR EN CASO 2: Odómetro disminuyó artificialmente al eliminar servicio antiguo');
+  process.exit(1);
+}
+
+// CASO 3: CASO ACTUAL DE 1.567.888 KM
+// Vehículo afectado por registro de prueba eliminado previamente:
+// Odómetro en 1.567.888 km sin servicio existente correspondiente
+const vehCorrupted = { id: 'veh_curr', name: 'Auto Afectado', km: 1567888, unitDistance: 'km' };
+context.appState.vehicles = [vehCorrupted];
+context.appState.activeVehicleId = 'veh_curr';
+context.getActiveVehicle = () => vehCorrupted;
+context.appState.services = [
+  { id: 's_real', vehicleId: 'veh_curr', date: '2026-09-22', km: 100000, category: 'Aceite', title: 'Aceite Sintético' }
+];
+
+// Al calcular salud o reconciliar, debe autorepararse a 100.000 km
+const healthAutoRepaired = context.calculateVehicleHealth(vehCorrupted);
+console.log('\n[CASO ACTUAL] Vehículo con odómetro huérfano de 1.567.888 KM:');
+console.log('Odómetro reparado (debe ser 100.000 km):', vehCorrupted.km, vehCorrupted.km === 100000 ? 'PASÓ' : 'FALLÓ');
+console.log('Score Aceite recalculado (debe ser 100):', healthAutoRepaired.oilData.score, healthAutoRepaired.oilData.score === 100 ? 'PASÓ' : 'FALLÓ');
+console.log('Desgaste Aceite recalculado (debe ser 0%):', healthAutoRepaired.oilData.wearPct, healthAutoRepaired.oilData.wearPct === 0 ? 'PASÓ' : 'FALLÓ');
+
+if (vehCorrupted.km !== 100000 || healthAutoRepaired.oilData.score !== 100) {
+  console.error('ERROR EN CASO ACTUAL: No se reparó correctamente el odómetro o la salud');
+  process.exit(1);
+}
+
 console.log('\n¡TODAS LAS PRUEBAS PASARON EXITOSAMENTE!');
+
