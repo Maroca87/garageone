@@ -454,31 +454,21 @@
 
         <div class="settings-card" id="backupCard">
           <h3 style="margin-bottom:8px;">Respaldos</h3>
-          <p class="subtitle" style="margin-bottom:12px; font-size:0.82rem;">Exporta e importa tus datos y configuración en XML.</p>
-          <div id="storageUsageContainer" style="margin-bottom:14px;"></div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <p class="subtitle" style="margin-bottom:12px; font-size:0.82rem;">Restaura tus datos y configuración desde un archivo de respaldo XML.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('backupImportInput').click()">Importar XML</button>
             <input id="backupImportInput" type="file" accept=".xml,text/xml,application/xml" style="display:none" onchange="importBackupXml(event)">
           </div>
-          <div style="margin:14px 0 6px; display:flex; flex-direction:column; gap:10px;">
-            <div class="form-group" style="margin:0;">
-              <label style="font-size:0.8rem;">Respaldo automático</label>
-              <select id="backupFrequency" class="form-control" onchange="updateBackupScheduleSettings()">
-                <option value="off">Desactivado</option>
-                <option value="daily">Diario</option>
-                <option value="weekly">Semanal</option>
-                <option value="monthly">Mensual</option>
-              </select>
+          <div id="autoBackupStatusCard" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:10px 14px; border-radius:8px; font-size:0.82rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="color:var(--text-secondary);">Respaldo automático:</span>
+              <strong style="color:#10b981;">Activo</strong>
             </div>
-            <div class="form-group" id="backupTimeGroup" style="margin:0; display:none;">
-              <label style="font-size:0.8rem;">Hora programada del respaldo</label>
-              <input type="time" id="backupTime" class="form-control" value="03:00" onchange="updateBackupScheduleSettings()">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="color:var(--text-secondary);">Último respaldo:</span>
+              <span id="lastAutoBackupTimeText" style="color:var(--text-primary); font-weight:600;">--</span>
             </div>
-            <div id="backupNextSchedule" style="font-size:0.82rem; color:#38bdf8; background:rgba(56,189,248,0.1); padding:8px 12px; border-radius:10px; border:1px solid rgba(56,189,248,0.25); display:none;"></div>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm btn-block" onclick="createManualBackup()" style="margin-top:8px;">Respaldar ahora</button>
-          <div id="backupStatus" style="font-size:0.78rem; color:var(--text-secondary); margin-top:4px;"></div>
-          <div id="backupHistory" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;"></div>
         </div>
       </section>
 

@@ -1088,10 +1088,11 @@ function saveState() {
       if (userDocs.length > 0) LocalDB.putMany(STORES.DOCUMENTS, userDocs);
       if (userReminders.length > 0) LocalDB.putMany(STORES.REMINDERS, userReminders);
       if (userContacts.length > 0) LocalDB.putMany(STORES.EMERGENCY_CONTACTS, userContacts);
-      if (appState.backupHistory && appState.backupHistory.length > 0) {
-        const userBackups = appState.backupHistory.map(b => ({ ...b, userId: uId }));
-        LocalDB.putMany(STORES.BACKUPS, userBackups);
-      }
+    }
+
+    // Disparar respaldo automático independiente en segundo plano
+    if (typeof triggerAutomaticBackup === 'function') {
+      triggerAutomaticBackup();
     }
   } catch (e) {
     console.error('Error guardando estado local:', e);
@@ -1334,9 +1335,10 @@ async function loadAppStateFromDB() {
     } catch (e) {}
 
     if (allBackups && allBackups.length > 0) {
-      const userBackups = (allBackups || []).filter(b => b && (b.userId === uId || !b.userId));
-      if (userBackups.length > 0 && (!appState.backupHistory || appState.backupHistory.length === 0)) {
-        appState.backupHistory = userBackups.slice(0, 3);
+      const autoSnapshot = allBackups.find(b => b && b.id === 'garageone_auto_backup_latest');
+      if (appState.vehicles.length === 0 && autoSnapshot && autoSnapshot.data && Array.isArray(autoSnapshot.data.vehicles) && autoSnapshot.data.vehicles.length > 0) {
+        console.log('[loadAppStateFromDB] Auto-recuperando estado desde respaldo automático independiente...');
+        await recoverFromAutoBackup();
       }
     }
   } else {
@@ -1424,88 +1426,31 @@ function getStorageUsage() {
 }
 
 function renderStorageStats() {
-  const container = document.getElementById('storageUsageContainer');
-  if (!container) return;
+  // Presentación visual del indicador de espacio eliminada de la interfaz.
+  // La persistencia e IndexedDB siguen funcionando de manera intacta e interna.
+  renderAutoBackupStatus();
+}
 
-  const usage = getStorageUsage();
-  let barColor = '#38bdf8';
-  if (usage.percent > 70) barColor = '#ffd60a';
-  if (usage.percent > 90) barColor = '#ff453a';
-
-  const totalPhotos = (appState.services || []).filter(s => s.receipt).length +
-                     (appState.documents || []).filter(d => d.file).length +
-                     (appState.vehicles || []).filter(v => v.photo).length;
-
-  container.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
-      <span>Espacio Ocupado: <strong>${usage.mb} MB</strong> (${usage.kb} KB)</span>
-    </div>
-    <div style="width:100%; height:10px; background:rgba(255,255,255,0.08); border-radius:5px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.05);">
-      <div style="width:${Math.max(1, Math.min(100, usage.percent))}%; height:100%; background:${barColor}; border-radius:5px; transition:width 0.3s ease; box-shadow:0 0 10px ${barColor}66;"></div>
-    </div>
-    <div style="font-size:0.78rem; color:#cbd5e1; line-height:1.4;">
-      • ${appState.vehicles ? appState.vehicles.length : 0} vehículo(s) • ${appState.services ? appState.services.length : 0} servicio(s) • ${totalPhotos} archivo(s) almacenados.
-    </div>
-  `;
+function renderAutoBackupStatus() {
+  const timeEl = document.getElementById('lastAutoBackupTimeText');
+  if (!timeEl) return;
+  const metaRaw = localStorage.getItem('garageone_auto_backup_meta');
+  if (metaRaw) {
+    try {
+      const meta = JSON.parse(metaRaw);
+      timeEl.textContent = meta.dateStr || '--';
+      return;
+    } catch (e) {}
+  }
+  if (appState.lastAutoBackupTimestamp) {
+    timeEl.textContent = new Date(appState.lastAutoBackupTimestamp).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+  } else {
+    timeEl.textContent = 'En espera del primer guardado';
+  }
 }
 
 function autoOptimizeStorageImagesSilent() {
-  const compressDataUrl = (dataUrl, maxDim = 500, quality = 0.5, callback) => {
-    if (!dataUrl || !dataUrl.startsWith('data:image')) return callback(dataUrl);
-    const img = new Image();
-    img.onload = () => {
-      let w = img.width;
-      let h = img.height;
-      if (w <= maxDim && h <= maxDim && dataUrl.length < 40000) return callback(dataUrl);
-
-      if (w > h && w > maxDim) {
-        h = Math.round((h * maxDim) / w);
-        w = maxDim;
-      } else if (h > maxDim) {
-        w = Math.round((w * maxDim) / h);
-        h = maxDim;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => callback(dataUrl);
-    img.src = dataUrl;
-  };
-
-  let tasks = [];
-  (appState.services || []).forEach(s => {
-    if (s.receipt && s.receipt.length > 40000) {
-      tasks.push(cb => compressDataUrl(s.receipt, 500, 0.5, res => { s.receipt = res; cb(); }));
-    }
-  });
-
-  (appState.documents || []).forEach(d => {
-    if (d.file && d.file.length > 40000) {
-      tasks.push(cb => compressDataUrl(d.file, 500, 0.5, res => { d.file = res; cb(); }));
-    }
-  });
-
-  (appState.vehicles || []).forEach(v => {
-    if (v.photo && v.photo.length > 40000) {
-      tasks.push(cb => compressDataUrl(v.photo, 500, 0.5, res => { v.photo = res; cb(); }));
-    }
-  });
-
-  if (tasks.length === 0) return;
-
-  let completed = 0;
-  tasks.forEach(fn => {
-    fn(() => {
-      completed++;
-      if (completed === tasks.length) {
-        saveStateToIDB(appState);
-      }
-    });
-  });
+  // Desactivado permanentemente para proteger la resolución, nitidez y legibilidad de documentos e imágenes.
 }
 
 function setTodayDates() {
@@ -1676,13 +1621,29 @@ function renderApp() {
         <span class="hero-odometer-val">${formatVehicleDistance(veh.km, veh)}</span>
       </div>
     </div>
-    ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo">` : ''}
+    ${veh.photo ? `<img src="${veh.photo}" class="hero-image-preview" alt="Foto Vehículo" onclick="viewVehiclePhoto('${veh.id}')" style="cursor:pointer;" title="Toca para ampliar foto">` : ''}
   `;
 
   renderServiceList(veh.id);
   renderFuelList(veh.id);
 
   setTimeout(initSwipeListeners, 50);
+}
+
+function viewVehiclePhoto(vehicleId) {
+  const veh = (appState.vehicles || []).find(v => v.id === vehicleId);
+  if (veh && veh.photo) {
+    const titleEl = document.getElementById('receiptModalTitle');
+    if (titleEl) titleEl.textContent = `Foto: ${veh.name || 'Vehículo'}`;
+    const container = document.getElementById('receiptContainer');
+    if (container) {
+      container.innerHTML = `<img src="${veh.photo}" alt="Foto de ${escapeHtml(veh.name)}">`;
+    }
+    if (typeof setupReceiptZoom === 'function') {
+      setupReceiptZoom(true);
+    }
+    openModal('modalReceiptViewer');
+  }
 }
 
 function openOdometerModal() {
@@ -4737,14 +4698,7 @@ function renderUserSettings() {
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 
   applyNavigationPermissions();
-  renderStorageStats();
-
-  const backupFreqEl = document.getElementById('backupFrequency');
-  const backupTimeEl = document.getElementById('backupTime');
-  if (backupFreqEl) backupFreqEl.value = appState.backupFrequency || 'off';
-  if (backupTimeEl) backupTimeEl.value = appState.backupTime || '03:00';
-  updateBackupScheduleSettings(false);
-  renderBackupHistory();
+  renderAutoBackupStatus();
 
   applyLanguageTranslations();
 }
@@ -5908,14 +5862,30 @@ function downloadReportPDF() {
 
 function readAndCompressImage(file, callback) {
   if (!file) return callback('');
+
+  // 1. Si es PDF, se conserva el documento original sin alteración
+  if (file.type === 'application/pdf') {
+    const reader = new FileReader();
+    reader.onload = (e) => callback(e.target.result);
+    reader.onerror = () => callback('');
+    reader.readAsDataURL(file);
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = function(e) {
+    const originalDataUrl = e.target.result;
     const img = new Image();
     img.onload = function() {
-      const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      const maxDim = 600;
+      // Resolución de alta fidelidad para documentos, facturas y texto legible (2048px)
+      const maxDim = 2048;
+
+      // Si la imagen ya tiene dimensiones moderadas y pesa menos de 2MB, conservar el archivo tal cual
+      if (width <= maxDim && height <= maxDim && file.size < 2000000) {
+        return callback(originalDataUrl);
+      }
 
       if (width > height && width > maxDim) {
         height = Math.round((height * maxDim) / width);
@@ -5925,16 +5895,21 @@ function readAndCompressImage(file, callback) {
         height = maxDim;
       }
 
+      const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, width, height);
-      callback(canvas.toDataURL('image/jpeg', 0.6));
+
+      // Calidad de 0.85 para garantizar lectura nítida de letras pequeñas y números
+      callback(canvas.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = function() {
-      callback(e.target.result);
+      callback(originalDataUrl);
     };
-    img.src = e.target.result;
+    img.src = originalDataUrl;
   };
   reader.readAsDataURL(file);
 }
@@ -8032,154 +8007,124 @@ function saveServiceCategory(e) {
 
 
 
-function createManualBackup() {
+function checkAndTriggerAutoBackup() {
+  triggerAutomaticBackup();
+}
+
+/* ==========================================================================
+   MOTOR DE RESPALDO AUTOMÁTICO INDEPENDIENTE Y RECUPERABLE
+   ========================================================================== */
+let _autoBackupDebounceTimer = null;
+
+/**
+ * Disparador debounce para el respaldo automático tras cambios importantes.
+ */
+function triggerAutomaticBackup() {
+  if (_autoBackupDebounceTimer) clearTimeout(_autoBackupDebounceTimer);
+  _autoBackupDebounceTimer = setTimeout(() => {
+    performIndependentAutoBackup();
+  }, 400);
+}
+
+/**
+ * Genera y almacena una copia de seguridad independiente en IndexedDB (LocalDB).
+ * Contiene todo el appState necesario para recuperar GarageOne íntegramente.
+ */
+async function performIndependentAutoBackup() {
   try {
-    const xmlStr = objectToXML(appState);
-    const now = new Date();
-    const backupItem = {
-      id: 'bk_' + Date.now(),
-      filename: `GarageOne_Backup_${now.toISOString().substring(0,10)}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xml`,
-      date: now.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
-      timestamp: Date.now(),
-      sizeKb: Math.round(xmlStr.length / 1024) || 1,
-      type: 'manual',
-      xmlData: xmlStr
+    const uId = currentUser ? currentUser.id : 'local_user';
+    const now = Date.now();
+    const dateStr = new Date(now).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+
+    // Copia profunda e independiente de todos los datos necesarios
+    const backupSnapshot = {
+      id: 'garageone_auto_backup_latest',
+      userId: uId,
+      timestamp: now,
+      dateStr: dateStr,
+      backupVersion: '2.0',
+      data: {
+        vehicles: JSON.parse(JSON.stringify(appState.vehicles || [])),
+        services: JSON.parse(JSON.stringify(appState.services || [])),
+        fuels: JSON.parse(JSON.stringify(appState.fuels || [])),
+        documents: JSON.parse(JSON.stringify(appState.documents || [])),
+        reminders: JSON.parse(JSON.stringify(appState.reminders || [])),
+        emergencyContacts: JSON.parse(JSON.stringify(appState.emergencyContacts || [])),
+        serviceCategories: JSON.parse(JSON.stringify(appState.serviceCategories || [])),
+        vehicleHealthConfig: JSON.parse(JSON.stringify(appState.vehicleHealthConfig || {})),
+        activeVehicleId: appState.activeVehicleId || null,
+        settings: {
+          currency: appState.currency || 'CRC',
+          distanceUnit: appState.distanceUnit || 'km',
+          fuelUnit: appState.fuelUnit || 'L'
+        }
+      }
     };
 
-    appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
-    saveState();
-    renderBackupHistory();
+    // 1. Guardar snapshot principal en IndexedDB
+    await LocalDB.put(STORES.BACKUPS, backupSnapshot);
 
-    const status = document.getElementById('backupStatus');
-    if (status) status.textContent = 'Respaldo generado y guardado en el historial.';
-  } catch (e) {
-    console.error('Error al generar respaldo manual:', e);
-  }
-}
+    // 2. Guardar también una copia histórica de seguridad en IndexedDB
+    const historicalId = `auto_bk_${now}`;
+    await LocalDB.put(STORES.BACKUPS, { ...backupSnapshot, id: historicalId, isHistorical: true });
 
-function renderBackupHistory() {
-  const container = document.getElementById('backupHistory');
-  if (!container) return;
-
-  const history = appState.backupHistory || [];
-  if (history.length === 0) {
-    container.innerHTML = `<div style="font-size:0.78rem; color:var(--text-secondary); text-align:center; padding:8px;">No hay respaldos en el historial.</div>`;
-    return;
-  }
-
-  container.innerHTML = history.map(item => `
-    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-      <div style="flex:1; overflow:hidden;">
-        <div style="font-size:0.83rem; font-weight:700; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${escapeHtml(item.filename)}</div>
-        <div style="font-size:0.75rem; color:var(--text-secondary);">${item.date} • ${item.sizeKb} KB ${item.type === 'auto' ? '• Auto' : ''}</div>
-      </div>
-      <div style="display:flex; gap:6px; flex-shrink:0;">
-        <button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.75rem;" onclick="downloadBackupItem('${item.id}')">Descargar</button>
-        <button type="button" class="btn btn-secondary btn-sm" style="padding:3px 8px; font-size:0.75rem; color:#ff453a; border-color:rgba(255,69,58,0.3);" onclick="deleteBackupItem('${item.id}')">Eliminar</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function downloadBackupItem(id) {
-  const item = (appState.backupHistory || []).find(b => b.id === id);
-  if (!item || !item.xmlData) return;
-  const blob = new Blob([item.xmlData], { type: 'application/xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const dlAnchorElem = document.createElement('a');
-  dlAnchorElem.setAttribute("href", url);
-  dlAnchorElem.setAttribute("download", item.filename);
-  document.body.appendChild(dlAnchorElem);
-  dlAnchorElem.click();
-  dlAnchorElem.remove();
-  URL.revokeObjectURL(url);
-}
-
-function deleteBackupItem(id) {
-  if (confirm('¿Eliminar este respaldo del historial?')) {
-    appState.backupHistory = (appState.backupHistory || []).filter(b => b.id !== id);
-    saveState();
-    renderBackupHistory();
-  }
-}
-
-/**
- * Determina con precisión si corresponde ejecutar un respaldo automático según cualquier frecuencia y horario.
- * @returns {boolean}
- */
-function isAutoBackupDue() {
-  const freq = appState.backupFrequency || 'off';
-  if (freq === 'off') return false;
-
-  const timeStr = appState.backupTime || '03:00';
-  const parts = timeStr.split(':');
-  const targetHour = parseInt(parts[0], 10) || 0;
-  const targetMinute = parseInt(parts[1], 10) || 0;
-
-  const now = new Date();
-  const lastTime = Number(appState.lastAutoBackupTimestamp || 0);
-
-  // Fecha del horario programado correspondiente a hoy
-  let scheduledSlot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetHour, targetMinute, 0, 0);
-
-  // Si la hora programada de hoy aún no ha llegado, el ciclo anterior programado fue ayer/semana anterior
-  if (now.getTime() < scheduledSlot.getTime()) {
-    if (freq === 'daily') {
-      scheduledSlot.setDate(scheduledSlot.getDate() - 1);
-    } else if (freq === 'weekly') {
-      scheduledSlot.setDate(scheduledSlot.getDate() - 7);
-    } else if (freq === 'monthly') {
-      scheduledSlot.setMonth(scheduledSlot.getMonth() - 1);
-    }
-  }
-
-  // Si nunca se ha realizado un respaldo o el último respaldo ocurrió antes del horario programado más reciente
-  if (lastTime === 0 || lastTime < scheduledSlot.getTime()) {
-    return true;
-  }
-
-  // Control secundario por intervalo de tiempo
-  let intervalMs = 24 * 60 * 60 * 1000;
-  if (freq === 'weekly') intervalMs = 7 * 24 * 60 * 60 * 1000;
-  if (freq === 'monthly') intervalMs = 30 * 24 * 60 * 60 * 1000;
-
-  if (now.getTime() - lastTime >= intervalMs) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Verifica y ejecuta el respaldo automático si corresponde según la programación activa.
- * @param {boolean} forceCheck - Si es true, fuerza la generación independientemente del temporizador.
- */
-function checkAndTriggerAutoBackup(forceCheck = false) {
-  const freq = appState.backupFrequency || 'off';
-  if (freq === 'off') return;
-
-  if (forceCheck || isAutoBackupDue()) {
+    // Mantener sólo las últimas 3 copias históricas
     try {
-      const xmlStr = objectToXML(appState);
-      const nowDate = new Date();
-      const now = Date.now();
-      const backupItem = {
-        id: 'bk_' + now,
-        filename: `GarageOne_AutoBackup_${nowDate.toISOString().substring(0,10)}_${String(nowDate.getHours()).padStart(2,'0')}${String(nowDate.getMinutes()).padStart(2,'0')}.xml`,
-        date: nowDate.toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }),
-        timestamp: now,
-        sizeKb: Math.round(xmlStr.length / 1024) || 1,
-        type: 'auto',
-        xmlData: xmlStr
-      };
+      const allBackups = await LocalDB.getAll(STORES.BACKUPS);
+      const historicalList = (allBackups || []).filter(b => b && b.isHistorical).sort((a, b) => b.timestamp - a.timestamp);
+      if (historicalList.length > 3) {
+        for (let i = 3; i < historicalList.length; i++) {
+          await LocalDB.delete(STORES.BACKUPS, historicalList[i].id);
+        }
+      }
+    } catch (eClean) {}
 
-      appState.backupHistory = [backupItem, ...(appState.backupHistory || [])].slice(0, 3);
-      appState.lastAutoBackupTimestamp = now;
-      saveState();
-      renderBackupHistory();
-    } catch (err) {
-      console.error('Error al generar respaldo automático:', err);
+    // 3. Metadata ligera para actualización visual inmediata
+    appState.lastAutoBackupTimestamp = now;
+    try {
+      localStorage.setItem('garageone_auto_backup_meta', JSON.stringify({
+        timestamp: now,
+        dateStr: dateStr
+      }));
+    } catch (eMeta) {}
+
+    renderAutoBackupStatus();
+  } catch (err) {
+    console.warn('[performIndependentAutoBackup] Error generando respaldo automático:', err);
+  }
+}
+
+/**
+ * Función de recuperación independiente: Restaura el garaje desde el respaldo automático en caso de pérdida o corrupción.
+ */
+async function recoverFromAutoBackup() {
+  try {
+    const backupSnapshot = await LocalDB.get(STORES.BACKUPS, 'garageone_auto_backup_latest');
+    if (!backupSnapshot || !backupSnapshot.data) {
+      console.warn('[recoverFromAutoBackup] No se encontró snapshot de respaldo automático.');
+      return false;
     }
+    const d = backupSnapshot.data;
+    if (Array.isArray(d.vehicles) && d.vehicles.length > 0) appState.vehicles = d.vehicles;
+    if (Array.isArray(d.services)) appState.services = d.services;
+    if (Array.isArray(d.fuels)) appState.fuels = d.fuels;
+    if (Array.isArray(d.documents)) appState.documents = d.documents;
+    if (Array.isArray(d.reminders)) appState.reminders = d.reminders;
+    if (Array.isArray(d.emergencyContacts)) appState.emergencyContacts = d.emergencyContacts;
+    if (Array.isArray(d.serviceCategories)) appState.serviceCategories = d.serviceCategories;
+    if (d.vehicleHealthConfig) appState.vehicleHealthConfig = d.vehicleHealthConfig;
+    if (d.activeVehicleId) appState.activeVehicleId = d.activeVehicleId;
+    if (d.settings) {
+      if (d.settings.currency) appState.currency = d.settings.currency;
+      if (d.settings.distanceUnit) appState.distanceUnit = d.settings.distanceUnit;
+      if (d.settings.fuelUnit) appState.fuelUnit = d.settings.fuelUnit;
+    }
+    saveState();
+    renderApp();
+    return true;
+  } catch (e) {
+    console.error('[recoverFromAutoBackup] Error recuperando respaldo automático:', e);
+    return false;
   }
 }
 
