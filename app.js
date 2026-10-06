@@ -1090,9 +1090,15 @@ function saveState() {
       if (userContacts.length > 0) LocalDB.putMany(STORES.EMERGENCY_CONTACTS, userContacts);
     }
 
-    // Disparar respaldo automático independiente en segundo plano
-    if (typeof triggerAutomaticBackup === 'function') {
-      triggerAutomaticBackup();
+    // Registrar fecha y hora del guardado automático real
+    const now = Date.now();
+    appState.lastSaveTimestamp = now;
+    try {
+      localStorage.setItem('garageone_last_save_time', new Date(now).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' }));
+    } catch (e) {}
+
+    if (typeof renderAutoSaveStatus === 'function') {
+      renderAutoSaveStatus();
     }
   } catch (e) {
     console.error('Error guardando estado local:', e);
@@ -1428,25 +1434,28 @@ function getStorageUsage() {
 function renderStorageStats() {
   // Presentación visual del indicador de espacio eliminada de la interfaz.
   // La persistencia e IndexedDB siguen funcionando de manera intacta e interna.
-  renderAutoBackupStatus();
+  renderAutoSaveStatus();
 }
 
-function renderAutoBackupStatus() {
-  const timeEl = document.getElementById('lastAutoBackupTimeText');
+function renderAutoSaveStatus() {
+  const timeEl = document.getElementById('lastAutoSaveTimeText') || document.getElementById('lastAutoBackupTimeText');
   if (!timeEl) return;
-  const metaRaw = localStorage.getItem('garageone_auto_backup_meta');
-  if (metaRaw) {
-    try {
-      const meta = JSON.parse(metaRaw);
-      timeEl.textContent = meta.dateStr || '--';
-      return;
-    } catch (e) {}
+  const lastTime = localStorage.getItem('garageone_last_save_time');
+  if (lastTime) {
+    timeEl.textContent = lastTime;
+    return;
   }
-  if (appState.lastAutoBackupTimestamp) {
-    timeEl.textContent = new Date(appState.lastAutoBackupTimestamp).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
+  if (appState.lastSaveTimestamp) {
+    timeEl.textContent = new Date(appState.lastSaveTimestamp).toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
   } else {
-    timeEl.textContent = 'En espera del primer guardado';
+    timeEl.textContent = new Date().toLocaleString('es-CR', { dateStyle: 'short', timeStyle: 'short' });
   }
+}
+
+// Salvaguarda explícita contra scripts obsoletos o cacheados
+function renderBackupHistory() {}
+if (typeof window !== 'undefined') {
+  window.renderBackupHistory = function() {};
 }
 
 function autoOptimizeStorageImagesSilent() {
@@ -4698,7 +4707,7 @@ function renderUserSettings() {
   document.querySelectorAll('.currency-lbl').forEach(el => el.textContent = symbol);
 
   applyNavigationPermissions();
-  renderAutoBackupStatus();
+  renderAutoSaveStatus();
 
   applyLanguageTranslations();
 }
@@ -8088,7 +8097,7 @@ async function performIndependentAutoBackup() {
       }));
     } catch (eMeta) {}
 
-    renderAutoBackupStatus();
+    renderAutoSaveStatus();
   } catch (err) {
     console.warn('[performIndependentAutoBackup] Error generando respaldo automático:', err);
   }

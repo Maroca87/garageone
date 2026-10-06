@@ -459,14 +459,14 @@
             <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('backupImportInput').click()">Importar XML</button>
             <input id="backupImportInput" type="file" accept=".xml,text/xml,application/xml" style="display:none" onchange="importBackupXml(event)">
           </div>
-          <div id="autoBackupStatusCard" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:10px 14px; border-radius:8px; font-size:0.82rem;">
+          <div id="autoSaveStatusCard" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:10px 14px; border-radius:8px; font-size:0.82rem;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <span style="color:var(--text-secondary);">Respaldo automático:</span>
+              <span style="color:var(--text-secondary);">Guardado automático:</span>
               <strong style="color:#10b981;">Activo</strong>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="color:var(--text-secondary);">Último respaldo:</span>
-              <span id="lastAutoBackupTimeText" style="color:var(--text-primary); font-weight:600;">--</span>
+              <span style="color:var(--text-secondary);">Último guardado:</span>
+              <span id="lastAutoSaveTimeText" style="color:var(--text-primary); font-weight:600;">--</span>
             </div>
           </div>
         </div>
@@ -1268,13 +1268,13 @@
   </div>
 
 
-  <script src="db.js?v=1040"></script>
-  <script src="auth-service.js?v=1040"></script>
-  <script src="sync-service.js?v=1040"></script>
-  <script src="app.js?v=1040"></script>
+  <script src="db.js?v=1042"></script>
+  <script src="auth-service.js?v=1042"></script>
+  <script src="sync-service.js?v=1042"></script>
+  <script src="app.js?v=1042"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js?v=1040').catch(err => console.log('ServiceWorker error: ', err));
+      navigator.serviceWorker.register('sw.js?v=1042').catch(err => console.log('ServiceWorker error: ', err));
     }
   </script>
 </body>
