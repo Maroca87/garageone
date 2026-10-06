@@ -779,12 +779,20 @@
     </div>
   </div>
 
-  <!-- Modal: Visor de Factura -->
+  <!-- Modal: Visor de Factura / Adjuntos -->
   <div id="modalReceiptViewer" class="modal-backdrop">
     <div class="modal-card full-media">
-      <div class="modal-header">
-        <h3>Comprobante / Factura</h3>
-        <button class="close-btn" onclick="closeModal('modalReceiptViewer')">✕</button>
+      <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <h3 id="receiptModalTitle" style="margin:0;">Comprobante / Adjunto</h3>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div id="receiptZoomControls" class="receipt-zoom-toolbar" style="display:none;">
+            <button type="button" class="btn btn-secondary btn-sm" id="btnReceiptZoomOut" onclick="zoomReceiptImage(-0.3)" title="Alejar" style="padding:3px 9px; font-weight:bold; font-size:0.9rem; line-height:1;">−</button>
+            <span id="receiptZoomLevel" style="font-size:0.75rem; font-weight:600; min-width:38px; text-align:center; color:var(--text-secondary); user-select:none;">100%</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnReceiptZoomIn" onclick="zoomReceiptImage(0.3)" title="Acercar" style="padding:3px 9px; font-weight:bold; font-size:0.9rem; line-height:1;">+</button>
+            <button type="button" class="btn btn-tertiary btn-sm" id="btnReceiptZoomReset" onclick="resetReceiptZoom()" title="Restablecer (100%)" style="padding:3px 7px; font-size:0.75rem;">1:1</button>
+          </div>
+          <button class="close-btn" onclick="closeModal('modalReceiptViewer')">✕</button>
+        </div>
       </div>
       <div class="receipt-container" id="receiptContainer">
         <!-- Rendered base64 image or preview -->

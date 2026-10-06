@@ -261,6 +261,9 @@ function closeModal(modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.remove('open');
+    if (modalId === 'modalReceiptViewer' && typeof resetReceiptZoom === 'function') {
+      resetReceiptZoom();
+    }
   }
 }
 
@@ -3150,9 +3153,18 @@ async function deleteDocumentDirect(docId, event = null) {
 function viewDocumentFile(docId) {
   const doc = (appState.documents || []).find(d => d.id === docId);
   if (doc && doc.file) {
-    document.getElementById('receiptContainer').innerHTML = `
-      <img src="${doc.file}" alt="Documento ${escapeHtml(doc.title)}">
-    `;
+    const titleEl = document.getElementById('receiptModalTitle');
+    if (titleEl) titleEl.textContent = doc.title ? `Documento: ${doc.title}` : 'Documento Adjunto';
+    const container = document.getElementById('receiptContainer');
+    const isPdf = typeof doc.file === 'string' && doc.file.startsWith('data:application/pdf');
+    if (isPdf) {
+      container.innerHTML = `<iframe src="${doc.file}" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>`;
+    } else {
+      container.innerHTML = `<img src="${doc.file}" alt="Documento ${escapeHtml(doc.title)}">`;
+    }
+    if (typeof setupReceiptZoom === 'function') {
+      setupReceiptZoom(!isPdf);
+    }
     openModal('modalReceiptViewer');
   }
 }
@@ -5316,14 +5328,214 @@ async function saveFuel(e) {
   }
 }
 
+/* --- Visor Interactivo de Imágenes Adjuntas (Zoom & Paneo) --- */
+let receiptZoomState = {
+  scale: 1,
+  panX: 0,
+  panY: 0,
+  isDragging: false,
+  startX: 0,
+  startY: 0,
+  initialDistance: null,
+  initialScale: 1,
+  lastTapTime: 0
+};
+
+function resetReceiptZoom() {
+  receiptZoomState.scale = 1;
+  receiptZoomState.panX = 0;
+  receiptZoomState.panY = 0;
+  receiptZoomState.isDragging = false;
+  receiptZoomState.initialDistance = null;
+  applyReceiptZoomTransform();
+}
+
+function zoomReceiptImage(delta) {
+  setReceiptScale(receiptZoomState.scale + delta);
+}
+
+function setReceiptScale(targetScale) {
+  const minScale = 1;
+  const maxScale = 5;
+  const clampedScale = Math.min(Math.max(targetScale, minScale), maxScale);
+  receiptZoomState.scale = Math.round(clampedScale * 100) / 100;
+  if (receiptZoomState.scale === 1) {
+    receiptZoomState.panX = 0;
+    receiptZoomState.panY = 0;
+  }
+  applyReceiptZoomTransform();
+}
+
+function applyReceiptZoomTransform() {
+  const container = document.getElementById('receiptContainer');
+  if (!container) return;
+  const img = container.querySelector('img');
+  const levelEl = document.getElementById('receiptZoomLevel');
+  if (levelEl) {
+    levelEl.textContent = `${Math.round(receiptZoomState.scale * 100)}%`;
+  }
+  if (receiptZoomState.scale > 1) {
+    container.classList.add('is-zoomed');
+  } else {
+    container.classList.remove('is-zoomed');
+  }
+  if (img) {
+    img.style.transform = `translate(${receiptZoomState.panX}px, ${receiptZoomState.panY}px) scale(${receiptZoomState.scale})`;
+  }
+}
+
+function setupReceiptZoom(hasImage) {
+  const controls = document.getElementById('receiptZoomControls');
+  const container = document.getElementById('receiptContainer');
+  if (!container) return;
+
+  resetReceiptZoom();
+
+  if (!hasImage) {
+    if (controls) controls.style.display = 'none';
+    return;
+  }
+
+  if (controls) controls.style.display = 'inline-flex';
+
+  if (container._receiptZoomBound) return;
+  container._receiptZoomBound = true;
+
+  // Zoom con rueda de ratón
+  container.addEventListener('wheel', (e) => {
+    const img = container.querySelector('img');
+    if (!img) return;
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.3 : -0.3;
+    zoomReceiptImage(delta);
+  }, { passive: false });
+
+  // Arrastre (Pan) con Mouse
+  container.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const img = container.querySelector('img');
+    if (!img || receiptZoomState.scale <= 1) return;
+    receiptZoomState.isDragging = true;
+    receiptZoomState.startX = e.clientX - receiptZoomState.panX;
+    receiptZoomState.startY = e.clientY - receiptZoomState.panY;
+    container.classList.add('is-dragging');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!receiptZoomState.isDragging) return;
+    receiptZoomState.panX = e.clientX - receiptZoomState.startX;
+    receiptZoomState.panY = e.clientY - receiptZoomState.startY;
+    applyReceiptZoomTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (receiptZoomState.isDragging) {
+      receiptZoomState.isDragging = false;
+      container.classList.remove('is-dragging');
+    }
+  });
+
+  // Doble click para alternar entre 1x y 2.5x
+  container.addEventListener('dblclick', (e) => {
+    const img = container.querySelector('img');
+    if (!img) return;
+    e.preventDefault();
+    if (receiptZoomState.scale > 1.2) {
+      resetReceiptZoom();
+    } else {
+      setReceiptScale(2.5);
+    }
+  });
+
+  // Gestos táctiles en móviles (Pellizco / Drag / Doble toque)
+  container.addEventListener('touchstart', (e) => {
+    const img = container.querySelector('img');
+    if (!img) return;
+
+    if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - receiptZoomState.lastTapTime < 300) {
+        e.preventDefault();
+        if (receiptZoomState.scale > 1.2) {
+          resetReceiptZoom();
+        } else {
+          setReceiptScale(2.5);
+        }
+        receiptZoomState.lastTapTime = 0;
+        return;
+      }
+      receiptZoomState.lastTapTime = now;
+
+      if (receiptZoomState.scale > 1) {
+        receiptZoomState.isDragging = true;
+        receiptZoomState.startX = e.touches[0].clientX - receiptZoomState.panX;
+        receiptZoomState.startY = e.touches[0].clientY - receiptZoomState.panY;
+        container.classList.add('is-dragging');
+      }
+    } else if (e.touches.length === 2) {
+      receiptZoomState.isDragging = false;
+      container.classList.remove('is-dragging');
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      receiptZoomState.initialDistance = dist;
+      receiptZoomState.initialScale = receiptZoomState.scale;
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchmove', (e) => {
+    const img = container.querySelector('img');
+    if (!img) return;
+
+    if (e.touches.length === 1 && receiptZoomState.isDragging) {
+      e.preventDefault();
+      receiptZoomState.panX = e.touches[0].clientX - receiptZoomState.startX;
+      receiptZoomState.panY = e.touches[0].clientY - receiptZoomState.startY;
+      applyReceiptZoomTransform();
+    } else if (e.touches.length === 2 && receiptZoomState.initialDistance) {
+      e.preventDefault();
+      const currentDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const ratio = currentDist / receiptZoomState.initialDistance;
+      setReceiptScale(receiptZoomState.initialScale * ratio);
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      receiptZoomState.initialDistance = null;
+    }
+    if (e.touches.length === 0) {
+      receiptZoomState.isDragging = false;
+      container.classList.remove('is-dragging');
+    }
+  });
+
+  container.addEventListener('touchcancel', () => {
+    receiptZoomState.isDragging = false;
+    receiptZoomState.initialDistance = null;
+    container.classList.remove('is-dragging');
+  });
+}
+
 function viewReceipt(serviceId) {
   const serv = appState.services.find(s => s.id === serviceId);
   if (serv && serv.receipt) {
+    const titleEl = document.getElementById('receiptModalTitle');
+    if (titleEl) titleEl.textContent = serv.title ? `Factura: ${serv.title}` : 'Comprobante de Servicio';
     const container = document.getElementById('receiptContainer');
-    if (serv.receipt.startsWith('data:application/pdf')) {
+    const isPdf = typeof serv.receipt === 'string' && serv.receipt.startsWith('data:application/pdf');
+    if (isPdf) {
       container.innerHTML = `<iframe src="${serv.receipt}" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>`;
     } else {
       container.innerHTML = `<img src="${serv.receipt}" alt="Factura de ${escapeHtml(serv.title)}">`;
+    }
+    if (typeof setupReceiptZoom === 'function') {
+      setupReceiptZoom(!isPdf);
     }
     openModal('modalReceiptViewer');
   }
@@ -5332,11 +5544,17 @@ function viewReceipt(serviceId) {
 function viewFuelReceipt(fuelId) {
   const f = appState.fuels.find(item => item.id === fuelId);
   if (f && f.receipt) {
+    const titleEl = document.getElementById('receiptModalTitle');
+    if (titleEl) titleEl.textContent = 'Comprobante de Combustible';
     const container = document.getElementById('receiptContainer');
-    if (f.receipt.startsWith('data:application/pdf')) {
+    const isPdf = typeof f.receipt === 'string' && f.receipt.startsWith('data:application/pdf');
+    if (isPdf) {
       container.innerHTML = `<iframe src="${f.receipt}" style="width:100%; height:450px; border:none; border-radius:8px;"></iframe>`;
     } else {
       container.innerHTML = `<img src="${f.receipt}" alt="Comprobante de Recarga de Gasolina">`;
+    }
+    if (typeof setupReceiptZoom === 'function') {
+      setupReceiptZoom(!isPdf);
     }
     openModal('modalReceiptViewer');
   }
