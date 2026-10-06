@@ -8324,10 +8324,9 @@ function importBackupXml(e) {
         renderGuantera();
         renderRemindersTab();
         renderReports();
-        renderBackupHistory();
 
-        const vehName = vehicles.length > 0 ? (vehicles[0].name || vehicles[0].model || 'Vehículo') : 'Vehículo';
-        alert(`¡Respaldo XML restaurado con éxito!\n\nSe importaron:\n• ${vehicles.length} vehículo(s) (${vehName})\n• ${services.length} mantenimiento(s)\n• ${fuels.length} recarga(s) de combustible\n• ${documents.length} documento(s)`);
+        alert('¡Copia de seguridad (XML) restaurada con éxito! Todos tus vehículos, registros e información fueron recuperados.');
+        if (e && e.target) e.target.value = '';
       }
     } catch (err) {
       console.error('Error al importar el respaldo XML:', err);
