@@ -8334,7 +8334,7 @@ function importBackupXml(e) {
         renderRemindersTab();
         renderReports();
 
-        alert('¡Copia de seguridad (XML) restaurada con éxito! Todos tus vehículos, registros e información fueron recuperados.');
+        alert('¡Copia de seguridad XML restaurada con éxito!');
         if (e && e.target) e.target.value = '';
       }
     } catch (err) {
@@ -8343,4 +8343,31 @@ function importBackupXml(e) {
     }
   };
   reader.readAsText(file);
+}
+
+/**
+ * Exporta el estado completo de GarageOne a un archivo físico XML descargable.
+ */
+function exportBackupXml() {
+  try {
+    const xmlContent = objectToXML(appState, 'GarageOneBackup');
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const filename = `garageone_respaldo_${year}-${month}-${day}.xml`;
+
+    const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error al exportar respaldo XML:', err);
+    alert('Error al generar el respaldo XML: ' + err.message);
+  }
 }
